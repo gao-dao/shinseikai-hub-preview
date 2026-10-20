@@ -1,0 +1,23 @@
+'use client'
+import {useCallback,useEffect,useRef,useState} from 'react'
+import TurnstileWidget from './turnstile-widget'
+
+export default function Page(){
+  const [token,setToken]=useState(''),[generation,setGeneration]=useState(0),[busy,setBusy]=useState(false),[result,setResult]=useState('')
+  const [siteKey,setSiteKey]=useState('')
+  useEffect(()=>{const controller=new AbortController();void fetch('/local-test/site-key',{cache:'no-store',credentials:'omit',signal:controller.signal}).then(async response=>{if(!response.ok)throw new Error();const data=await response.json();if(typeof data.siteKey==='string')setSiteKey(data.siteKey)}).catch(()=>{if(!controller.signal.aborted)setResult('専用Site Keyを取得できません')});return()=>controller.abort()},[])
+  const inFlight=useRef(false)
+  const receive=useCallback((value:string)=>setToken(value),[])
+  async function submit(){
+    if(inFlight.current||!token)return
+    inFlight.current=true;setBusy(true);setResult('検証中です')
+    const current=token;setToken('')
+    try{
+      const response=await fetch('/api/turnstile-check',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token:current}),credentials:'omit',cache:'no-store',signal:AbortSignal.timeout(8000)})
+      const data=await response.json()
+      setResult(response.status===200&&data?.ok===true&&data.code==='VERIFIED'?'Turnstile検証成功（申込処理はありません）':response.status===429?'この起動での検証上限に達しました':response.status===409?'重複操作は拒否されました':'検証できませんでした。自動再送は行いません')
+    }catch{setResult('通信結果が不明です。同じトークンは再送しません。確認後に認証をやり直してください')}
+    finally{inFlight.current=false;setBusy(false);setGeneration(value=>value+1)}
+  }
+  return <main><h1>localhost専用・実Turnstile検証</h1><p>shinseikai-hub-local-test専用。申込・DB・Redis処理はありません。最大3回、再起動で上限がリセットされます。</p>{siteKey&&<TurnstileWidget siteKey={siteKey} generation={generation} onToken={receive}/>}<button disabled={busy||!token} onClick={()=>void submit()}>Siteverifyで検証する</button><p role="status">{result}</p></main>
+}

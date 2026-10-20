@@ -1,0 +1,8 @@
+import {verifyTurnstile} from '@/lib/security/turnstile'
+// @ts-expect-error The isolated fixture includes this server-only JavaScript module.
+import {createVerificationHandler} from '@/lib/local-real/guard.mjs'
+export const runtime='nodejs'
+export const dynamic='force-dynamic'
+const state=globalThis as typeof globalThis & {localRealHandler?:ReturnType<typeof createVerificationHandler>}
+state.localRealHandler??=createVerificationHandler({port:Number(process.env.LOCAL_REAL_PORT),allowSiteverify:process.env.LOCAL_REAL_ALLOW_SITEVERIFY==='1',verify:verifyTurnstile})
+export async function POST(request:Request){return state.localRealHandler.handle(request)}

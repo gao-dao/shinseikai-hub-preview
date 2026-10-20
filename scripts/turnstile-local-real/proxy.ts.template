@@ -1,0 +1,11 @@
+import {NextResponse,type NextRequest} from 'next/server'
+export function proxy(request:NextRequest){
+  const deny=(status:number)=>new Response(null,{status,headers:{'Cache-Control':'no-store'}})
+  if(request.headers.get('host')!==`localhost:${process.env.LOCAL_REAL_PORT}`)return deny(403)
+  const path=request.nextUrl.pathname
+  if(path==='/api/turnstile-check'){
+    if(request.method!=='POST')return deny(405)
+    if(request.headers.get('origin')!==`http://localhost:${process.env.LOCAL_REAL_PORT}`)return deny(403)
+  }else if(request.method!=='GET'||!(path==='/turnstile-check'||path==='/local-test/status'||path==='/local-test/site-key'||path.startsWith('/_next/static/')))return deny(404)
+  const response=NextResponse.next();response.headers.set('Cache-Control','no-store');return response
+}
