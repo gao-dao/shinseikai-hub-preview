@@ -54,6 +54,130 @@ test('uncertain transport and fresh challenges preserve exactly the same key and
   assert.deepEqual(bodies[0],bodies[1]);assert.equal(calls[0][1].headers['Idempotency-Key'],calls[1][1].headers['Idempotency-Key']);assert.equal(generated(),1)
 })
 
+test('20-second timeout preserves the attempt for manual retry with a fresh token', async () => {
+  let now = 0
+  let nextTimerId = 0
+  const timers = new Map()
+  const scheduledDelays = []
+  const clearedTimers = []
+
+  const timeoutModel = compile(
+    'lib/registrations/public-form.ts',
+    {
+      './proxy-registration': proxy,
+      './public-registration': validation,
+    },
+    {
+      setTimeout(callback, delay) {
+        const id = ++nextTimerId
+        scheduledDelays.push(delay)
+        timers.set(id, { at: now + delay, callback })
+        return id
+      },
+      clearTimeout(id) {
+        clearedTimers.push(id)
+        timers.delete(id)
+      },
+    },
+  )
+
+  function advance(milliseconds) {
+    now += milliseconds
+    const ordered = [...timers.entries()]
+      .sort((a, b) => a[1].at - b[1].at)
+    for (const [id, timer] of ordered) {
+      if (timers.has(id) && timer.at <= now) {
+        timers.delete(id)
+        timer.callback()
+      }
+    }
+  }
+
+  const store = storage()
+  let generatedKeys = 0
+  const instance = new timeoutModel.PublicRegistrationAttempt(
+    store,
+    () => {
+      generatedKeys += 1
+      return key1
+    },
+  )
+  const calls = []
+  const fetcher = async (url, options) => {
+    calls.push({ url, options })
+    if (calls.length === 1) {
+      return new Promise((resolve, reject) => {
+        const abort = () => reject(new Error('Synthetic request aborted'))
+        if (options.signal.aborted) {
+          abort()
+          return
+        }
+        options.signal.addEventListener('abort', abort, { once: true })
+      })
+    }
+    return response()
+  }
+
+  assert.equal(instance.prepare(input), true)
+  const originalPayload = plain(instance.payload)
+  const originalMarker = store.getItem(model.publicAttemptStorageKey)
+  const firstRequest = instance.submit('token-before-timeout', fetcher)
+
+  assert.deepEqual(scheduledDelays, [20_000])
+  assert.equal(calls.length, 1)
+  advance(19_999)
+  assert.equal(calls[0].options.signal.aborted, false)
+
+  advance(1)
+  assert.equal(calls[0].options.signal.aborted, true)
+  const firstResult = await firstRequest
+
+  assert.equal(firstResult.kind, 'unknown')
+  assert.equal(instance.phase, 'pending')
+  assert.deepEqual(plain(instance.payload), originalPayload)
+  assert.equal(store.getItem(model.publicAttemptStorageKey), originalMarker)
+  assert.equal(generatedKeys, 1)
+  assert.equal(timers.size, 0)
+  assert.deepEqual(clearedTimers, [1])
+
+  // 時間を進めても自動再送されない。
+  advance(60_000)
+  await Promise.resolve()
+  assert.equal(calls.length, 1)
+  assert.equal(generatedKeys, 1)
+
+  // 結果不明の間は、別の入力で申込内容を置き換えない。
+  assert.equal(instance.prepare({ ...input, notes: 'Changed notes' }), true)
+  assert.deepEqual(plain(instance.payload), originalPayload)
+
+  // 新しいトークンを渡して、明示的に手動再送する。
+  const retryResult = await instance.submit('token-after-timeout', fetcher)
+  assert.equal(retryResult.kind, 'success')
+  assert.equal(calls.length, 2)
+  assert.equal(generatedKeys, 1)
+
+  const firstBody = JSON.parse(calls[0].options.body)
+  const retryBody = JSON.parse(calls[1].options.body)
+  assert.equal(firstBody.turnstile_token, 'token-before-timeout')
+  assert.equal(retryBody.turnstile_token, 'token-after-timeout')
+  delete firstBody.turnstile_token
+  delete retryBody.turnstile_token
+  assert.deepEqual(retryBody, firstBody)
+  for (const call of calls) {
+    assert.equal(call.url, '/api/registrations')
+    assert.equal(call.options.headers['Idempotency-Key'], key1)
+  }
+
+  assert.deepEqual(scheduledDelays, [20_000, 20_000])
+  assert.deepEqual(clearedTimers, [1, 2])
+  assert.equal(timers.size, 0)
+
+  // 成功後に解除済みタイマーが発火しないことも確認する。
+  advance(60_000)
+  assert.equal(calls[1].options.signal.aborted, false)
+  assert.equal(calls.length, 2)
+})
+
 test('same-tick double submissions send once and never auto-retry',async()=>{
   const {instance}=attempt();instance.prepare(input)
   let release,calls=0
