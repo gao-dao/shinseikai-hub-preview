@@ -55,6 +55,14 @@ export class PublicRegistrationAttempt {
         body: JSON.stringify({ ...this.payload, turnstile_token: token }),
         credentials: 'omit', cache: 'no-store', signal: controller.signal,
       })
+      // Firewall responses may be HTML or empty. Never parse or display their body.
+      // A previous attempt may already have committed: preserve the original intent.
+      if (response.status === 429) {
+        const retry = response.headers.get('Retry-After')
+        const seconds = retry && /^[1-9][0-9]{0,4}$/.test(retry) ? Number(retry) : undefined
+        return { kind: 'rejected', message: '申込操作が集中しています。時間をおいて同じ申込内容・同じ申込キーで再確認してください。',
+          ...(seconds ? { retryAfterSeconds: seconds } : {}) }
+      }
       const data: unknown = await response.json()
       if (!data || typeof data !== 'object' || Array.isArray(data)) return unknownResult
       const row = data as Record<string, unknown>

@@ -3,8 +3,6 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
-import * as net from 'node:net'
-import * as crypto from 'node:crypto'
 
 function compile(path, dependencies = {}, globals = {}) {
   const exports = {}
@@ -25,7 +23,7 @@ const secret = 'SYNTHETIC_SECRET_NO_REAL_CREDENTIALS'
 const valid = { event_group_id: 5, name: ' Synthetic attendee ', contact: ' synthetic.contact.invalid ', notes: ' Synthetic memo ', schedule_ids: [12,11], turnstile_token: 'synthetic-token' }
 const registered = { success: true, code: 'REGISTERED', http_status: 201 }
 const plain = value => JSON.parse(JSON.stringify(value))
-function setup({ configuration = { REGISTRATION_ALLOWED_ORIGINS: origin }, ipResult = { ok: true, ip: '192.0.2.25' }, limitResult = { ok: true }, turnstileResult = { ok: true }, rpcData = registered, rpcError = null, rpcThrows = false, stageThrows, realIp = false, realLimit = false, realTurnstile = false } = {}) {
+function setup({ configuration = { REGISTRATION_ALLOWED_ORIGINS: origin }, turnstileResult = { ok: true }, rpcData = registered, rpcError = null, rpcThrows = false, stageThrows, realTurnstile = false } = {}) {
   const calls = [], rpcCalls = [], clients = [], logs = [], outbound = []
   const globals = {
     process: { env: { ...configuration } }, URL, AbortController, setTimeout, clearTimeout,
@@ -39,14 +37,10 @@ function setup({ configuration = { REGISTRATION_ALLOWED_ORIGINS: origin }, ipRes
       return { rpc: async (...args) => { calls.push('rpc'); rpcCalls.push(args); if (rpcThrows) throw new Error(secret); return { data: rpcData, error: rpcError } } }
     } },
   }, { ...globals, process: { env: { NEXT_PUBLIC_SUPABASE_URL: 'http://mock.invalid', SUPABASE_SECRET_KEY: secret } } })
-  const ipModule = realIp ? compile('lib/security/registration-client-ip.ts', { 'server-only':{}, 'node:net':net }, globals) : null
-  const limitModule = realLimit ? compile('lib/security/registration-rate-limit.ts', { 'server-only':{},'node:crypto':crypto,'node:net':net }, globals) : null
   const turnstileModule = realTurnstile ? compile('lib/security/turnstile.ts', { 'server-only':{} }, globals) : null
   const route = compile('app/api/registrations/route.ts', {
     'next/server': { NextResponse: { json: (body,options) => Response.json(body,options) } },
     '@/lib/registrations/public-registration': { ...validation, validatePublicRegistration: (...args) => { calls.push('validate'); return validation.validatePublicRegistration(...args) } },
-    '@/lib/security/registration-client-ip': { getRegistrationClientIp: headers => { calls.push('ip'); if(stageThrows==='ip') throw new Error(secret); return ipModule ? ipModule.getRegistrationClientIp(headers) : ipResult } },
-    '@/lib/security/registration-rate-limit': { checkRegistrationRateLimit: async ip => { calls.push('limit'); assert.equal(ip,'192.0.2.25'); if(stageThrows==='limit') throw new Error(secret); return limitModule ? limitModule.checkRegistrationRateLimit(ip) : limitResult } },
     '@/lib/security/turnstile': { verifyTurnstile: async token => { calls.push('turnstile'); assert.equal(typeof token,'string'); if(stageThrows==='turnstile') throw new Error(secret); return turnstileModule ? turnstileModule.verifyTurnstile(token) : turnstileResult } },
     '@/lib/supabase/registration-service': { submitPublicRegistration: async (...args) => { calls.push(['service',...args]); return service.submitPublicRegistration(...args) } },
   }, globals)
@@ -70,7 +64,7 @@ test('public POST orders security stages and invokes one server-only RPC with no
   const context=setup(),result=await context.post(valid,{headers:{Cookie:'secret-cookie',Authorization:'Bearer user-token'}})
   assert.equal(result.status,201)
   assert.equal(result.body.code,'REGISTERED')
-  assert.deepEqual(context.calls.map(c=>Array.isArray(c)?c[0]:c),['ip','limit','validate','turnstile','service','rpc'])
+  assert.deepEqual(context.calls.map(c=>Array.isArray(c)?c[0]:c),['validate','turnstile','service','rpc'])
   assert.deepEqual(plain(context.rpcCalls),[['submit_registration_idempotent',{p_idempotency_key:key.toLowerCase(),p_event_group_id:5,p_name:'Synthetic attendee',p_contact:'synthetic.contact.invalid',p_notes:'Synthetic memo',p_schedule_ids:[11,12]}]])
   const serviceCall=context.calls.find(c=>Array.isArray(c))
   assert.equal(serviceCall.length,3)
@@ -183,20 +177,12 @@ test('invalid registration, unknown fields, challenge and key stop before Turnst
   }
 })
 
-test('IP failure prevents Redis, challenge verification and RPC',async()=>{
-  const context=setup({ipResult:{ok:false,code:'REGISTRATION_IP_UNAVAILABLE',message:'確認できません'}})
-  assert.equal((await context.post()).status,503)
-  assert.deepEqual(context.calls,['ip']);noRpc(context)
-})
-
-test('Redis excess returns 429 and Retry-After; Redis errors fail closed',async()=>{
-  for(const code of ['RATE_LIMIT_EXCEEDED','RATE_LIMIT_UNAVAILABLE','RATE_LIMIT_TIMEOUT','RATE_LIMIT_CONFIG_ERROR']) {
-    const context=setup({limitResult:{ok:false,code,message:'確認できません',retryAfterSeconds:60}})
-    const result=await context.post()
-    assert.equal(result.status,code==='RATE_LIMIT_EXCEEDED'?429:503)
-    assert.equal(result.headers.get('Retry-After'),code==='RATE_LIMIT_EXCEEDED'?'60':null)
-    assert.deepEqual(context.calls,['ip','limit']);noRpc(context)
-  }
+test('POST does not depend on IP headers, Vercel IP guards or Redis configuration',async()=>{
+  const context=setup({configuration:{REGISTRATION_ALLOWED_ORIGINS:origin,NODE_ENV:'development',REGISTRATION_IP_TRUST_MODE:'invalid',UPSTASH_REDIS_REST_URL:'invalid'}})
+  assert.equal((await context.post(valid,{headers:{'x-real-ip':null}})).status,201)
+  assert.deepEqual(context.outbound,[])
+  assert.equal(context.rpcCalls.length,1)
+  assert.equal(context.calls.filter(c=>c==='turnstile').length,1)
 })
 
 test('Turnstile rejection and configuration/network/timeout failures never call RPC',async()=>{
@@ -218,18 +204,16 @@ test('invalid RPC responses and transport failures stay safe with exactly one at
 })
 
 test('unexpected security dependency exceptions fail safely without calling RPC',async()=>{
-  for(const stageThrows of ['ip','limit','turnstile']) {
+  for(const stageThrows of ['turnstile']) {
     const context=setup({stageThrows})
     assert.equal((await context.post()).status,503)
     noRpc(context)
   }
 })
 
-test('real security modules reject missing configuration or local execution without any external access',async()=>{
+test('Origin and real Turnstile reject missing configuration without any external access',async()=>{
   const scenarios=[
-    {configuration:{},realIp:true,realLimit:true,realTurnstile:true},
-    {configuration:{REGISTRATION_ALLOWED_ORIGINS:origin,NODE_ENV:'development'},realIp:true},
-    {configuration:{REGISTRATION_ALLOWED_ORIGINS:origin},realLimit:true},
+    {configuration:{},realTurnstile:true},
     {configuration:{REGISTRATION_ALLOWED_ORIGINS:origin},realTurnstile:true},
   ]
   for(const scenario of scenarios) {

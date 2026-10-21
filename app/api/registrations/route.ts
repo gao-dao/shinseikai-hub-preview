@@ -1,7 +1,5 @@
 import { NextResponse } from 'next/server'
 import { validatePublicRegistration, type PublicRegistrationResponse } from '@/lib/registrations/public-registration'
-import { getRegistrationClientIp } from '@/lib/security/registration-client-ip'
-import { checkRegistrationRateLimit } from '@/lib/security/registration-rate-limit'
 import { verifyTurnstile } from '@/lib/security/turnstile'
 import { submitPublicRegistration } from '@/lib/supabase/registration-service'
 
@@ -71,13 +69,7 @@ export async function POST(request: Request) {
     const raw = await readBody(request)
     if ('status' in raw) return fail(raw.status === 413 ? 'BODY_TOO_LARGE' : 'INVALID_REQUEST', raw.status, raw.status === 413 ? '送信内容が大きすぎます' : '送信内容を確認してください')
 
-    const ip = getRegistrationClientIp(request.headers)
-    if (!ip.ok) return fail(ip.code, 503, ip.message)
-    const limit = await checkRegistrationRateLimit(ip.ip)
-    if (!limit.ok) {
-      if (limit.code === 'RATE_LIMIT_EXCEEDED') return fail(limit.code, 429, limit.message, limit.retryAfterSeconds)
-      return fail(limit.code, 503, limit.message)
-    }
+    // Request rate limiting is enforced by the deployment's Vercel Firewall.
 
     let body: unknown
     try { body = JSON.parse(raw.text) } catch { return fail('INVALID_JSON', 400, 'JSON形式が不正です') }

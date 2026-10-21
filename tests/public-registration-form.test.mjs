@@ -243,3 +243,33 @@ test('form validation rejects oversized participant details without confirmation
   assert.ok(context.render().some(item=>item.props?.role==='alert'))
   assert.equal(context.calls.some(call=>call[1]?.method==='POST'),false)
 })
+
+
+for (const body of ['html', 'empty', 'json']) test(`Firewall 429 ${body} bypasses JSON parsing and keeps the original attempt`, async()=>{
+  const {instance,generated}=attempt();instance.prepare(input)
+  const calls=[]
+  const contents={html:'<html>UNTRUSTED_SECRET</html>',empty:'',json:JSON.stringify({success:false,code:'RATE_LIMIT_EXCEEDED'})}
+  const blocked=new Response(contents[body],{status:429,headers:{'Retry-After':'60','Content-Type':body==='json'?'application/json':'text/html'}})
+  blocked.json=async()=>{throw new Error('must-not-parse-firewall-body')}
+  const first=await instance.submit('token-one',async(...args)=>{calls.push(args);return blocked})
+  assert.equal(first.kind,'rejected');assert.equal(first.retryAfterSeconds,60)
+  assert.match(first.message,/同じ申込内容・同じ申込キー/)
+  assert.doesNotMatch(first.message,/未登録|登録されていません/)
+  assert.equal(calls.length,1);assert.equal(instance.phase,'pending');assert.equal(instance.startNew(),false)
+  instance.prepare({...input,name:'Changed'})
+  await instance.submit('token-two',async(...args)=>{calls.push(args);return response()})
+  assert.equal(generated(),1);assert.equal(calls.length,2)
+  assert.equal(calls[0][1].headers['Idempotency-Key'],calls[1][1].headers['Idempotency-Key'])
+  const bodies=calls.map(c=>JSON.parse(c[1].body))
+  assert.equal(bodies[0].turnstile_token,'token-one');assert.equal(bodies[1].turnstile_token,'token-two')
+  for(const item of bodies)delete item.turnstile_token
+  assert.deepEqual(bodies[0],bodies[1])
+})
+
+for(const value of [null,'','0','-1','1.5','NaN','100000',' 60','60 ','Wed, 21 Oct 2030 00:00:00 GMT','<script>secret</script>'])test('Firewall invalid or missing Retry-After is ignored safely',async()=>{
+  const {instance}=attempt();instance.prepare(input)
+  // Header implementations may normalize whitespace: override get to test raw input.
+  const result=await instance.submit('token',async()=>({status:429,headers:{get:()=>value},json:()=>{throw new Error('must-not-parse')}}))
+  assert.equal(result.kind,'rejected');assert.equal(result.retryAfterSeconds,undefined)
+  assert.doesNotMatch(JSON.stringify(result),/script|Wed|secret/)
+})
