@@ -102,3 +102,14 @@ export async function POST(request: Request) {
     return fail('REGISTRATION_RESULT_UNKNOWN', 503, '申込結果を確認できませんでした。新しい申込キーで再送せず、同じ申込内容で結果を確認してください')
   }
 }
+
+// TEMPORARY preview-only diagnostics. Remove this GET and its helper together.
+export async function GET(request: Request) {
+  try {
+    const { logPreviewRegistrationDiagnostics } = await import('@/lib/security/registration-diagnostics')
+    logPreviewRegistrationDiagnostics(request.headers)
+  } catch {
+    // Never expose unexpected exceptions or configuration through this endpoint.
+  }
+  return new Response(null, { status: 405, headers: { 'Cache-Control': 'no-store', Allow: 'POST' } })
+}
