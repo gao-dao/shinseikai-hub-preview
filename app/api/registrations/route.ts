@@ -94,27 +94,3 @@ export async function POST(request: Request) {
     return fail('REGISTRATION_RESULT_UNKNOWN', 503, '申込結果を確認できませんでした。新しい申込キーで再送せず、同じ申込内容で結果を確認してください')
   }
 }
-
-// TEMPORARY preview-only diagnostics. Remove this GET and its helper together.
-export async function GET(request: Request) {
-  const response = (stage?: 'guard-rejected' | 'completed' | 'import-failed' | 'collection-failed') => new Response(null, { status: 405, headers: {
-    'Cache-Control': 'no-store', Allow: 'POST', ...(stage ? { 'X-Registration-Diagnostic-Stage': stage } : {}),
-  } })
-  // Check before dynamic import so import failures can be classified safely.
-  // Keep this predicate aligned with diagnosticsProjectMatches in the helper.
-  const actual = process.env.VERCEL_PROJECT_ID
-  const expected = process.env.REGISTRATION_DIAGNOSTICS_EXPECTED_PROJECT_ID
-  if (typeof actual !== 'string' || actual.trim().length === 0 ||
-      typeof expected !== 'string' || expected.trim().length === 0 || actual !== expected) return response()
-  let classification = 'IMPORT_FAILED'
-  try {
-    const { logPreviewRegistrationDiagnostics } = await import('@/lib/security/registration-diagnostics')
-    classification = 'COLLECTION_FAILED'
-    const stage = logPreviewRegistrationDiagnostics(request.headers)
-    return response(stage)
-  } catch {
-    // Fixed classifications only; no exceptions, configuration or request values.
-    try { console.info(JSON.stringify({ event: 'REGISTRATION_PREVIEW_DIAGNOSTIC_FAILURE', classification })) } catch { /* logging must not alter the response */ }
-    return response(classification === 'IMPORT_FAILED' ? 'import-failed' : 'collection-failed')
-  }
-}
