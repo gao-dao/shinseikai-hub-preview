@@ -86,7 +86,7 @@ export function collectPreviewRegistrationDiagnostics(env: Environment, headers:
   }
 }
 
-export function logPreviewRegistrationDiagnostics(headers: Pick<Headers, 'get'>): void {
+export function logPreviewRegistrationDiagnostics(headers: Pick<Headers, 'get'>): 'guard-rejected' | 'completed' | undefined {
   if (!diagnosticsProjectMatches(process.env)) return
   const guards = collectPreviewDiagnosticGuards(process.env)
   const enabled = previewDiagnosticsEnabled(process.env)
@@ -95,6 +95,7 @@ export function logPreviewRegistrationDiagnostics(headers: Pick<Headers, 'get'>)
     classification: enabled ? 'GUARDS_PASSED' : 'GUARD_REJECTED',
     ...guards,
   }))
-  if (!enabled) return
+  if (!enabled) return 'guard-rejected'
   console.info(JSON.stringify(collectPreviewRegistrationDiagnostics(process.env, headers)))
+  return 'completed'
 }

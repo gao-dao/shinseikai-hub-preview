@@ -46,6 +46,7 @@ const headers = value => new Headers(value === null ? {} : { 'x-real-ip': value 
 test('enabled GET emits guard and fixed-schema records, no services, always 405/no-store', async () => {
   const s = setup(); const response = await s.route.GET(new Request(`https://${host}/api/registrations`, { headers: headers(ip) }))
   assert.equal(response.status, 405); assert.equal(response.headers.get('Cache-Control'), 'no-store'); assert.equal(response.headers.get('Allow'), 'POST'); assert.equal(await response.text(), '')
+  assert.equal(response.headers.get('X-Registration-Diagnostic-Stage'), 'completed');
   assert.equal(s.logs.length, 2); assert.equal(s.logs[0].classification, 'GUARDS_PASSED'); assert.deepEqual(s.calls, [])
   assert.equal(s.logs[1].event, 'REGISTRATION_PREVIEW_DIAGNOSTICS')
   for (const [key, value] of Object.entries(s.logs[1])) if (key !== 'event') assert.equal(typeof value, 'boolean')
@@ -63,7 +64,7 @@ for (const [key, value] of [
   const s = setup({ ...configuration, [key]: value })
   const request = new Request(`https://${host}/api/registrations`, { headers: { 'x-real-ip': ip, 'REGISTRATION_DIAGNOSTICS_ENABLED': 'true', 'x-vercel-project-production-url': host } })
   const response = await s.route.GET(request)
-  assert.equal(response.status, 405); assert.equal(await response.text(), ''); assert.equal(response.headers.get('Cache-Control'), 'no-store'); assert.equal(s.logs.length, 1); assert.equal(s.logs[0].classification, 'GUARD_REJECTED'); assert.deepEqual(s.calls, [])
+  assert.equal(response.status, 405); assert.equal(await response.text(), ''); assert.equal(response.headers.get('Cache-Control'), 'no-store'); assert.equal(response.headers.get('X-Registration-Diagnostic-Stage'), 'guard-rejected'); assert.equal(s.logs.length, 1); assert.equal(s.logs[0].classification, 'GUARD_REJECTED'); assert.deepEqual(s.calls, [])
 })
 
 test('preview deployment environment is permitted only with all other guards', () => {
@@ -120,13 +121,14 @@ for (const [actual, expected] of [
   s.helper.logPreviewRegistrationDiagnostics({ get: () => { throw new Error('must-not-read') } })
   const r = await s.route.GET(new Request(`https://${host}/api/registrations`, { headers: { VERCEL_PROJECT_ID: 'prj_synthetic_preview', REGISTRATION_DIAGNOSTICS_EXPECTED_PROJECT_ID: 'prj_synthetic_preview' } }))
   assert.equal(r.status, 405); assert.equal(await r.text(), ''); assert.equal(r.headers.get('Cache-Control'), 'no-store')
-  assert.deepEqual(s.logs, []); assert.deepEqual(s.calls, [])
+  assert.equal(r.headers.get('X-Registration-Diagnostic-Stage'), null); assert.deepEqual(s.logs, []); assert.deepEqual(s.calls, [])
 })
 
 for (const kind of ['importFails', 'collectionFails']) test(`exception fixed classification only: ${kind}`, async () => {
   const s = setup(configuration, { [kind]: true })
   const r = await s.route.GET(new Request(`https://${host}/api/registrations`))
   assert.equal(r.status, 405); assert.equal(await r.text(), ''); assert.equal(r.headers.get('Cache-Control'), 'no-store')
+  assert.equal(r.headers.get('X-Registration-Diagnostic-Stage'), kind === 'importFails' ? 'import-failed' : 'collection-failed')
   assert.deepEqual(s.logs, [{ event: 'REGISTRATION_PREVIEW_DIAGNOSTIC_FAILURE', classification: kind === 'importFails' ? 'IMPORT_FAILED' : 'COLLECTION_FAILED' }])
   assert.ok(!JSON.stringify(s.logs).includes('synthetic-sensitive-error')); assert.deepEqual(s.calls, [])
 })
@@ -145,7 +147,33 @@ test('unexpected detailed collection failure is reported safely after guard reco
   const env = { ...configuration }
   Object.defineProperty(env, 'UPSTASH_REDIS_REST_TOKEN', { get: () => { throw new Error('synthetic-sensitive-error') } })
   const s = setup(env); const r = await s.route.GET(new Request(`https://${host}/api/registrations`))
-  assert.equal(r.status, 405); assert.equal(s.logs.length, 2)
+  assert.equal(r.status, 405); assert.equal(r.headers.get('X-Registration-Diagnostic-Stage'), 'collection-failed'); assert.equal(s.logs.length, 2)
   assert.equal(s.logs[0].classification, 'GUARDS_PASSED'); assert.equal(s.logs[1].classification, 'COLLECTION_FAILED')
   assert.ok(!JSON.stringify(s.logs).includes('synthetic-sensitive-error')); assert.deepEqual(s.calls, [])
+})
+
+
+test('headers and body contain only fixed classifications and no sensitive values', async () => {
+  for (const options of [{}, { importFails: true }, { collectionFails: true }]) {
+    const s = setup(configuration, options)
+    const r = await s.route.GET(new Request(`https://${host}/api/registrations?secret=synthetic-sensitive-error`, {
+      headers: { 'x-real-ip': ip, Authorization: 'synthetic-sensitive-error', 'X-Registration-Diagnostic-Stage': 'attacker-value' },
+    }))
+    assert.equal(r.status, 405); assert.equal(await r.text(), '')
+    assert.deepEqual([...r.headers.keys()].sort(), ['allow', 'cache-control', 'x-registration-diagnostic-stage'])
+    const serialized = JSON.stringify({ headers: [...r.headers], logs: s.logs })
+    for (const value of [ip, host, configuration.VERCEL_PROJECT_ID, configuration.UPSTASH_REDIS_REST_TOKEN,
+      configuration.REGISTRATION_RATE_LIMIT_HMAC_SECRET, configuration.UPSTASH_REDIS_REST_URL, 'synthetic-sensitive-error', 'attacker-value']) {
+      assert.ok(!serialized.includes(value))
+    }
+    assert.deepEqual(s.calls, [])
+  }
+})
+
+test('completed means collection finished even if configuration or IP checks fail', async () => {
+  const s = setup({ ...configuration, REGISTRATION_ALLOWED_ORIGINS: undefined })
+  const r = await s.route.GET(new Request(`https://${host}/api/registrations`))
+  assert.equal(r.headers.get('X-Registration-Diagnostic-Stage'), 'completed')
+  assert.equal(s.logs[1].origin_config_valid, false); assert.equal(s.logs[1].real_ip_valid, false)
+  assert.deepEqual(s.calls, [])
 })

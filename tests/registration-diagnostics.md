@@ -36,3 +36,18 @@ GET https://shinseikai-hub-preview.vercel.app/api/registrations を一度だけ�
 
 診断フラグだけを無効にしてもProject ID一致時のガードログは残る。完全停止にはREGISTRATION_DIAGNOSTICS_EXPECTED_PROJECT_IDを検証用から削除して再反映する。
 その後、route.ts末尾の一時GET全体、lib/security/registration-diagnostics.ts、tests/registration-diagnostics.test.mjs、本手順書を削除。診断フラグも削除し、テスト・型・Lint後に承認を受け検証用へ反映する。既存POST・共有セキュリティモジュールは変更しない。既存ログの保存期間は運用側で確認する。
+
+
+## HTTP段階ヘッダー（今回追加）
+
+Project ID一致後だけX-Registration-Diagnostic-Stageを返す。
+
+| 固定値 | 意味 |
+| --- | --- |
+| guard-rejected | 既存ガード不一致。限定ガードログのみ |
+| completed | 詳細診断の収集・ログ呼出しが終了。全検査成功や申込成功を意味しない |
+| import-failed | 診断ヘルパーの読込失敗 |
+| collection-failed | 読込後の診断・ログ処理で例外 |
+
+Project ID欠落・不一致ではヘッダーなし。常に405・本文なし・no-storeを維持。応答にID・IP・設定値・ハッシュ・トークンを出さない。ヘッダーやクエリで分類を指定できない。
+次の承認後に検証用へ反映し、GETを1回だけ行い、ブラウザNetworkのResponse Headersで固定値だけ確認する。POSTや外部サービスへの接続は行わない。ヘッダーなしはID不一致や未到達等を区別できず、405だけで原因確定しない。削除時は既存の一時GET全体を削除すればヘッダー処理も撤去される。

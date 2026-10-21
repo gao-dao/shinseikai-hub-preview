@@ -105,7 +105,9 @@ export async function POST(request: Request) {
 
 // TEMPORARY preview-only diagnostics. Remove this GET and its helper together.
 export async function GET(request: Request) {
-  const response = () => new Response(null, { status: 405, headers: { 'Cache-Control': 'no-store', Allow: 'POST' } })
+  const response = (stage?: 'guard-rejected' | 'completed' | 'import-failed' | 'collection-failed') => new Response(null, { status: 405, headers: {
+    'Cache-Control': 'no-store', Allow: 'POST', ...(stage ? { 'X-Registration-Diagnostic-Stage': stage } : {}),
+  } })
   // Check before dynamic import so import failures can be classified safely.
   // Keep this predicate aligned with diagnosticsProjectMatches in the helper.
   const actual = process.env.VERCEL_PROJECT_ID
@@ -116,10 +118,11 @@ export async function GET(request: Request) {
   try {
     const { logPreviewRegistrationDiagnostics } = await import('@/lib/security/registration-diagnostics')
     classification = 'COLLECTION_FAILED'
-    logPreviewRegistrationDiagnostics(request.headers)
+    const stage = logPreviewRegistrationDiagnostics(request.headers)
+    return response(stage)
   } catch {
     // Fixed classifications only; no exceptions, configuration or request values.
     try { console.info(JSON.stringify({ event: 'REGISTRATION_PREVIEW_DIAGNOSTIC_FAILURE', classification })) } catch { /* logging must not alter the response */ }
+    return response(classification === 'IMPORT_FAILED' ? 'import-failed' : 'collection-failed')
   }
-  return response()
 }
