@@ -6,6 +6,33 @@ const previewHost = 'shinseikai-hub-preview.vercel.app'
 const previewOrigin = `https://${previewHost}`
 type Environment = Record<string, string | undefined>
 
+// Missing IDs never compare equal; values are neither normalized nor logged.
+export function diagnosticsProjectMatches(env: Environment): boolean {
+  const actual = env.VERCEL_PROJECT_ID
+  const expected = env.REGISTRATION_DIAGNOSTICS_EXPECTED_PROJECT_ID
+  return typeof actual === 'string' && actual.trim().length > 0 &&
+    typeof expected === 'string' && expected.trim().length > 0 && actual === expected
+}
+
+export function collectPreviewDiagnosticGuards(env: Environment) {
+  return {
+    diagnostics_flag_present: !!env.REGISTRATION_DIAGNOSTICS_ENABLED,
+    diagnostics_flag_matches: env.REGISTRATION_DIAGNOSTICS_ENABLED === 'true',
+    vercel_present: !!env.VERCEL,
+    vercel_matches: env.VERCEL === '1',
+    node_env_present: !!env.NODE_ENV,
+    node_env_matches: env.NODE_ENV === 'production',
+    vercel_env_present: !!env.VERCEL_ENV,
+    vercel_env_matches: ['production', 'preview'].includes(env.VERCEL_ENV ?? ''),
+    repo_owner_present: !!env.VERCEL_GIT_REPO_OWNER,
+    repo_owner_matches: env.VERCEL_GIT_REPO_OWNER === 'gao-dao',
+    repo_slug_present: !!env.VERCEL_GIT_REPO_SLUG,
+    repo_slug_matches: env.VERCEL_GIT_REPO_SLUG === 'shinseikai-hub-preview',
+    production_url_present: !!env.VERCEL_PROJECT_PRODUCTION_URL,
+    production_url_matches: env.VERCEL_PROJECT_PRODUCTION_URL === previewHost,
+  }
+}
+
 export function previewDiagnosticsEnabled(env: Environment): boolean {
   return env.REGISTRATION_DIAGNOSTICS_ENABLED === 'true' &&
     env.VERCEL === '1' && env.NODE_ENV === 'production' &&
@@ -60,6 +87,14 @@ export function collectPreviewRegistrationDiagnostics(env: Environment, headers:
 }
 
 export function logPreviewRegistrationDiagnostics(headers: Pick<Headers, 'get'>): void {
-  if (!previewDiagnosticsEnabled(process.env)) return
+  if (!diagnosticsProjectMatches(process.env)) return
+  const guards = collectPreviewDiagnosticGuards(process.env)
+  const enabled = previewDiagnosticsEnabled(process.env)
+  console.info(JSON.stringify({
+    event: 'REGISTRATION_PREVIEW_DIAGNOSTIC_GUARDS',
+    classification: enabled ? 'GUARDS_PASSED' : 'GUARD_REJECTED',
+    ...guards,
+  }))
+  if (!enabled) return
   console.info(JSON.stringify(collectPreviewRegistrationDiagnostics(process.env, headers)))
 }

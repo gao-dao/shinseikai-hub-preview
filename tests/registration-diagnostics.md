@@ -1,34 +1,38 @@
-# 一時的な検証用申込診断
+# 一時的な検証用申込診断（二段階）
 
-ローカル実装のみ。設定変更・デプロイ・実通信は未実施。
+ローカル実装・モックテストのみ。実Project IDはコード／ログ／本書に記載しない。
 
-## 有効化条件
+## 第1段階：Project IDの照合
 
-すべてサーバー環境で完全一致が必要。リクエストから変更できない。
+Vercel提供のVERCEL_PROJECT_IDと、独自サーバー変数REGISTRATION_DIAGNOSTICS_EXPECTED_PROJECT_IDの両方が空白だけでない非空文字列で、完全一致することが必須。期待値には検証用VercelのSettings → Generalでユーザーが確認したProject IDを登録する。今回設定は行わない。NEXT_PUBLIC_は付けず、実行側VERCEL_PROJECT_IDを独自設定で偽装しない。
+欠落・不一致はログなしで405。動的import前にGETで判定し、専用ヘルパーも再確認する。IDだけで環境分離全体を保証するものではなく、期待値は検証用プロジェクトにだけ設定する。
 
-- REGISTRATION_DIAGNOSTICS_ENABLED=true
-- VERCEL=1、NODE_ENV=production
-- VERCEL_ENV=production または preview
-- VERCEL_GIT_REPO_OWNER=gao-dao
-- VERCEL_GIT_REPO_SLUG=shinseikai-hub-preview
-- VERCEL_PROJECT_PRODUCTION_URL=shinseikai-hub-preview.vercel.app
+## 第2段階：既存ガードと詳細診断
 
-システム変数の欠落時も無効。実デプロイで提供されるかは未確認。診断GETは有効・無効とも405、Allow: POST、Cache-Control: no-store、本文なし。無効時はログなし。既存POSTは変更しない。
+Project ID一致後、REGISTRATION_PREVIEW_DIAGNOSTIC_GUARDSを1件出力。次の7条件について存在・期待値一致を真偽値で記録する。
 
-## 次の承認後の手順
+- REGISTRATION_DIAGNOSTICS_ENABLED=true（diagnostics_flag_*）
+- VERCEL=1（vercel_*）
+- NODE_ENV=production（node_env_*）
+- VERCEL_ENV=productionまたはpreview（vercel_env_*）
+- VERCEL_GIT_REPO_OWNER=gao-dao（repo_owner_*）
+- VERCEL_GIT_REPO_SLUG=shinseikai-hub-preview（repo_slug_*）
+- VERCEL_PROJECT_PRODUCTION_URL=shinseikai-hub-preview.vercel.app（production_url_*）
 
-1. previewのGit remoteとVercelプロジェクト、システム変数の提供設定を確認。元リポジトリは操作しない。
-2. previewにだけコードを反映し、診断フラグを適用対象の環境に設定して再デプロイする。今回は実施しない。
-3. https://shinseikai-hub-preview.vercel.app/api/registrations をGETで一度開く。405は正常。申込POSTを送らない。
-4. 検証用FunctionログのREGISTRATION_PREVIEW_DIAGNOSTICSを見る。出力は固定イベント名と真偽値のみ。
-5. ログがなければガード変数・フラグ・デプロイ反映を確認する。条件を緩めない。
+分類はGUARD_REJECTED／GUARDS_PASSED。診断フラグが不一致でもID一致なら限定されたガードログは出る。全条件一致した場合だけ既存のREGISTRATION_PREVIEW_DIAGNOSTICSを出力する。Origin形式と既知の検証Origin許可、IPモード・実行環境、x-real-ipの存在と形式、Redis URL・トークン・HMAC・namespace・制限値の形式を記録する。
+例外はREGISTRATION_PREVIEW_DIAGNOSTIC_FAILUREとIMPORT_FAILED／COLLECTION_FAILEDのみ。IP取得例外は既存どおりreal_ip_readable=false等に分類する。例外原文は出さない。
 
-## 診断範囲
+## 応答・安全条件
 
-Origin形式と既知の検証Origin許可、IPモード・実行環境条件、x-real-ipの存在と形式、Redis URL・トークン・HMAC・namespace・制限値の形式。Redis通信、Turnstile検証、DB・RPC呼出し、本文読み取りは行わない。値・ハッシュ・長さ・IP・ヘッダー全文・例外原文はログにしない。
+GETは有効・無効・例外とも405、本文なし、Cache-Control: no-store、Allow: POST。POST本文は変更しない。ヘッダー・クエリで有効化条件を上書きできない。Redis通信、Turnstile検証、DB・RPC、登録処理、本文読み取りを行わない。Project IDの値・ハッシュ、設定値・長さ・ハッシュ、IP、トークン、個人情報、ヘッダー全文をログにしない。
 
-GETで確認した現在の状態であり過去POSTの証拠ではない。秘密値の真偽や実接続を保証しない。origin/redisの検証は本番関数を変更しないため専用コードで再現。将来の本体変更時は一致を再確認する。公開GETの連打はログ・Function費用を発生させ得るため短期間だけ有効化する。
+## 次の承認後の確認
+
+previewのremote・Vercelプロジェクト・対象commitを確認後、期待IDを検証用の適切な環境に設定し再デプロイする。今回はcommit/push/デプロイ/環境変数変更しない。
+GET https://shinseikai-hub-preview.vercel.app/api/registrations を一度だけ実行し、同デプロイのInfoログを見る。405は正常。申込POSTは送らない。
+ログなしならProject IDの欠落／不一致、GET未到達、またはログ収集側の問題が残る。ID照合を解除しない。GETの現在状態であり過去POSTの証拠ではない。公開GET連打によるログ・Function費用に注意し短期間に限定する。
 
 ## 削除
 
-診断フラグを削除／無効化して検証用へ再反映。その後route.ts末尾の一時GET全体と、lib/security/registration-diagnostics.ts、tests/registration-diagnostics.test.mjs、本手順書だけを削除。既存POST・IP・Redis・Turnstileのコードは変更しない。GETはフレームワーク既定の405に戻る。全テスト・型・Lintを再実行し、承認後に検証用へ反映する。既存ログの保存期間は運用側で確認する。
+診断フラグだけを無効にしてもProject ID一致時のガードログは残る。完全停止にはREGISTRATION_DIAGNOSTICS_EXPECTED_PROJECT_IDを検証用から削除して再反映する。
+その後、route.ts末尾の一時GET全体、lib/security/registration-diagnostics.ts、tests/registration-diagnostics.test.mjs、本手順書を削除。診断フラグも削除し、テスト・型・Lint後に承認を受け検証用へ反映する。既存POST・共有セキュリティモジュールは変更しない。既存ログの保存期間は運用側で確認する。
