@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import RegistrationControl from './registration-control'
 import GroupClasses from './group-classes'
+import NewScheduleForm from '../new-schedule-form'
 import { validateEventGroupOccurrence, type EventGroupOccurrence } from '@/lib/event-groups/validation'
 
 type Group = { id: number; title: string; description: string | null; registration_open: boolean } & EventGroupOccurrence
@@ -36,7 +37,30 @@ export default function EventGroups() {
   const [refreshing, setRefreshing] = useState(false)
   const editBusy = useRef(false)
 
+  const [addingGroup, setAddingGroup] = useState<Group | null>(null)
+  const [creatingClass, setCreatingClass] = useState(false)
+  const [classRefresh, setClassRefresh] = useState<Record<number, number>>({})
+  const addingGroupRef = useRef<number | null>(null)
+  const classBusy = useRef(false)
+  const classDirty = useRef(false)
+
+  function closeClassForm(): boolean {
+    if (classBusy.current) return false
+    if (classDirty.current && !window.confirm('未保存の予定入力を破棄しますか？')) return false
+    addingGroupRef.current = null; classDirty.current = false; setAddingGroup(null)
+    return true
+  }
+
+  function toggleClassForm(group: Group) {
+    if (classBusy.current || editing || editBusy.current) return
+    if (addingGroupRef.current === group.id) { closeClassForm(); return }
+    if (addingGroupRef.current !== null && !closeClassForm()) return
+    addingGroupRef.current = group.id
+    setAddingGroup({ ...group })
+  }
+
   function beginEdit(group: Group) {
+    if (classBusy.current || addingGroupRef.current !== null) return
     setEditing({ id: group.id, expected: { city: group.city, start_date: group.start_date, end_date: group.end_date } })
     setEditCity(group.city ?? ''); setEditStart(group.start_date ?? ''); setEditEnd(group.end_date ?? '')
     setEditError(''); setConflict(false); setLatest(null)
@@ -96,7 +120,7 @@ export default function EventGroups() {
     const controller = new AbortController()
     async function load() {
       setLoading(true)
-      setResult(null)
+      if (addingGroupRef.current === null) setResult(null)
       setListError('')
       try {
         const response = await fetch(`/api/admin/event-groups?page=${page}`, { cache: 'no-store', signal: controller.signal })
@@ -116,6 +140,7 @@ export default function EventGroups() {
   async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (submitting.current) return
+    if (addingGroupRef.current !== null) { setFormError('予定追加フォームを閉じてからグループを作成してください。'); return }
     setMessage('')
     setFormError('')
     if (!title.trim() || Array.from(title.trim()).length > 200 || Array.from(description).length > 3000) {
@@ -181,7 +206,7 @@ export default function EventGroups() {
         <label htmlFor="eg-end">終了日（任意）</label>
         <input id="eg-end" type="date" value={endDate} onChange={event => setEndDate(event.target.value)} disabled={saving} />
         <p>開始日と終了日は両方入力するか、両方空欄にしてください。</p>
-        <button className="eg-submit" type="submit" disabled={saving}>{saving ? '作成中...' : '作成する'}</button>
+        <button className="eg-submit" type="submit" disabled={saving || addingGroup !== null}>{saving ? '作成中...' : '作成する'}</button>
         {formError && <p role="alert" style={{ color: '#B91C1C', marginTop: 12 }}>{formError}</p>}
         <p role="status" style={{ marginTop: 12 }}>{message}</p>
       </form>
@@ -204,7 +229,7 @@ export default function EventGroups() {
         </div>}
       </form>}
       <h2>登録済みの講習会グループ</h2>
-      <button onClick={() => setReload(value => value + 1)} disabled={loading}>一覧を再取得</button>
+      <button onClick={() => setReload(value => value + 1)} disabled={loading || addingGroup !== null}>一覧を再取得</button>
       <p role="status" style={{ margin: '16px 0' }}>{loading ? '読み込み中...' : result ? `全${result.total}件・${result.page}ページ目` : ''}</p>
       {listError && <p role="alert">{listError} <Link href="/login">ログイン画面へ</Link></p>}
       {result?.eventGroups.length === 0 && <p>表示する講習会グループはありません。</p>}
@@ -213,13 +238,22 @@ export default function EventGroups() {
         <p className="eg-description">{group.description || '説明なし'}</p>
         <p>グループ全体の申込受付：<strong>{group.registration_open ? '受付中' : '停止中'}</strong></p>
         <p>開催地：{group.city ?? '未設定'} ／ 開始日：{group.start_date ?? '未設定'} ／ 終了日：{group.end_date ?? '未設定'}</p>
-        <button type="button" disabled={editing !== null} onClick={() => beginEdit(group)}>開催情報を編集</button>
-        <GroupClasses groupId={group.id} />
+        <button type="button" disabled={editing !== null || addingGroup !== null} onClick={() => beginEdit(group)}>開催情報を編集</button>
+        <button type="button" disabled={editing !== null || creatingClass} aria-expanded={addingGroup?.id === group.id}
+          onClick={() => toggleClassForm(group)}>このグループに予定を追加</button>
+        {addingGroup?.id === group.id && <div>
+          <NewScheduleForm key={addingGroup.id} fixedGroup={{ id: addingGroup.id, title: addingGroup.title, registration_open: group.registration_open }}
+            onBusyChange={busy => { classBusy.current = busy; setCreatingClass(busy) }}
+            onDirtyChange={dirty => { classDirty.current = dirty }}
+            onCreated={() => setClassRefresh(value => ({ ...value, [group.id]: (value[group.id] ?? 0) + 1 }))} />
+          <button type="button" disabled={creatingClass} onClick={closeClassForm}>予定追加を閉じる</button>
+        </div>}
+        <GroupClasses groupId={group.id} refreshToken={classRefresh[group.id] ?? 0} />
         <RegistrationControl id={group.id} title={group.title} registrationOpen={group.registration_open} onUpdated={() => setReload(value => value + 1)} />
       </article>)}
       {result && <nav aria-label="講習会グループのページ切替" style={{ display: 'flex', gap: 16 }}>
-        <button disabled={page <= 1} onClick={() => setPage(value => value - 1)}>前のページ</button>
-        <button disabled={page * result.pageSize >= result.total} onClick={() => setPage(value => value + 1)}>次のページ</button>
+        <button disabled={addingGroup !== null || page <= 1} onClick={() => setPage(value => value - 1)}>前のページ</button>
+        <button disabled={addingGroup !== null || page * result.pageSize >= result.total} onClick={() => setPage(value => value + 1)}>次のページ</button>
       </nav>}
     </section>
   )

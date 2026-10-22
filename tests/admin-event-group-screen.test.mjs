@@ -35,9 +35,12 @@ function setup({ group = original, postStatus = 201, patchStatus = 200, patchThr
     },
   }
   const Control = () => null
+  const ScheduleForm = () => null
+  const Classes = () => null
+  const confirmations = []; let confirmResult = true
   const { default: Component } = compile('app/(app)/admin/event-groups/event-groups.tsx', {
-    react, 'react/jsx-runtime': jsxRuntime, 'next/link': { default: () => null }, './registration-control': { default: Control }, './group-classes': { default: () => null }, '@/lib/event-groups/validation': validation,
-  }, { fetch: async (url, options = {}) => {
+    react, 'react/jsx-runtime': jsxRuntime, 'next/link': { default: () => null }, './registration-control': { default: Control }, './group-classes': { default: Classes }, '../new-schedule-form': { default: ScheduleForm }, '@/lib/event-groups/validation': validation,
+  }, { window: { confirm: message => { confirmations.push(message); return confirmResult } }, fetch: async (url, options = {}) => {
     calls.push({ url, options })
     const body = options.body ? JSON.parse(options.body) : null
     if (options.method === 'POST') return { ok: postStatus === 201, status: postStatus, json: async () => ({ error: '保存できませんでした' }) }
@@ -52,7 +55,7 @@ function setup({ group = original, postStatus = 201, patchStatus = 200, patchThr
   const find = id => render().find(item => item.props?.id === id)
   const button = label => render().find(item => item.type === 'button' && item.props.children === label)
   return {
-    calls, Control, render, find, button, text: () => text(render()),
+    calls, Control, ScheduleForm, Classes, confirmations, confirm: value => { confirmResult = value }, render, find, button, text: () => text(render()),
     setGroups: value => { groups = value }, failLists: () => { getFails = true },
     async flush() { render(); for (const effect of effects.splice(0)) { effect.cleanup?.(); effect.cleanup = effect.fn() } await new Promise(resolve => setImmediate(resolve)); render() },
     async mount() { render(); await this.flush() },
@@ -147,4 +150,76 @@ test('existing registration control props and refresh callback are maintained', 
   control.props.onUpdated(); await c.flush()
   assert.equal(c.calls.filter(call => !call.options.method).length, 2)
   assert.equal(patches(c).length, 0)
+})
+
+
+test('group card opens one form with fixed identity and refreshes only the saved group', async () => {
+  const c = setup(); await c.mount()
+  c.setGroups([original, { ...original, id: 8, title: '別開催回' }]); c.button('一覧を再取得').props.onClick(); await c.flush()
+  const add = () => c.render().filter(item => item.type === 'button' && item.props.children === 'このグループに予定を追加')
+  add()[0].props.onClick()
+  let forms = c.render().filter(item => item.type === c.ScheduleForm)
+  assert.equal(forms.length, 1)
+  assert.deepEqual(JSON.parse(JSON.stringify(forms[0].props.fixedGroup)), { id: 7, title: original.title, registration_open: true })
+  forms[0].props.onCreated()
+  const classes = c.render().filter(item => item.type === c.Classes)
+  assert.deepEqual(classes.map(item => [item.props.groupId, item.props.refreshToken]), [[7, 1], [8, 0]])
+  assert.equal(posts(c).length, 0); assert.equal(patches(c).length, 0)
+  assert.equal(c.render().find(item => item.type === c.Control).props.registrationOpen, true)
+  add()[1].props.onClick()
+  forms = c.render().filter(item => item.type === c.ScheduleForm)
+  assert.equal(forms.length, 1); assert.equal(forms[0].props.fixedGroup.id, 8)
+})
+test('unsaved close and group switching require confirmation and cancellation retains form', async () => {
+  const c = setup(); await c.mount()
+  c.setGroups([original, { ...original, id: 8 }]); c.button('一覧を再取得').props.onClick(); await c.flush()
+  const add = () => c.render().filter(item => item.type === 'button' && item.props.children === 'このグループに予定を追加')
+  add()[0].props.onClick()
+  c.render().find(item => item.type === c.ScheduleForm).props.onDirtyChange(true)
+  c.confirm(false); c.button('予定追加を閉じる').props.onClick()
+  assert.equal(c.render().find(item => item.type === c.ScheduleForm).props.fixedGroup.id, 7)
+  add()[1].props.onClick()
+  assert.equal(c.render().find(item => item.type === c.ScheduleForm).props.fixedGroup.id, 7)
+  assert.equal(c.confirmations.length, 2)
+  c.confirm(true); add()[1].props.onClick()
+  assert.equal(c.render().find(item => item.type === c.ScheduleForm).props.fixedGroup.id, 8)
+  c.button('予定追加を閉じる').props.onClick()
+  assert.equal(c.render().some(item => item.type === c.ScheduleForm), false)
+})
+test('busy form prevents closing, switching, editing and losing input through pagination', async () => {
+  const c = setup(); await c.mount()
+  const add = () => c.button('このグループに予定を追加')
+  add().props.onClick()
+  const form = c.render().find(item => item.type === c.ScheduleForm)
+  form.props.onBusyChange(true)
+  assert.equal(c.button('予定追加を閉じる').props.disabled, true)
+  assert.equal(add().props.disabled, true)
+  assert.equal(c.button('開催情報を編集').props.disabled, true)
+  assert.equal(c.button('一覧を再取得').props.disabled, true)
+  assert.equal(c.button('次のページ').props.disabled, true)
+  c.button('予定追加を閉じる').props.onClick(); add().props.onClick(); c.edit()
+  assert.equal(c.render().filter(item => item.type === c.ScheduleForm).length, 1)
+  assert.equal(c.find('eg-edit-city'), undefined)
+  form.props.onBusyChange(false)
+  c.button('予定追加を閉じる').props.onClick()
+  c.edit(); assert.ok(c.find('eg-edit-city')); assert.equal(add().props.disabled, true)
+  add().props.onClick(); assert.equal(c.render().some(item => item.type === c.ScheduleForm), false)
+})
+test('unrelated reception refresh preserves the open create form and its refresh token', async () => {
+  const c = setup(); await c.mount(); c.button('このグループに予定を追加').props.onClick()
+  const before = c.render().find(item => item.type === c.ScheduleForm)
+  before.props.onDirtyChange(true)
+  c.render().find(item => item.type === c.Control).props.onUpdated(); await c.flush()
+  const after = c.render().find(item => item.type === c.ScheduleForm)
+  assert.equal(after.key, before.key); assert.equal(after.props.fixedGroup.id, 7)
+  assert.equal(c.render().find(item => item.type === c.Classes).props.refreshToken, 0)
+})
+
+
+test('creating a new group cannot navigate away from an open class form', async () => {
+  const c = setup(); await c.mount(); c.button('このグループに予定を追加').props.onClick()
+  c.change('eg-title', '新しいグループ'); await c.create()
+  assert.equal(posts(c).length, 0)
+  assert.equal(c.button('作成する').props.disabled, true)
+  assert.equal(c.render().filter(item => item.type === c.ScheduleForm).length, 1)
 })

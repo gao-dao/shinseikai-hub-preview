@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ScheduleRegistrationStatus, useScheduleRegistrationStatuses } from './schedule-registration-status'
 import { deleteScheduleSafely, scheduleDeletionBlockReason } from './schedule-deletion'
-import NewScheduleFields from './new-schedule-fields'
+import NewScheduleForm from './new-schedule-form'
 import EditScheduleFields from './edit-schedule-fields'
 import { parseRegistrationFields, validateNewSchedule } from '@/lib/schedules/new-schedule'
 import { scheduleEditRestriction } from '@/lib/schedules/edit-schedule'
@@ -47,8 +47,6 @@ export default function AdminPage() {
   const [sType, setSType] = useState<ScheduleType>('稽古会')
   const [sMsg, setSMsg] = useState('')
   const [creatingSchedule, setCreatingSchedule] = useState(false)
-  const creatingScheduleRef = useRef(false)
-  const [newScheduleKey, setNewScheduleKey] = useState(0)
 
   // パスワード変更
   const [adminNewPw, setAdminNewPw] = useState('')
@@ -198,34 +196,6 @@ export default function AdminPage() {
         updatingScheduleRef.current = false
         setUpdatingSchedule(false)
       }
-    } else {
-      if (creatingScheduleRef.current) return
-      const form = new FormData(e.currentTarget as HTMLFormElement)
-      const fields = parseRegistrationFields(String(form.get('new_event_group_id') ?? ''), String(form.get('new_capacity') ?? ''), form.get('new_registration_enabled') === 'on')
-      if (fields.error) { setSMsg('エラー: ' + fields.error); return }
-      const validation = validateNewSchedule({ ...payload, ...fields.data })
-      if (validation.error) { setSMsg('エラー: ' + validation.error); return }
-      creatingScheduleRef.current = true
-      setCreatingSchedule(true)
-      setSMsg('')
-      try {
-        const response = await fetch('/api/admin/schedules', {
-          method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(validation.data),
-        })
-        if (!response.ok) {
-          const message = response.status === 401 ? 'ログインし直してください' : response.status === 403 ? '管理者権限またはリクエスト元を確認してください' : response.status === 400 ? '入力内容と講習会グループを確認してください' : '予定を作成できませんでした。登録状況を確認してから再操作してください'
-          setSMsg('エラー: ' + message)
-          return
-        }
-        setNewScheduleKey(value => value + 1)
-        setSMsg('スケジュールを追加しました！')
-      } catch {
-        setSMsg('エラー: 作成結果を確認できませんでした。予定一覧を確認してから再操作してください')
-        return
-      } finally {
-        creatingScheduleRef.current = false
-        setCreatingSchedule(false)
-      }
     }
     setSTitle(''); setSDate(''); setSStart(''); setSEnd(''); setSLocation(''); setSType('稽古会')
     fetchSchedules()
@@ -362,7 +332,8 @@ export default function AdminPage() {
 
         {tab === 'schedules' && (
           <>
-            <div className={`form-card${editSchedule ? ' editing' : ''}`}>
+            {!editSchedule && <NewScheduleForm onCreated={() => { void fetchSchedules(); scheduleStatuses.refresh() }} onBusyChange={setCreatingSchedule} />}
+            {editSchedule && <div className={`form-card${editSchedule ? ' editing' : ''}`}>
               <div className="list-hd">{editSchedule ? '✏️ 予定を編集' : '＋ 予定を追加'}</div>
               <form onSubmit={addSchedule}>
                 <fieldset disabled={creatingSchedule || updatingSchedule} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
@@ -381,15 +352,15 @@ export default function AdminPage() {
                   <option value="稽古会">稽古会</option>
                   <option value="一般参加">一般参加</option>
                 </select>
-                {editSchedule ? <EditScheduleFields key={`${editSchedule.id}-${editScheduleKey}`} schedule={editSchedule}
+                {<EditScheduleFields key={`${editSchedule.id}-${editScheduleKey}`} schedule={editSchedule}
                   history={scheduleStatuses.statuses[String(editSchedule.id)]} historyLoading={scheduleStatuses.loading} historyError={scheduleStatuses.error}
-                  groupTitle={scheduleStatuses.statuses[String(editSchedule.id)]?.event_groups?.title} /> : <NewScheduleFields key={newScheduleKey} />}
+                  groupTitle={scheduleStatuses.statuses[String(editSchedule.id)]?.event_groups?.title} />}
                 <button type="submit" style={btnStyle} disabled={!!editSchedule && (scheduleStatuses.loading || !!scheduleStatuses.error || !scheduleStatuses.statuses[String(editSchedule.id)])}>{editSchedule ? updatingSchedule ? '更新中...' : '更新する' : creatingSchedule ? '作成中...' : '追加する'}</button>
                 {editSchedule && <button type="button" className="cancel-btn" onClick={() => { setEditSchedule(null); setSTitle(''); setSDate(''); setSStart(''); setSEnd(''); setSLocation(''); setSType('稽古会'); setSMsg('') }}>キャンセル</button>}
                 {sMsg && <div className={sMsg.includes('エラー') ? 'error' : 'success'}>{sMsg}</div>}
                 </fieldset>
               </form>
-            </div>
+            </div>}
             <div className="list-hd">登録済み予定 ({schedules.length}件)</div>
             <div style={{ marginBottom: '14px' }}>
               <button type="button" className="edit-btn" disabled={scheduleStatuses.loading} onClick={scheduleStatuses.refresh}>申込状況を再取得</button>

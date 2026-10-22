@@ -226,6 +226,18 @@ function adminForm({ ok = true, historyKnown = true } = {}) {
   const harness = hooks(), calls = []
   const ExtraFields = () => null
   const EditFields = () => null
+  const NewForm = () => null
+  let createHarness, CreateForm, createMounted = false
+  function mountCreate() {
+    createHarness = hooks()
+    CreateForm = compile('app/(app)/admin/new-schedule-form.tsx', {
+      react: createHarness.react, 'react/jsx-runtime': jsxRuntime,
+      './new-schedule-fields': { default: ExtraFields }, '@/lib/schedules/new-schedule': validation,
+    }, {
+      fetch: async (url, options) => { calls.push(['post', url, JSON.parse(options.body)]); return { ok, status: ok ? 201 : 500 } },
+      FormData: class { constructor(values) { this.values = values } get(key) { return this.values[key] ?? null } },
+    }).default
+  }
   const query = {
     select: () => query,
     order: async () => { calls.push(['refresh']); return { data: [] } },
@@ -237,19 +249,28 @@ function adminForm({ ok = true, historyKnown = true } = {}) {
     'next/navigation': { useRouter: () => ({}) }, 'next/link': { default: () => null },
     './schedule-registration-status': { useScheduleRegistrationStatuses: () => ({ statuses: historyKnown ? { '12': { hasRegistrationHistory: false, activeRegistrationCount: 0 } } : {}, loading: false, error: '', refresh() { calls.push(['refresh-status']) } }), ScheduleRegistrationStatus: () => null },
     './schedule-deletion': { scheduleDeletionBlockReason: () => 'unknown' },
-    './new-schedule-fields': { default: ExtraFields }, '@/lib/schedules/new-schedule': validation,
+    './new-schedule-form': { default: NewForm }, '@/lib/schedules/new-schedule': validation,
     './edit-schedule-fields': { default: EditFields }, '@/lib/schedules/edit-schedule': compile('lib/schedules/edit-schedule.ts'),
   }, {
     fetch: async (url, options) => { calls.push([options.method === 'PATCH' ? 'patch' : 'post', url, JSON.parse(options.body)]); return { ok, status: ok ? 201 : 500 } },
     FormData: class { constructor(values) { this.values = values } get(key) { return this.values[key] ?? null } },
     setTimeout() {}, window: { scrollTo() {} },
   })
-  const render = () => { harness.reset(); return elements(Admin()) }
+  const render = () => {
+    harness.reset()
+    const tree = elements(Admin()), child = tree.find(item => item.type === NewForm)
+    if (!child) { createMounted = false; return tree }
+    if (!createMounted) { mountCreate(); createMounted = true }
+    createHarness.reset()
+    return [...tree, ...elements(CreateForm(child.props))]
+  }
   render()
   harness.state[0] = 'schedules'; harness.state[1] = true; harness.state[2] = false
   let tree = render()
   tree.find(item => item.props?.placeholder === '通常稽古').props.onChange({ target: { value: '予定' } })
   tree.find(item => item.props?.type === 'date').props.onChange({ target: { value: '2026-10-20' } })
+  // Editing retains the parent-controlled field state; creation owns separate state.
+  harness.state[15] = '予定'; harness.state[16] = '2026-10-20'
   return { render, calls, harness, ExtraFields, EditFields }
 }
 

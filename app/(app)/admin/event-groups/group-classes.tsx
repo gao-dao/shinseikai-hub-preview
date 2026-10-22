@@ -18,7 +18,7 @@ function validClass(value: unknown): value is ClassItem {
     Number.isSafeInteger(row.registeredCount) && row.registeredCount >= 0 && typeof row.registration_enabled === 'boolean'
 }
 
-export default function GroupClasses({ groupId }: { groupId: number }) {
+export default function GroupClasses({ groupId, refreshToken = 0 }: { groupId: number; refreshToken?: number }) {
   const [expanded, setExpanded] = useState(false)
   const [page, setPage] = useState(1)
   const [reload, setReload] = useState(0)
@@ -47,7 +47,7 @@ export default function GroupClasses({ groupId }: { groupId: number }) {
     }
     void load()
     return () => controller.abort()
-  }, [expanded, groupId, page, reload])
+  }, [expanded, groupId, page, reload, refreshToken])
 
   return <div style={{ marginTop: 12 }}>
     <button type="button" aria-expanded={expanded} aria-controls={regionId}

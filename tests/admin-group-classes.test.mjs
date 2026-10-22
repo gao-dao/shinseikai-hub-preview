@@ -14,7 +14,7 @@ function elements(tree) {
 }
 function setup({ body = page(), status = 200, throws = false, pending = false } = {}) {
   const slots = [], effects = [], calls = []
-  let cursor = 0, payload = body, httpStatus = status, release
+  let cursor = 0, payload = body, httpStatus = status, release, refreshToken = 0
   const react = {
     useState(initial) { const i = cursor++; if (!(i in slots)) slots[i] = { value: initial }; return [slots[i].value, value => { slots[i].value = typeof value === 'function' ? value(slots[i].value) : value }] },
     useEffect(fn, deps) {
@@ -36,9 +36,9 @@ function setup({ body = page(), status = 200, throws = false, pending = false } 
       return { ok: httpStatus === 200, status: httpStatus, json: async () => payload }
     },
   })
-  const render = () => { cursor = 0; return elements(exports.default({ groupId: 7 })) }
+  const render = () => { cursor = 0; return elements(exports.default({ groupId: 7, refreshToken })) }
   const button = text => render().find(item => item.type === 'button' && item.props.children === text)
-  return { calls, render, button, change: (value, nextStatus = 200) => { payload = value; httpStatus = nextStatus },
+  return { calls, render, button, refresh: () => { refreshToken += 1 }, change: (value, nextStatus = 200) => { payload = value; httpStatus = nextStatus },
     text: () => render().filter(item => item.type === 'p' || item.type === 'h3').map(item => JSON.stringify(item.props.children)).join(' '),
     async flush() { render(); for (const effect of effects.splice(0)) { effect.cleanup?.(); effect.cleanup = effect.fn() } await new Promise(resolve => setImmediate(resolve)); render() },
     release: value => release({ ok: true, json: async () => value }),
@@ -102,4 +102,13 @@ test('closing during loading ignores the stale response', async () => {
   c.release(page()); await c.flush()
   assert.equal(c.render().some(item => item.type === 'li'), false)
   assert.equal(c.calls.length, 1)
+})
+
+
+test('parent refresh reloads an expanded list and defers collapsed list until expansion', async () => {
+  const c = setup(); await open(c); assert.equal(c.calls.length, 1)
+  c.refresh(); await c.flush(); assert.equal(c.calls.length, 2)
+  c.button('所属クラス一覧を閉じる').props.onClick(); await c.flush()
+  c.refresh(); await c.flush(); assert.equal(c.calls.length, 2)
+  c.button('所属クラス一覧を表示').props.onClick(); await c.flush(); assert.equal(c.calls.length, 3)
 })

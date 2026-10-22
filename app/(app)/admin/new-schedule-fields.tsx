@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 
-type Group = { id: number; title: string; registration_open: boolean }
+export type Group = { id: number; title: string; registration_open: boolean }
 
 export async function loadAllEventGroups(fetcher: typeof fetch, signal: AbortSignal): Promise<Group[]> {
   const groups: Group[] = []
@@ -25,7 +25,7 @@ export async function loadAllEventGroups(fetcher: typeof fetch, signal: AbortSig
 }
 
 // Mounted only for new schedules; unmounting on edit/cancel discards these values.
-export default function NewScheduleFields() {
+export default function NewScheduleFields({ fixedGroup }: { fixedGroup?: Group } = {}) {
   const [groups, setGroups] = useState<Group[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -34,9 +34,11 @@ export default function NewScheduleFields() {
   const [capacity, setCapacity] = useState('')
   const [enabled, setEnabled] = useState(false)
   const validCapacity = /^[1-9][0-9]*$/.test(capacity) && Number(capacity) <= 2147483647
-  const canEnable = !loading && !error && group !== '' && validCapacity
+  const fixedValid = fixedGroup !== undefined && Number.isSafeInteger(fixedGroup.id) && fixedGroup.id > 0
+  const canEnable = (fixedGroup ? fixedValid : !loading && !error && group !== '') && validCapacity
 
   useEffect(() => {
+    if (fixedGroup) return
     const controller = new AbortController()
     async function load() {
       setLoading(true)
@@ -55,11 +57,12 @@ export default function NewScheduleFields() {
     }
     void load()
     return () => controller.abort()
-  }, [reload])
+  }, [reload, fixedGroup])
 
   const fieldStyle = { width: '100%', background: '#fff', border: '1px solid #EDE8DF', borderRadius: 10, padding: '12px 14px', marginBottom: 12, font: 'inherit' }
   return (
     <div style={{ borderTop: '1px solid #EDE8DF', paddingTop: 12 }}>
+      {fixedGroup ? <p>対象グループ：{fixedGroup.title}（{fixedGroup.registration_open ? '受付中' : '停止中'}）</p> : <>
       <label htmlFor="new-schedule-group" style={{ display: 'block', marginBottom: 6 }}>講習会グループ</label>
       <select id="new-schedule-group" name="new_event_group_id" style={fieldStyle} value={group} disabled={loading || !!error}
         onChange={event => { setGroup(event.target.value); setEnabled(false) }}>
@@ -68,6 +71,7 @@ export default function NewScheduleFields() {
       </select>
       {loading && <p role="status">講習会グループを読み込み中...</p>}
       {error && <p role="alert">{error} <button type="button" className="edit-btn" onClick={() => setReload(value => value + 1)}>再取得</button></p>}
+      </>}
       <label htmlFor="new-schedule-capacity" style={{ display: 'block', marginBottom: 6 }}>定員（任意・1〜2147483647）</label>
       <input id="new-schedule-capacity" name="new_capacity" style={fieldStyle} type="text" inputMode="numeric" pattern="[1-9][0-9]*" value={capacity}
         onChange={event => { setCapacity(event.target.value); setEnabled(false) }} placeholder="未設定" />
