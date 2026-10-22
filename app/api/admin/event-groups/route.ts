@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/supabase/require-admin'
 import { createClient } from '@/lib/supabase/server'
+import { validateEventGroupOccurrence } from '@/lib/event-groups/validation'
 
 export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store, max-age=0', Vary: 'Cookie' }
-const columns = 'id, title, description, registration_open'
+const columns = 'id, title, description, registration_open, city, start_date, end_date'
 const pageSize = 50
 
 function failure(error: string, status: number) {
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
     }
     if (!body || typeof body !== 'object' || Array.isArray(body)) return failure('入力内容が不正です', 400)
     const input = body as Record<string, unknown>
-    if (Object.keys(input).some(key => key !== 'title' && key !== 'description')) {
+    if (Object.keys(input).some(key => !['title', 'description', 'city', 'start_date', 'end_date'].includes(key))) {
       return failure('指定できない項目が含まれています', 400)
     }
     if (typeof input.title !== 'string' || (input.description != null && typeof input.description !== 'string')) {
@@ -63,9 +64,12 @@ export async function POST(request: Request) {
     if (description !== null && Array.from(description).length > 3000) {
       return failure('説明は3000文字以内で入力してください', 400)
     }
+    const occurrenceInput = Object.fromEntries(Object.entries(input).filter(([key]) => ['city', 'start_date', 'end_date'].includes(key)))
+    const occurrence = validateEventGroupOccurrence(occurrenceInput)
+    if (!occurrence.data) return failure(occurrence.error, 400)
     const supabase = await createClient()
     const { data, error } = await supabase.from('event_groups')
-      .insert({ title, description: description?.trim() || null, registration_open: false })
+      .insert({ title, description: description?.trim() || null, ...occurrence.data, registration_open: false })
       .select(columns).single()
     if (error) return failure('講習会グループを作成できませんでした', 500)
     return NextResponse.json({ eventGroup: data }, { status: 201, headers })

@@ -3,8 +3,9 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import RegistrationControl from './registration-control'
+import { validateEventGroupOccurrence, type EventGroupOccurrence } from '@/lib/event-groups/validation'
 
-type Group = { id: number; title: string; description: string | null; registration_open: boolean }
+type Group = { id: number; title: string; description: string | null; registration_open: boolean } & EventGroupOccurrence
 type List = { eventGroups: Group[]; page: number; pageSize: number; total: number }
 
 export default function EventGroups() {
@@ -19,6 +20,76 @@ export default function EventGroups() {
   const submitting = useRef(false)
   const [formError, setFormError] = useState('')
   const [message, setMessage] = useState('')
+
+  const [city, setCity] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [editing, setEditing] = useState<{ id: number; expected: EventGroupOccurrence } | null>(null)
+  const [editCity, setEditCity] = useState('')
+  const [editStart, setEditStart] = useState('')
+  const [editEnd, setEditEnd] = useState('')
+  const [editError, setEditError] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+  const [conflict, setConflict] = useState(false)
+  const [latest, setLatest] = useState<Group | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const editBusy = useRef(false)
+
+  function beginEdit(group: Group) {
+    setEditing({ id: group.id, expected: { city: group.city, start_date: group.start_date, end_date: group.end_date } })
+    setEditCity(group.city ?? ''); setEditStart(group.start_date ?? ''); setEditEnd(group.end_date ?? '')
+    setEditError(''); setConflict(false); setLatest(null)
+  }
+
+  async function saveEdit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!editing || editBusy.current || conflict) return
+    const validation = validateEventGroupOccurrence({ city: editCity, start_date: editStart, end_date: editEnd })
+    if (!validation.data) { setEditError(validation.error); return }
+    editBusy.current = true; setEditSaving(true); setEditError('')
+    try {
+      const response = await fetch(`/api/admin/event-groups/${editing.id}`, {
+        method: 'PATCH', cache: 'no-store', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...validation.data, expected: editing.expected }),
+      })
+      if (response.status === 409) {
+        setConflict(true)
+        setEditError('他の管理者によって開催情報が変更されました。最新情報を読み込み、内容を確認してから編集し直してください。')
+        return
+      }
+      if (!response.ok) {
+        setEditError(response.status === 401 ? 'ログインし直してください。' : response.status === 403 ? '更新する権限がありません。' : '開催情報を保存できませんでした。入力内容を確認してください。')
+        return
+      }
+      const data = await response.json()
+      if (data.eventGroup?.id !== editing.id || !['city', 'start_date', 'end_date'].every(key => data.eventGroup[key] === validation.data[key as keyof EventGroupOccurrence])) throw new Error('Invalid update response')
+      setEditing(null); setMessage('開催情報を更新しました。'); setReload(value => value + 1)
+    } catch {
+      setEditError('更新結果を確認できませんでした。入力内容は保持されています。一覧を再取得して登録状況を確認してください。')
+    } finally { editBusy.current = false; setEditSaving(false) }
+  }
+
+  async function refreshConflict() {
+    if (!editing || editBusy.current) return
+    editBusy.current = true; setRefreshing(true); setLatest(null)
+    try {
+      let currentPage = 1
+      for (;;) {
+        const response = await fetch(`/api/admin/event-groups?page=${currentPage}`, { cache: 'no-store' })
+        if (!response.ok) throw new Error('Reload failed')
+        const data: List = await response.json()
+        if (!Array.isArray(data.eventGroups) || data.page !== currentPage || !Number.isSafeInteger(data.total) || data.total < 0 || !Number.isSafeInteger(data.pageSize) || data.pageSize <= 0) throw new Error('Invalid list')
+        const group = data.eventGroups.find(item => item.id === editing.id)
+        if (group) {
+          if (![group.city, group.start_date, group.end_date].every(value => value === null || typeof value === 'string')) throw new Error('Invalid occurrence')
+          setLatest(group); setReload(value => value + 1); return
+        }
+        if (currentPage * data.pageSize >= data.total || data.eventGroups.length === 0) throw new Error('Group unavailable')
+        currentPage += 1
+      }
+    } catch { setEditError('最新情報を取得できませんでした。入力内容は保持されています。再取得してください。') }
+    finally { editBusy.current = false; setRefreshing(false) }
+  }
 
   useEffect(() => {
     const controller = new AbortController()
@@ -50,12 +121,14 @@ export default function EventGroups() {
       setFormError('タイトルは1〜200文字、説明は3000文字以内で入力してください。')
       return
     }
+    const occurrence = validateEventGroupOccurrence({ city, start_date: startDate, end_date: endDate })
+    if (!occurrence.data) { setFormError(occurrence.error); return }
     submitting.current = true
     setSaving(true)
     try {
       const response = await fetch('/api/admin/event-groups', {
         method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, description }),
+        body: JSON.stringify({ title, description, ...occurrence.data }),
       })
       if (!response.ok) {
         const data = await response.json()
@@ -64,6 +137,7 @@ export default function EventGroups() {
       }
       setTitle('')
       setDescription('')
+      setCity(''); setStartDate(''); setEndDate('')
       setMessage('講習会グループを作成しました。申込受付は停止中です。')
       setPage(1)
       setReload(value => value + 1)
@@ -99,10 +173,35 @@ export default function EventGroups() {
         <input id="eg-title" value={title} onChange={event => setTitle(event.target.value)} required disabled={saving} />
         <label htmlFor="eg-description">説明（3000文字以内）</label>
         <textarea id="eg-description" value={description} onChange={event => setDescription(event.target.value)} rows={4} disabled={saving} />
+        <label htmlFor="eg-city">開催地（任意・100文字以内）</label>
+        <input id="eg-city" value={city} onChange={event => setCity(event.target.value)} disabled={saving} />
+        <label htmlFor="eg-start">開始日（任意）</label>
+        <input id="eg-start" type="date" value={startDate} onChange={event => setStartDate(event.target.value)} disabled={saving} />
+        <label htmlFor="eg-end">終了日（任意）</label>
+        <input id="eg-end" type="date" value={endDate} onChange={event => setEndDate(event.target.value)} disabled={saving} />
+        <p>開始日と終了日は両方入力するか、両方空欄にしてください。</p>
         <button className="eg-submit" type="submit" disabled={saving}>{saving ? '作成中...' : '作成する'}</button>
         {formError && <p role="alert" style={{ color: '#B91C1C', marginTop: 12 }}>{formError}</p>}
         <p role="status" style={{ marginTop: 12 }}>{message}</p>
       </form>
+      {editing && <form className="eg-card" aria-label="開催情報の編集" onSubmit={saveEdit}>
+        <h2>開催情報の編集</h2>
+        <label htmlFor="eg-edit-city">開催地（任意・100文字以内）</label>
+        <input id="eg-edit-city" value={editCity} onChange={event => setEditCity(event.target.value)} disabled={editSaving || refreshing || conflict} />
+        <label htmlFor="eg-edit-start">開始日（任意）</label>
+        <input id="eg-edit-start" type="date" value={editStart} onChange={event => setEditStart(event.target.value)} disabled={editSaving || refreshing || conflict} />
+        <label htmlFor="eg-edit-end">終了日（任意）</label>
+        <input id="eg-edit-end" type="date" value={editEnd} onChange={event => setEditEnd(event.target.value)} disabled={editSaving || refreshing || conflict} />
+        <p>開始日と終了日は両方入力するか、両方空欄にしてください。</p>
+        <button type="submit" disabled={editSaving || refreshing || conflict}>{editSaving ? '保存中...' : '開催情報を保存'}</button>
+        <button type="button" disabled={editSaving || refreshing} onClick={() => { setEditing(null); setEditError(''); setLatest(null); setConflict(false) }}>編集をキャンセル</button>
+        {editError && <p role="alert">{editError}</p>}
+        {conflict && <button type="button" disabled={refreshing || editSaving} onClick={refreshConflict}>{refreshing ? '再取得中...' : '最新情報を再取得'}</button>}
+        {latest && <div role="status">
+          <p>最新の開催地：{latest.city ?? '未設定'} ／ 開始日：{latest.start_date ?? '未設定'} ／ 終了日：{latest.end_date ?? '未設定'}</p>
+          <button type="button" disabled={refreshing || editSaving} onClick={() => beginEdit(latest)}>最新情報で編集を再開</button>
+        </div>}
+      </form>}
       <h2>登録済みの講習会グループ</h2>
       <button onClick={() => setReload(value => value + 1)} disabled={loading}>一覧を再取得</button>
       <p role="status" style={{ margin: '16px 0' }}>{loading ? '読み込み中...' : result ? `全${result.total}件・${result.page}ページ目` : ''}</p>
@@ -112,6 +211,8 @@ export default function EventGroups() {
         <h2 style={{ overflowWrap: 'anywhere' }}>{group.title}</h2>
         <p className="eg-description">{group.description || '説明なし'}</p>
         <p>申込受付：<strong>{group.registration_open ? '受付中' : '停止中'}</strong></p>
+        <p>開催地：{group.city ?? '未設定'} ／ 開始日：{group.start_date ?? '未設定'} ／ 終了日：{group.end_date ?? '未設定'}</p>
+        <button type="button" disabled={editing !== null} onClick={() => beginEdit(group)}>開催情報を編集</button>
         <RegistrationControl id={group.id} title={group.title} registrationOpen={group.registration_open} onUpdated={() => setReload(value => value + 1)} />
       </article>)}
       {result && <nav aria-label="講習会グループのページ切替" style={{ display: 'flex', gap: 16 }}>
