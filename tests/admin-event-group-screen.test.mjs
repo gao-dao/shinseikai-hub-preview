@@ -36,7 +36,7 @@ function setup({ group = original, postStatus = 201, patchStatus = 200, patchThr
   }
   const Control = () => null
   const { default: Component } = compile('app/(app)/admin/event-groups/event-groups.tsx', {
-    react, 'react/jsx-runtime': jsxRuntime, 'next/link': { default: () => null }, './registration-control': { default: Control }, '@/lib/event-groups/validation': validation,
+    react, 'react/jsx-runtime': jsxRuntime, 'next/link': { default: () => null }, './registration-control': { default: Control }, './group-classes': { default: () => null }, '@/lib/event-groups/validation': validation,
   }, { fetch: async (url, options = {}) => {
     calls.push({ url, options })
     const body = options.body ? JSON.parse(options.body) : null

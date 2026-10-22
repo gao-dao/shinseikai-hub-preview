@@ -18,7 +18,7 @@ function compile(path, dependencies = {}, globals = {}) {
 const validation = compile('lib/registrations/proxy-registration.ts', { './details': compile('lib/registrations/details.ts') })
 const availability = compile('lib/registrations/class-availability.ts')
 const valid = { event_group_id: 5, name: ' 参加者 ', contact: ' 電話連絡先 ', notes: ' 備考 ', schedule_ids: [11, 12] }
-function row(id = 11, changes = {}) { return { id, title: `クラス${id}`, date: '2026-10-20', start_time: '10:00', end_time: '11:00', event_group_id: 5, capacity: 10, registration_enabled: true, active_items: [{ count: 2 }], ...changes } }
+function row(id = 11, changes = {}) { return { id, title: `クラス${id}`, date: '2026-10-20', start_time: '10:00', end_time: '11:00', location: '合成会場', event_group_id: 5, capacity: 10, registration_enabled: true, active_items: [{ count: 2 }], ...changes } }
 
 // Isolated mock clients: real Supabase modules and env files are never loaded.
 function setup({ authorization = { ok: true }, group = { id: 5, registration_open: false }, groupError = null, rows = [row(), row(12)], classError = null, total, rpcError = null, throws = false } = {}) {
@@ -324,4 +324,21 @@ test('proxy success closes the form and reloads page one; cancel does not refres
   assert.equal(harness.state[0], 1)
   assert.equal(harness.state[1], 1)
   assert.equal(render().some(item => item.type === Form), false)
+})
+
+
+test('class GET includes venue and explicit reception state, preserving active counts', async () => {
+  const context = setup({ rows: [row(11, { registration_enabled: false })] })
+  const response = await context.get()
+  assert.equal(response.status, 200)
+  assert.equal(response.body.schedules[0].location, '合成会場')
+  assert.equal(response.body.schedules[0].registration_enabled, false)
+  assert.equal(response.body.schedules[0].registeredCount, 2)
+  assert.ok(context.calls.some(call => call[0] === 'select' && call[1].includes('location')))
+  noRpc(context); noCache(response)
+})
+test('missing class venue fails safely rather than guessing metadata', async () => {
+  const context = setup({ rows: [row(11, { location: undefined })] })
+  assert.equal((await context.get()).status, 500)
+  noRpc(context)
 })

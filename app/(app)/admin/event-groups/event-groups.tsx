@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import RegistrationControl from './registration-control'
+import GroupClasses from './group-classes'
 import { validateEventGroupOccurrence, type EventGroupOccurrence } from '@/lib/event-groups/validation'
 
 type Group = { id: number; title: string; description: string | null; registration_open: boolean } & EventGroupOccurrence
@@ -210,9 +211,10 @@ export default function EventGroups() {
       {result?.eventGroups.map(group => <article className="eg-card" key={group.id}>
         <h2 style={{ overflowWrap: 'anywhere' }}>{group.title}</h2>
         <p className="eg-description">{group.description || '説明なし'}</p>
-        <p>申込受付：<strong>{group.registration_open ? '受付中' : '停止中'}</strong></p>
+        <p>グループ全体の申込受付：<strong>{group.registration_open ? '受付中' : '停止中'}</strong></p>
         <p>開催地：{group.city ?? '未設定'} ／ 開始日：{group.start_date ?? '未設定'} ／ 終了日：{group.end_date ?? '未設定'}</p>
         <button type="button" disabled={editing !== null} onClick={() => beginEdit(group)}>開催情報を編集</button>
+        <GroupClasses groupId={group.id} />
         <RegistrationControl id={group.id} title={group.title} registrationOpen={group.registration_open} onUpdated={() => setReload(value => value + 1)} />
       </article>)}
       {result && <nav aria-label="講習会グループのページ切替" style={{ display: 'flex', gap: 16 }}>

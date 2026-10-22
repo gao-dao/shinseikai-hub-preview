@@ -20,12 +20,15 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const { data: group, error: groupError } = await supabase.from('event_groups').select('id').eq('id', Number(id)).maybeSingle()
     if (groupError) return fail('講習会グループを確認できませんでした', 500)
     if (!group) return fail('講習会グループが見つかりません', 404)
-    const { data, error, count } = await supabase.from('schedules').select(registrationClassColumns, { count: 'exact' })
+    const { data, error, count } = await supabase.from('schedules').select(`${registrationClassColumns}, location`, { count: 'exact' })
       .eq('event_group_id', Number(id)).eq('active_items.status', 'active')
       .order('date', { ascending: true }).order('start_time', { ascending: true }).order('id', { ascending: true })
       .range((page - 1) * pageSize, page * pageSize - 1)
     if (error || !data || count === null || !Number.isSafeInteger(count) || count < 0) return fail('クラス候補を取得できませんでした', 500)
-    return NextResponse.json({ schedules: data.map(registrationClassAvailability), page, pageSize, total: count }, { headers })
+    return NextResponse.json({ schedules: data.map(row => {
+      if (typeof row.location !== 'string') throw new Error('Class location unavailable')
+      return { ...registrationClassAvailability(row), location: row.location, registration_enabled: row.registration_enabled }
+    }), page, pageSize, total: count }, { headers })
   } catch {
     return fail('クラス候補・空き枠を確認できませんでした', 500)
   }
