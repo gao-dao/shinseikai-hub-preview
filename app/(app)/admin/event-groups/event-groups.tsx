@@ -40,6 +40,7 @@ export default function EventGroups() {
   const [addingGroup, setAddingGroup] = useState<Group | null>(null)
   const [creatingClass, setCreatingClass] = useState(false)
   const [classRefresh, setClassRefresh] = useState<Record<number, number>>({})
+  const [classSuccess, setClassSuccess] = useState<Record<number, string>>({})
   const addingGroupRef = useRef<number | null>(null)
   const classBusy = useRef(false)
   const classDirty = useRef(false)
@@ -245,10 +246,17 @@ export default function EventGroups() {
           <NewScheduleForm key={addingGroup.id} fixedGroup={{ id: addingGroup.id, title: addingGroup.title, registration_open: group.registration_open }}
             onBusyChange={busy => { classBusy.current = busy; setCreatingClass(busy) }}
             onDirtyChange={dirty => { classDirty.current = dirty }}
-            onCreated={() => setClassRefresh(value => ({ ...value, [group.id]: (value[group.id] ?? 0) + 1 }))} />
+            onCreated={() => {
+              // Successful persistence must not go through the discard-confirmation path.
+              addingGroupRef.current = null; classDirty.current = false; setAddingGroup(null)
+              setClassSuccess(value => ({ ...value, [group.id]: '予定を保存しました。所属クラス一覧をご確認ください。' }))
+              setClassRefresh(value => ({ ...value, [group.id]: (value[group.id] ?? 0) + 1 }))
+            }} />
           <button type="button" disabled={creatingClass} onClick={closeClassForm}>予定追加を閉じる</button>
         </div>}
-        <GroupClasses groupId={group.id} refreshToken={classRefresh[group.id] ?? 0} />
+        {classSuccess[group.id] && <p role="status">{classSuccess[group.id]}</p>}
+        <GroupClasses key={`${group.id}-${classRefresh[group.id] ?? 0}`} groupId={group.id}
+          initiallyExpanded={(classRefresh[group.id] ?? 0) > 0} />
         <RegistrationControl id={group.id} title={group.title} registrationOpen={group.registration_open} onUpdated={() => setReload(value => value + 1)} />
       </article>)}
       {result && <nav aria-label="講習会グループのページ切替" style={{ display: 'flex', gap: 16 }}>

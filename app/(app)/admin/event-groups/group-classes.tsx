@@ -18,8 +18,8 @@ function validClass(value: unknown): value is ClassItem {
     Number.isSafeInteger(row.registeredCount) && row.registeredCount >= 0 && typeof row.registration_enabled === 'boolean'
 }
 
-export default function GroupClasses({ groupId, refreshToken = 0 }: { groupId: number; refreshToken?: number }) {
-  const [expanded, setExpanded] = useState(false)
+export default function GroupClasses({ groupId, refreshToken = 0, initiallyExpanded = false }: { groupId: number; refreshToken?: number; initiallyExpanded?: boolean }) {
+  const [expanded, setExpanded] = useState(initiallyExpanded)
   const [page, setPage] = useState(1)
   const [reload, setReload] = useState(0)
   const [result, setResult] = useState<ClassPage | null>(null)

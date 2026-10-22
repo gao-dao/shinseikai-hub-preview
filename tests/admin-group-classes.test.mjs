@@ -12,7 +12,7 @@ function elements(tree) {
   if (!tree || typeof tree !== 'object') return []
   return [tree, ...elements(tree.props?.children)]
 }
-function setup({ body = page(), status = 200, throws = false, pending = false } = {}) {
+function setup({ body = page(), status = 200, throws = false, pending = false, initiallyExpanded = false } = {}) {
   const slots = [], effects = [], calls = []
   let cursor = 0, payload = body, httpStatus = status, release, refreshToken = 0
   const react = {
@@ -36,7 +36,7 @@ function setup({ body = page(), status = 200, throws = false, pending = false } 
       return { ok: httpStatus === 200, status: httpStatus, json: async () => payload }
     },
   })
-  const render = () => { cursor = 0; return elements(exports.default({ groupId: 7, refreshToken })) }
+  const render = () => { cursor = 0; return elements(exports.default({ groupId: 7, refreshToken, initiallyExpanded })) }
   const button = text => render().find(item => item.type === 'button' && item.props.children === text)
   return { calls, render, button, refresh: () => { refreshToken += 1 }, change: (value, nextStatus = 200) => { payload = value; httpStatus = nextStatus },
     text: () => render().filter(item => item.type === 'p' || item.type === 'h3').map(item => JSON.stringify(item.props.children)).join(' '),
@@ -111,4 +111,23 @@ test('parent refresh reloads an expanded list and defers collapsed list until ex
   c.button('所属クラス一覧を閉じる').props.onClick(); await c.flush()
   c.refresh(); await c.flush(); assert.equal(c.calls.length, 2)
   c.button('所属クラス一覧を表示').props.onClick(); await c.flush(); assert.equal(c.calls.length, 3)
+})
+
+
+test('success-remounted list automatically expands and fetches page one exactly once', async () => {
+  const c = setup({ initiallyExpanded: true, body: page([{ ...row, title: '追加した予定' }]) })
+  await c.flush()
+  assert.equal(c.button('所属クラス一覧を閉じる').props['aria-expanded'], true)
+  assert.equal(c.calls.length, 1)
+  assert.equal(c.calls[0].url, '/api/admin/event-groups/7/classes?page=1')
+  assert.match(c.text(), /追加した予定/)
+})
+test('post-save list failure is separately reported and only retries on explicit refresh', async () => {
+  const c = setup({ initiallyExpanded: true, status: 500 }); await c.flush()
+  assert.equal(c.calls.length, 1)
+  assert.ok(c.render().some(item => item.props?.role === 'alert'))
+  assert.doesNotMatch(c.text(), /保存に失敗|クラス未登録/)
+  c.render(); await Promise.resolve(); assert.equal(c.calls.length, 1)
+  c.change(page()); c.button('所属クラスを再取得').props.onClick(); await c.flush()
+  assert.equal(c.calls.length, 2); assert.match(c.text(), /午前クラス/)
 })
