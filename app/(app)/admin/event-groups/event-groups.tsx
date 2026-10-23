@@ -255,6 +255,7 @@ export default function EventGroups({ groupId, createOnly = false }: { groupId?:
         <h2 style={{ overflowWrap: 'anywhere' }}>{group.title}</h2>
         <nav className="occurrence-nav" aria-label="開催回の項目"><a href={`#basic-${group.id}`}>基本情報</a><a href={`#classes-${group.id}`}>クラス・受付</a><a href={`#applications-${group.id}`}>申込管理</a></nav>
         <h3 id={`basic-${group.id}`}>基本情報</h3>
+        <Link href={`/admin/event-groups/${group.id}/edit`}>開催回と全クラスをまとめて編集</Link>
         <p className="eg-description">{group.description || '説明なし'}</p>
         <p>グループ全体の申込受付：<strong>{group.registration_open ? '受付中' : '停止中'}</strong></p>
         <p>開催地：{group.city ?? '未設定'} ／ 開始日：{group.start_date ?? '未設定'} ／ 終了日：{group.end_date ?? '未設定'}</p>
