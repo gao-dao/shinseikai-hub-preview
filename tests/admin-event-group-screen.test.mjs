@@ -38,9 +38,10 @@ function setup({ group = original, postStatus = 201, patchStatus = 200, patchThr
   const Control = () => null
   const ScheduleForm = () => null
   const Classes = () => null
+  const Detail = () => null
   const confirmations = []; let confirmResult = true
   const { default: Component } = compile('app/(app)/admin/event-groups/event-groups.tsx', {
-    '@/lib/event-groups/admin-overview': { ...overview, findOccurrence: async id => { const group = groups.find(item => item.id === id); if (!group) throw new Error('開催回が見つかりません'); return { ...group } } }, react, 'react/jsx-runtime': jsxRuntime, 'next/link': { default: () => null }, './registration-control': { default: Control }, './group-classes': { default: Classes }, '../new-schedule-form': { default: ScheduleForm }, '@/lib/event-groups/validation': validation,
+    '@/lib/event-groups/admin-overview': { ...overview, findOccurrence: async id => { const group = groups.find(item => item.id === id); if (!group) throw new Error('開催回が見つかりません'); return { ...group } } }, react, 'react/jsx-runtime': jsxRuntime, 'next/link': { default: () => null }, './registration-control': { default: Control }, './group-classes': { default: Classes }, './occurrence-detail': { default: Detail }, '../new-schedule-form': { default: ScheduleForm }, '@/lib/event-groups/validation': validation,
   }, { window: { confirm: message => { confirmations.push(message); return confirmResult } }, fetch: async (url, options = {}) => {
     calls.push({ url, options })
     const body = options.body ? JSON.parse(options.body) : null
@@ -56,7 +57,7 @@ function setup({ group = original, postStatus = 201, patchStatus = 200, patchThr
   const find = id => render().find(item => item.props?.id === id)
   const button = label => render().find(item => item.type === 'button' && item.props.children === label)
   return {
-    calls, Control, ScheduleForm, Classes, confirmations, confirm: value => { confirmResult = value }, render, find, button, text: () => text(render()),
+    calls, Control, ScheduleForm, Classes, Detail, confirmations, confirm: value => { confirmResult = value }, render, find, button, text: () => text(render()),
     setGroups: value => { groups = value }, failLists: () => { getFails = true },
     async flush() { render(); for (const effect of effects.splice(0)) { effect.cleanup?.(); effect.cleanup = effect.fn() } await new Promise(resolve => setImmediate(resolve)); render() },
     async mount() { render(); await this.flush() },
@@ -246,12 +247,18 @@ test('saved message remains in parent independently of class reload and subseque
 })
 
 
+
+
 test('detail mode shows only its exact occurrence, existing reception, and honest application navigation', async () => {
   const c = setup({ groupId: original.id }); await c.mount()
   assert.equal(c.render().filter(item => item.type === c.Control).length, 1)
   assert.equal(c.render().find(item => item.type === c.Control).props.id, original.id)
-  const classes = c.render().find(item => item.type === c.Classes)
-  assert.equal(classes.props.hideEndTime, true); assert.equal(classes.props.initiallyExpanded, true)
+  const detail = c.render().find(item => item.type === c.Detail)
+  assert.equal(detail.props.group.id, original.id)
+  assert.equal(c.render().some(item => item.type === c.Classes), false)
+  const nodes = c.render()
+  assert.ok(nodes.indexOf(detail) < nodes.indexOf(nodes.find(item => item.props?.['aria-label'] === '管理操作')))
+  assert.equal(nodes.find(item => item.type === 'h1').props.children, original.title)
   assert.match(c.text(), /開催回別のサーバー絞り込みは未対応/)
   assert.equal(c.render().some(item => item.type === 'form' && !item.props['aria-label']), false)
   c.button('＋ クラスを追加').props.onClick()
