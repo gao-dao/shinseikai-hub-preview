@@ -55,6 +55,7 @@ export default function GroupClasses({ groupId, refreshToken = 0, initiallyExpan
       {expanded ? '所属クラス一覧を閉じる' : '所属クラス一覧を表示'}
     </button>
     {expanded && <section id={regionId} aria-label="所属クラス一覧">
+      <p>クラスごとの受付設定は、管理画面の『予定 → 編集』から変更できます。</p>
       <p>以下はクラス単位の受付設定です。グループ全体が停止中の場合、クラスが有効でも公開申込は受け付けません。</p>
       {loading && <p role="status">所属クラスを読み込み中...</p>}
       {error && <p role="alert">{error}</p>}

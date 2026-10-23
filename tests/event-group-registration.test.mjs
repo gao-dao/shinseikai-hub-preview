@@ -250,3 +250,13 @@ test('duplicate clicks during eligibility checks issue only one update', async (
   assert.equal(context.calls.filter(call => call[0] === 'check').length, 1)
   assert.equal(context.calls.filter(call => call[0] === 'patch').length, 1)
 })
+
+
+for (const registrationOpen of [true, false]) test(`group reception label explicitly identifies its scope: ${registrationOpen}`, () => {
+  const c = control({ registrationOpen })
+  const button = c.render().find(item => item.type === 'button')
+  const action = registrationOpen ? '停止' : '開始'
+  assert.equal(button.props.children, `グループ全体の受付を${action}`)
+  assert.equal(button.props['aria-label'], `講習会：グループ全体の受付を${action}`)
+  assert.equal(c.calls.length, 0)
+})

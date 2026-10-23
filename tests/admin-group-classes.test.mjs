@@ -131,3 +131,30 @@ test('post-save list failure is separately reported and only retries on explicit
   c.change(page()); c.button('所属クラスを再取得').props.onClick(); await c.flush()
   assert.equal(c.calls.length, 2); assert.match(c.text(), /午前クラス/)
 })
+
+
+test('class reception is display-only and list controls cannot call a reception update', async () => {
+  const c = setup({ body: page([{ ...row, registration_enabled: false }]) })
+  await open(c)
+  assert.ok(c.text().includes('無効'))
+  assert.equal(c.render().some(item => item.type === 'button' && /受付停止|受付開始/.test(String(item.props.children))), false)
+  c.button('所属クラスを再取得').props.onClick(); await c.flush()
+  c.button('所属クラス一覧を閉じる').props.onClick(); await c.flush()
+  assert.ok(c.calls.length >= 2)
+  assert.ok(c.calls.every(call => call.url.startsWith('/api/admin/event-groups/7/classes?') && (call.options.method ?? 'GET') === 'GET'))
+})
+
+test('venue display uses the API location verbatim and empty location only shows unset', async () => {
+  for (const venue of ['【検証用】テスト会場', '登録済みの講習会グループ', '']) {
+    const c = setup({ body: page([{ ...row, location: venue }]) }); await open(c)
+    const line = c.render().find(item => item.type === 'p' && Array.isArray(item.props.children) && item.props.children[0] === '会場：')
+    assert.ok(line)
+    assert.equal(line.props.children[1], venue || '未設定')
+  }
+})
+
+
+test('expanded class list explains where class reception can be edited', async () => {
+  const c = setup(); await open(c)
+  assert.ok(c.text().includes('クラスごとの受付設定は、管理画面の『予定 → 編集』から変更できます。'))
+})

@@ -124,3 +124,25 @@ test('dirty notification covers bubbled input changes and clears only on success
   const failed = setup({ status: 500 }); failed.fill(); failed.render().find(item => item.type === 'form').props.onChange()
   await failed.submit(); assert.deepEqual(failed.dirty, [true]); assert.equal(failed.field('title').props.value, ' 通常稽古 ')
 })
+
+
+test('fixed group title never becomes the initial or submitted venue', async () => {
+  const c = setup({ fixedGroup: { ...fixed, title: '登録済みの講習会グループ' } })
+  assert.equal(c.field('location').props.value, '')
+  c.fill()
+  c.set('location', '【検証用】テスト会場')
+  await c.submit({ new_capacity: '5', new_registration_enabled: 'on' })
+  assert.equal(c.calls.length, 1)
+  const payload = JSON.parse(c.calls[0].options.body)
+  assert.equal(payload.location, '【検証用】テスト会場')
+  assert.equal(payload.event_group_id, fixed.id)
+  assert.equal(JSON.stringify(payload).includes('登録済みの講習会グループ'), false)
+})
+
+test('empty venue has no group-title fallback; explicitly typed text is preserved', async () => {
+  for (const venue of ['', '登録済みの講習会グループ']) {
+    const c = setup({ fixedGroup: fixed }); c.fill(); c.set('location', venue)
+    await c.submit({ new_capacity: '5' })
+    assert.equal(JSON.parse(c.calls[0].options.body).location, venue)
+  }
+})

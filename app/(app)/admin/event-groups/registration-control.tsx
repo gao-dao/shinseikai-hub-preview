@@ -61,8 +61,8 @@ export default function RegistrationControl({ id, title, registrationOpen, onUpd
   }
 
   return <div style={{ marginTop: 12 }}>
-    <button type="button" disabled={busy} onClick={change} aria-label={`${title}の受付${registrationOpen ? '停止' : '開始'}`}>
-      {busy ? '確認・更新中...' : registrationOpen ? '受付停止' : '受付開始'}
+    <button type="button" disabled={busy} onClick={change} aria-label={`${title}：グループ全体の受付を${registrationOpen ? '停止' : '開始'}`}>
+      {busy ? '確認・更新中...' : registrationOpen ? 'グループ全体の受付を停止' : 'グループ全体の受付を開始'}
     </button>
     {error && <p role="alert" style={{ color: '#B91C1C', marginTop: 8 }}>{error}</p>}
   </div>
