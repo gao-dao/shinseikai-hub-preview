@@ -15,7 +15,7 @@ export default function ResetPasswordPage() {
     setMsg('')
     setError('')
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: 'https://martial-arts-club-five.vercel.app/update-password'
+      redirectTo: new URL('/update-password', window.location.origin).href
     })
     if (error) {
       setError('エラーが発生しました: ' + error.message)

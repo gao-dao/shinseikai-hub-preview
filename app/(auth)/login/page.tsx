@@ -1,6 +1,5 @@
 'use client'
-import { useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 type Role = 'member' | 'admin'
@@ -11,36 +10,33 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const router = useRouter()
-  const supabase = createClient()
+  const busy = useRef(false)
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (busy.current) return
+    busy.current = true
     setLoading(true)
     setError('')
-
-    const res = await fetch('/api/auth/get-email-by-role', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ role })
-    })
-    const result = await res.json()
-
-    if (!res.ok) {
-      setError(result.error || 'ログインに失敗しました')
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST', credentials: 'same-origin', cache: 'no-store',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role, password }),
+      })
+      if (!response.ok) {
+        setError(response.status === 429 ? 'しばらく待ってからログインしてください' : 'ログインできませんでした。入力内容を確認するか、時間をおいてお試しください。')
+        return
+      }
+      const result = await response.json()
+      if (result.success !== true) throw new Error('LOGIN_UNCONFIRMED')
+      // A fresh document avoids reusing a browser client with an older session.
+      window.location.assign('/videos')
+    } catch {
+      setError('ログイン結果を確認できませんでした。画面を再読み込みして確認してください。')
+    } finally {
+      busy.current = false
       setLoading(false)
-      return
-    }
-
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email: result.email,
-      password
-    })
-
-    if (authError) {
-      setError('パスワードが正しくありません')
-      setLoading(false)
-    } else {
-      router.push('/videos')
     }
   }
 
@@ -106,6 +102,7 @@ export default function LoginPage() {
                 <button
                   key={r}
                   type="button"
+                  disabled={loading}
                   onClick={() => setRole(r)}
                   className={`role-btn${role === r ? ' active' : ''}`}
                 >
