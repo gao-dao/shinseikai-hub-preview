@@ -7,13 +7,17 @@ import { createClient } from '@/lib/supabase/client'
 const tabs = [
   { id: 'videos', icon: '▶', label: '動画ライブラリ', path: '/videos' },
   { id: 'schedule', icon: '📅', label: 'スケジュール', path: '/schedule' },
-  { id: 'admin', icon: '⚙️', label: '管理パネル', path: '/admin' },
+  { id: 'admin', icon: '⚙️', label: '開催回管理', path: '/admin' },
 ]
 
 const titles: Record<string, string> = {
   '/videos': '動画ライブラリ',
   '/schedule': 'スケジュール',
-  '/admin': '管理パネル',
+  '/admin': '開催回管理',
+  '/admin/event-groups': '開催回一覧',
+  '/admin/schedules': '予定管理',
+  '/admin/videos': '動画管理',
+  '/admin/passwords': 'パスワード管理',
 }
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -85,7 +89,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           <nav className="snav">
             {tabs.map(t => (
-              <div key={t.id} className={`snav-item${pathname === t.path ? ' act' : ''}`}
+              <div key={t.id} className={`snav-item${(t.id === 'admin' ? pathname.startsWith('/admin') : pathname === t.path) ? ' act' : ''}`}
                 onClick={() => router.push(t.path)}>
                 <span style={{ fontSize: '15px', width: '18px', textAlign: 'center' }}>{t.icon}</span>
                 {t.label}
@@ -98,7 +102,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </aside>
         <div className="main">
           <div className="topbar">
-            <div className="topbar-ttl">{titles[pathname] || '心勢会HUB'}</div>
+            <div className="topbar-ttl">{titles[pathname] || (pathname.startsWith('/admin/event-groups/') ? '開催回管理' : '心勢会HUB')}</div>
             {userChecked && (
               <button className="topbar-logout" onClick={handleAuth}>{isLogged ? 'ログアウト' : 'ログイン'}</button>
             )}
@@ -107,7 +111,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="bnav">
             <div className="bnav-inner">
               {tabs.map(t => (
-                <div key={t.id} className={`bitem${pathname === t.path ? ' act' : ''}`}
+                <div key={t.id} className={`bitem${(t.id === 'admin' ? pathname.startsWith('/admin') : pathname === t.path) ? ' act' : ''}`}
                   onClick={() => router.push(t.path)}>
                   <span className="bico">{t.icon}</span>
                   <span>{t.label}</span>

@@ -46,7 +46,7 @@ for (const [label, user, userError, profile, profileError, expected] of [
   assert.equal(calls.length, expected === 401 ? 0 : 1)
 })
 
-for (const [folder, component] of [['event-groups', './event-groups'], ['registrations', './registration-list']]) {
+for (const [folder, component] of [['event-groups', './occurrence-list'], ['registrations', './registration-list']]) {
   for (const [status, destination] of [[401, '/login'], [403, '/videos'], [200, null]]) {
     test(`admin ${folder} page boundary: ${status}`, async () => {
       let rendered = 0

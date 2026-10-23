@@ -4,13 +4,14 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import RegistrationControl from './registration-control'
 import GroupClasses from './group-classes'
+import { findOccurrence } from '@/lib/event-groups/admin-overview'
 import NewScheduleForm from '../new-schedule-form'
 import { validateEventGroupOccurrence, type EventGroupOccurrence } from '@/lib/event-groups/validation'
 
 type Group = { id: number; title: string; description: string | null; registration_open: boolean } & EventGroupOccurrence
 type List = { eventGroups: Group[]; page: number; pageSize: number; total: number }
 
-export default function EventGroups() {
+export default function EventGroups({ groupId, createOnly = false }: { groupId?: number; createOnly?: boolean } = {}) {
   const [page, setPage] = useState(1)
   const [reload, setReload] = useState(0)
   const [result, setResult] = useState<List | null>(null)
@@ -124,6 +125,12 @@ export default function EventGroups() {
       if (addingGroupRef.current === null) setResult(null)
       setListError('')
       try {
+        if (createOnly) { setLoading(false); return }
+        if (groupId) {
+          const group = await findOccurrence(groupId, controller.signal)
+          if (!controller.signal.aborted) setResult({ eventGroups: [group], page: 1, pageSize: 1, total: 1 })
+          return
+        }
         const response = await fetch(`/api/admin/event-groups?page=${page}`, { cache: 'no-store', signal: controller.signal })
         if (!response.ok) throw new Error(response.status === 401 ? 'ログインし直してください。' : response.status === 403 ? '管理者権限がありません。' : '一覧を取得できませんでした。')
         const data: List = await response.json()
@@ -136,7 +143,7 @@ export default function EventGroups() {
     }
     void load()
     return () => controller.abort()
-  }, [page, reload])
+  }, [page, reload, groupId, createOnly])
 
   async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -189,12 +196,20 @@ export default function EventGroups() {
         .eg-page button:disabled { opacity: .5; cursor: default; }
         .eg-page .eg-submit { background: #6B1F2B; color: #fff; margin-top: 16px; }
         .eg-page a { color: #6B1F2B; }
+        .eg-page { scroll-behavior: smooth; }
+        .eg-page h1 { font-size: 28px; margin: 20px 0; }
+        .eg-page h3 { margin: 24px 0 12px; scroll-margin-top: 16px; }
+        .occurrence-nav { display: flex; flex-wrap: wrap; gap: 14px; padding: 16px 0; }
+        .occurrence-applications { border-top: 1px solid #e7e1d8; margin-top: 24px; padding-top: 8px; }
+        .eg-page button { min-height: 44px; margin: 4px 6px 4px 0; }
+        @media(max-width:640px) { .eg-page { padding: 20px 16px; } .eg-card { padding: 16px; } .eg-page button { max-width: 100%; white-space: normal; } }
         .eg-description { white-space: pre-wrap; overflow-wrap: anywhere; margin: 12px 0; }
       `}</style>
-      <Link href="/admin">← 管理パネルへ戻る</Link>
-      <h1 id="event-groups-title">講習会グループ管理</h1>
-      <form onSubmit={create} className="eg-card">
-        <h2>講習会グループの新規作成</h2>
+      <Link href="/admin/event-groups">← 開催回一覧へ</Link>
+      <h1 id="event-groups-title">{groupId ? '開催回の詳細' : '開催回を作成'}</h1>
+      <nav className="occurrence-nav" aria-label="管理メニュー"><Link href="/admin/schedules">予定管理</Link><Link href="/admin/videos">動画管理</Link><Link href="/admin/passwords">パスワード管理</Link><Link href="/admin/registrations">全開催回の申込一覧</Link></nav>
+      {!groupId && <form onSubmit={create} className="eg-card">
+        <h2>開催回の基本情報</h2>
         <p>新規作成時の申込受付は停止中になります。</p>
         <label htmlFor="eg-title">タイトル（必須・200文字以内）</label>
         <input id="eg-title" value={title} onChange={event => setTitle(event.target.value)} required disabled={saving} />
@@ -210,7 +225,8 @@ export default function EventGroups() {
         <button className="eg-submit" type="submit" disabled={saving || addingGroup !== null}>{saving ? '作成中...' : '作成する'}</button>
         {formError && <p role="alert" style={{ color: '#B91C1C', marginTop: 12 }}>{formError}</p>}
         <p role="status" style={{ marginTop: 12 }}>{message}</p>
-      </form>
+      </form>}
+      {groupId && <p role="status">{message}</p>}
       {editing && <form className="eg-card" aria-label="開催情報の編集" onSubmit={saveEdit}>
         <h2>開催情報の編集</h2>
         <label htmlFor="eg-edit-city">開催地（任意・100文字以内）</label>
@@ -229,21 +245,25 @@ export default function EventGroups() {
           <button type="button" disabled={refreshing || editSaving} onClick={() => beginEdit(latest)}>最新情報で編集を再開</button>
         </div>}
       </form>}
-      <h2>登録済みの講習会グループ</h2>
+      {!createOnly && <>
+      {!groupId && <h2>登録済みの開催回</h2>}
       <button onClick={() => setReload(value => value + 1)} disabled={loading || addingGroup !== null}>一覧を再取得</button>
       <p role="status" style={{ margin: '16px 0' }}>{loading ? '読み込み中...' : result ? `全${result.total}件・${result.page}ページ目` : ''}</p>
       {listError && <p role="alert">{listError} <Link href="/login">ログイン画面へ</Link></p>}
       {result?.eventGroups.length === 0 && <p>表示する講習会グループはありません。</p>}
       {result?.eventGroups.map(group => <article className="eg-card" key={group.id}>
         <h2 style={{ overflowWrap: 'anywhere' }}>{group.title}</h2>
+        <nav className="occurrence-nav" aria-label="開催回の項目"><a href={`#basic-${group.id}`}>基本情報</a><a href={`#classes-${group.id}`}>クラス・受付</a><a href={`#applications-${group.id}`}>申込管理</a></nav>
+        <h3 id={`basic-${group.id}`}>基本情報</h3>
         <p className="eg-description">{group.description || '説明なし'}</p>
         <p>グループ全体の申込受付：<strong>{group.registration_open ? '受付中' : '停止中'}</strong></p>
         <p>開催地：{group.city ?? '未設定'} ／ 開始日：{group.start_date ?? '未設定'} ／ 終了日：{group.end_date ?? '未設定'}</p>
         <button type="button" disabled={editing !== null || addingGroup !== null} onClick={() => beginEdit(group)}>開催情報を編集</button>
+        <h3 id={`classes-${group.id}`}>クラス・受付</h3>
         <button type="button" disabled={editing !== null || creatingClass} aria-expanded={addingGroup?.id === group.id}
-          onClick={() => toggleClassForm(group)}>このグループに予定を追加</button>
+          onClick={() => toggleClassForm(group)}>{groupId ? '＋ クラスを追加' : 'このグループに予定を追加'}</button>
         {addingGroup?.id === group.id && <div>
-          <NewScheduleForm key={addingGroup.id} fixedGroup={{ id: addingGroup.id, title: addingGroup.title, registration_open: group.registration_open }}
+          <NewScheduleForm key={addingGroup.id} hideEndTime={!!groupId} fixedGroup={{ id: addingGroup.id, title: addingGroup.title, registration_open: group.registration_open }}
             onBusyChange={busy => { classBusy.current = busy; setCreatingClass(busy) }}
             onDirtyChange={dirty => { classDirty.current = dirty }}
             onCreated={() => {
@@ -256,13 +276,18 @@ export default function EventGroups() {
         </div>}
         {classSuccess[group.id] && <p role="status">{classSuccess[group.id]}</p>}
         <GroupClasses key={`${group.id}-${classRefresh[group.id] ?? 0}`} groupId={group.id}
-          initiallyExpanded={(classRefresh[group.id] ?? 0) > 0} />
+          hideEndTime={!!groupId} initiallyExpanded={!!groupId || (classRefresh[group.id] ?? 0) > 0} />
         <RegistrationControl id={group.id} title={group.title} registrationOpen={group.registration_open} onUpdated={() => setReload(value => value + 1)} />
+        <section id={`applications-${group.id}`} className="occurrence-applications"><h3>申込管理</h3>
+          <p>開催回別のサーバー絞り込みは未対応です。ここでは一部の申込を全件として表示しません。</p>
+          <Link href="/admin/registrations">全開催回の申込一覧を開く</Link><p>一覧の「対象講習会」で「{group.title}」を確認してください。情報編集・クラス追加・取消は申込一覧で行えます。</p>
+        </section>
       </article>)}
-      {result && <nav aria-label="講習会グループのページ切替" style={{ display: 'flex', gap: 16 }}>
+      {!groupId && result && <nav aria-label="講習会グループのページ切替" style={{ display: 'flex', gap: 16 }}>
         <button disabled={addingGroup !== null || page <= 1} onClick={() => setPage(value => value - 1)}>前のページ</button>
         <button disabled={addingGroup !== null || page * result.pageSize >= result.total} onClick={() => setPage(value => value + 1)}>次のページ</button>
       </nav>}
+      </>}
     </section>
   )
 }

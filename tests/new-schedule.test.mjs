@@ -243,7 +243,7 @@ function adminForm({ ok = true, historyKnown = true } = {}) {
     order: async () => { calls.push(['refresh']); return { data: [] } },
     update: payload => { calls.push(['update', payload]); return { eq: async () => ({ error: null }) } },
   }
-  const { default: Admin } = compile('app/(app)/admin/page.tsx', {
+  const { default: Admin } = compile('app/(app)/admin/management-tools.tsx', {
     react: harness.react, 'react/jsx-runtime': jsxRuntime,
     '@/lib/supabase/client': { createClient: () => ({ from: table => { assert.equal(table, 'schedules'); return query } }) },
     'next/navigation': { useRouter: () => ({}) }, 'next/link': { default: () => null },

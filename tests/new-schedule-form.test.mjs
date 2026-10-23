@@ -29,7 +29,7 @@ function hooks() {
     useEffect() {},
   } }
 }
-function setup({ fixedGroup, status = 201, throws = false, pending = false } = {}) {
+function setup({ fixedGroup, status = 201, throws = false, pending = false, hideEndTime = false } = {}) {
   const harness = hooks(), calls = [], busy = [], created = [], dirty = [], Fields = () => null
   let release
   const { default: Form } = compile('app/(app)/admin/new-schedule-form.tsx', {
@@ -44,7 +44,7 @@ function setup({ fixedGroup, status = 201, throws = false, pending = false } = {
       return { ok: status >= 200 && status < 300, status }
     },
   })
-  const render = () => { harness.reset(); return elements(Form({ fixedGroup, onCreated: () => created.push(true), onBusyChange: value => busy.push(value), onDirtyChange: value => dirty.push(value) })) }
+  const render = () => { harness.reset(); return elements(Form({ hideEndTime, fixedGroup, onCreated: () => created.push(true), onBusyChange: value => busy.push(value), onDirtyChange: value => dirty.push(value) })) }
   const field = name => render().find(item => item.props?.name === name)
   return { calls, busy, created, dirty, Fields, render, field,
     set(name, value) { field(name).props.onChange({ target: { value } }) },
@@ -145,4 +145,12 @@ test('empty venue has no group-title fallback; explicitly typed text is preserve
     await c.submit({ new_capacity: '5' })
     assert.equal(JSON.parse(c.calls[0].options.body).location, venue)
   }
+})
+
+
+test('occurrence creation hides the end-time input and never invents a value', async () => {
+  const c = setup({ fixedGroup: fixed, hideEndTime: true }); c.set('title', '合成クラス'); c.set('date', '2026-11-01'); c.set('start_time', '10:00'); c.set('location', '合成会場')
+  assert.equal(c.render().some(item => item.props?.name === 'end_time'), false)
+  await c.submit({ new_capacity: '5', new_registration_enabled: 'on' })
+  assert.equal(JSON.parse(c.calls[0].options.body).end_time, null)
 })

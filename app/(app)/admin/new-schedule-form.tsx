@@ -5,13 +5,14 @@ import NewScheduleFields, { type Group } from './new-schedule-fields'
 import { parseRegistrationFields, validateNewSchedule, type NewSchedule } from '@/lib/schedules/new-schedule'
 
 type Props = {
+  hideEndTime?: boolean
   fixedGroup?: Group
   onCreated?: () => void
   onBusyChange?: (busy: boolean) => void
   onDirtyChange?: (dirty: boolean) => void
 }
 
-export default function NewScheduleForm({ fixedGroup, onCreated, onBusyChange, onDirtyChange }: Props) {
+export default function NewScheduleForm({ hideEndTime = false, fixedGroup, onCreated, onBusyChange, onDirtyChange }: Props) {
   const [title, setTitle] = useState('')
   const [date, setDate] = useState('')
   const [start, setStart] = useState('')
@@ -64,7 +65,7 @@ export default function NewScheduleForm({ fixedGroup, onCreated, onBusyChange, o
         <label>タイトル *<input name="title" value={title} onChange={event => setTitle(event.target.value)} required placeholder="通常稽古" /></label>
         <label>日付 *<input name="date" type="date" value={date} onChange={event => setDate(event.target.value)} required /></label>
         <label>開始時間<input name="start_time" type="time" value={start} onChange={event => setStart(event.target.value)} /></label>
-        <label>終了時間<input name="end_time" type="time" value={end} onChange={event => setEnd(event.target.value)} /></label>
+        {!hideEndTime && <label>終了時間<input name="end_time" type="time" value={end} onChange={event => setEnd(event.target.value)} /></label>}
         <label>場所<input name="location" value={location} onChange={event => setLocation(event.target.value)} placeholder="道場A" /></label>
         <label>種別<select name="type" value={type} onChange={event => setType(event.target.value as NewSchedule['type'])}>
           <option value="稽古会">稽古会</option><option value="一般参加">一般参加</option>

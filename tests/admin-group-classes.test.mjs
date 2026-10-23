@@ -12,7 +12,7 @@ function elements(tree) {
   if (!tree || typeof tree !== 'object') return []
   return [tree, ...elements(tree.props?.children)]
 }
-function setup({ body = page(), status = 200, throws = false, pending = false, initiallyExpanded = false } = {}) {
+function setup({ body = page(), status = 200, throws = false, pending = false, initiallyExpanded = false, hideEndTime = false } = {}) {
   const slots = [], effects = [], calls = []
   let cursor = 0, payload = body, httpStatus = status, release, refreshToken = 0
   const react = {
@@ -36,7 +36,7 @@ function setup({ body = page(), status = 200, throws = false, pending = false, i
       return { ok: httpStatus === 200, status: httpStatus, json: async () => payload }
     },
   })
-  const render = () => { cursor = 0; return elements(exports.default({ groupId: 7, refreshToken, initiallyExpanded })) }
+  const render = () => { cursor = 0; return elements(exports.default({ groupId: 7, refreshToken, initiallyExpanded, hideEndTime })) }
   const button = text => render().find(item => item.type === 'button' && item.props.children === text)
   return { calls, render, button, refresh: () => { refreshToken += 1 }, change: (value, nextStatus = 200) => { payload = value; httpStatus = nextStatus },
     text: () => render().filter(item => item.type === 'p' || item.type === 'h3').map(item => JSON.stringify(item.props.children)).join(' '),
@@ -157,4 +157,11 @@ test('venue display uses the API location verbatim and empty location only shows
 test('expanded class list explains where class reception can be edited', async () => {
   const c = setup(); await open(c)
   assert.ok(c.text().includes('クラスごとの受付設定は、管理画面の『予定 → 編集』から変更できます。'))
+})
+
+
+test('occurrence class view shows start, capacity, bookings and seats but not end time', async () => {
+  const c = setup({ hideEndTime: true }); await open(c)
+  assert.ok(c.text().includes('10:00')); assert.equal(c.text().includes('12:00'), false)
+  assert.ok(c.text().includes('残席：')); assert.ok(c.text().includes('8名'))
 })

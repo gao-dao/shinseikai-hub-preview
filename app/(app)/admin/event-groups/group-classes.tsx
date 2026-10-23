@@ -18,7 +18,7 @@ function validClass(value: unknown): value is ClassItem {
     Number.isSafeInteger(row.registeredCount) && row.registeredCount >= 0 && typeof row.registration_enabled === 'boolean'
 }
 
-export default function GroupClasses({ groupId, refreshToken = 0, initiallyExpanded = false }: { groupId: number; refreshToken?: number; initiallyExpanded?: boolean }) {
+export default function GroupClasses({ groupId, refreshToken = 0, initiallyExpanded = false, hideEndTime = false }: { groupId: number; refreshToken?: number; initiallyExpanded?: boolean; hideEndTime?: boolean }) {
   const [expanded, setExpanded] = useState(initiallyExpanded)
   const [page, setPage] = useState(1)
   const [reload, setReload] = useState(0)
@@ -61,11 +61,12 @@ export default function GroupClasses({ groupId, refreshToken = 0, initiallyExpan
       {error && <p role="alert">{error}</p>}
       {result && result.total === 0 && <p>クラス未登録</p>}
       {result && <>
-        <ul>{result.schedules.map(item => <li key={item.id}>
+        <ul style={{ listStyle: 'none', padding: 0, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))', gap: 12 }}>{result.schedules.map(item => <li key={item.id} style={{ padding: 16, border: '1px solid #e7e1d8', borderRadius: 12, background: '#fff' }}>
           <h3>{item.title}</h3>
-          <p>日時：{item.date} {item.start_time ?? '未設定'}〜{item.end_time ?? '未設定'}</p>
+          <p>日時：{item.date} {item.start_time ?? '未設定'}{!hideEndTime && <>〜{item.end_time ?? '未設定'}</>}</p>
           <p>会場：{item.location || '未設定'}</p>
           <p>定員：{item.capacity === null ? '未設定' : `${item.capacity}名`} ／ 有効申込数：{item.registeredCount}件</p>
+          <p>残席：{item.capacity === null ? '確認できません' : `${Math.max(item.capacity - item.registeredCount, 0)}名`}</p>
           <p>クラス受付：{item.registration_enabled ? '有効' : '無効'}</p>
         </li>)}</ul>
         <p>全{result.total}クラス・{result.page}ページ目</p>

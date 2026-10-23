@@ -15,13 +15,14 @@ function compile(file, dependencies = {}, globals = {}) {
   return exports
 }
 const validation = compile('lib/event-groups/validation.ts')
+const overview = compile('lib/event-groups/admin-overview.ts')
 const original = { id: 7, title: '講習会', description: '説明', registration_open: true, city: '福岡', start_date: '2026-11-01', end_date: '2026-11-03' }
 function elements(tree) {
   if (Array.isArray(tree)) return tree.flatMap(elements)
   if (!tree || typeof tree !== 'object') return []
   return [tree, ...elements(tree.props?.children)]
 }
-function setup({ group = original, postStatus = 201, patchStatus = 200, patchThrows = false, patchInvalid = false, listFails = false } = {}) {
+function setup({ group = original, postStatus = 201, patchStatus = 200, patchThrows = false, patchInvalid = false, listFails = false, groupId } = {}) {
   const slots = [], effects = [], calls = []
   let cursor = 0, groups = [{ ...group }], getFails = listFails
   const react = {
@@ -39,7 +40,7 @@ function setup({ group = original, postStatus = 201, patchStatus = 200, patchThr
   const Classes = () => null
   const confirmations = []; let confirmResult = true
   const { default: Component } = compile('app/(app)/admin/event-groups/event-groups.tsx', {
-    react, 'react/jsx-runtime': jsxRuntime, 'next/link': { default: () => null }, './registration-control': { default: Control }, './group-classes': { default: Classes }, '../new-schedule-form': { default: ScheduleForm }, '@/lib/event-groups/validation': validation,
+    '@/lib/event-groups/admin-overview': { ...overview, findOccurrence: async id => { const group = groups.find(item => item.id === id); if (!group) throw new Error('開催回が見つかりません'); return { ...group } } }, react, 'react/jsx-runtime': jsxRuntime, 'next/link': { default: () => null }, './registration-control': { default: Control }, './group-classes': { default: Classes }, '../new-schedule-form': { default: ScheduleForm }, '@/lib/event-groups/validation': validation,
   }, { window: { confirm: message => { confirmations.push(message); return confirmResult } }, fetch: async (url, options = {}) => {
     calls.push({ url, options })
     const body = options.body ? JSON.parse(options.body) : null
@@ -50,7 +51,7 @@ function setup({ group = original, postStatus = 201, patchStatus = 200, patchThr
     }
     return { ok: !getFails, status: getFails ? 500 : 200, json: async () => ({ eventGroups: groups.map(item => ({ ...item })), page: 1, pageSize: 50, total: groups.length }) }
   } })
-  const render = () => { cursor = 0; return elements(Component()) }
+  const render = () => { cursor = 0; return elements(Component({ groupId })) }
   const text = node => elements(node).filter(item => item.type === 'p').map(item => JSON.stringify(item.props.children)).join(' ')
   const find = id => render().find(item => item.props?.id === id)
   const button = label => render().find(item => item.type === 'button' && item.props.children === label)
@@ -242,4 +243,17 @@ test('saved message remains in parent independently of class reload and subseque
   c.button('予定追加を閉じる').props.onClick()
   assert.match(c.text(), /予定を保存しました/)
   assert.equal(c.render().find(item => item.type === c.Classes).props.initiallyExpanded, true)
+})
+
+
+test('detail mode shows only its exact occurrence, existing reception, and honest application navigation', async () => {
+  const c = setup({ groupId: original.id }); await c.mount()
+  assert.equal(c.render().filter(item => item.type === c.Control).length, 1)
+  assert.equal(c.render().find(item => item.type === c.Control).props.id, original.id)
+  const classes = c.render().find(item => item.type === c.Classes)
+  assert.equal(classes.props.hideEndTime, true); assert.equal(classes.props.initiallyExpanded, true)
+  assert.match(c.text(), /開催回別のサーバー絞り込みは未対応/)
+  assert.equal(c.render().some(item => item.type === 'form' && !item.props['aria-label']), false)
+  c.button('＋ クラスを追加').props.onClick()
+  assert.equal(c.render().find(item => item.type === c.ScheduleForm).props.hideEndTime, true)
 })

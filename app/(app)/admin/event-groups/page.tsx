@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { requireAdmin } from '@/lib/supabase/require-admin'
-import EventGroups from './event-groups'
+import EventGroups from './occurrence-list'
 
 export const dynamic = 'force-dynamic'
 
