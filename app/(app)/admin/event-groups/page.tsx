@@ -1,11 +1,15 @@
 import { redirect } from 'next/navigation'
 import { requireAdmin } from '@/lib/supabase/require-admin'
-import EventGroups from './occurrence-list'
-
+import { indexOptions, type IndexResult } from '@/lib/event-groups/admin-index'
+import { loadAdminIndex } from '@/lib/event-groups/admin-index-server'
+import AdminIndexView from './admin-index-view'
 export const dynamic = 'force-dynamic'
-
-export default async function EventGroupsPage() {
-  const authorization = await requireAdmin()
-  if (!authorization.ok) redirect(authorization.status === 401 ? '/login' : '/videos')
-  return <EventGroups />
+export const revalidate = 0
+export default async function EventGroupsPage(props: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
+  const auth = await requireAdmin()
+  if (!auth.ok) redirect(auth.status === 401 ? '/login' : '/videos')
+  let options = indexOptions(false), result: IndexResult | null = null, error = ''
+  try { options = indexOptions(false, await props?.searchParams); result = await loadAdminIndex(options) }
+  catch { error = '開催回を取得できませんでした。条件を確認し、再読み込みしてください。' }
+  return <AdminIndexView options={options} result={result} error={error} />
 }

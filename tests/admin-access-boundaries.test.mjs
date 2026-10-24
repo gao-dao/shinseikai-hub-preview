@@ -46,7 +46,7 @@ for (const [label, user, userError, profile, profileError, expected] of [
   assert.equal(calls.length, expected === 401 ? 0 : 1)
 })
 
-for (const [folder, component] of [['event-groups', './occurrence-list'], ['registrations', './registration-list']]) {
+for (const [folder, component] of [['event-groups', './admin-index-view'], ['registrations', './registration-list']]) {
   for (const [status, destination] of [[401, '/login'], [403, '/videos'], [200, null]]) {
     test(`admin ${folder} page boundary: ${status}`, async () => {
       let rendered = 0
@@ -54,6 +54,8 @@ for (const [folder, component] of [['event-groups', './occurrence-list'], ['regi
         'next/navigation': { redirect(path) { assert.equal(path, destination); throw new Error('TEST_REDIRECT') } },
         '@/lib/supabase/require-admin': { requireAdmin: async () => status === 200 ? { ok: true } : { ok: false, status } },
         [component]: { default: () => null },
+        '@/lib/event-groups/admin-index': { indexOptions: () => ({}) },
+        '@/lib/event-groups/admin-index-server': { loadAdminIndex: async () => { assert.equal(status, 200); return {} } },
         'react/jsx-runtime': { jsx() { rendered++; return 'TEST_PAGE' } },
       })
       if (destination) {
