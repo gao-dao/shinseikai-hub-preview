@@ -83,3 +83,9 @@ test('detail ranges hide seconds without mutating raw values; absent end is not 
   assert.match(c.text(), /13:40〜15:40/); assert.doesNotMatch(c.text(), /:22|:33/); assert.equal(data.end_time, '15:40:33')
   const empty = screen({ rows: [row(1, { end_time: null })] }); await empty.flush(); assert.doesNotMatch(empty.text(), /〜/)
 })
+
+test('shared venue appears once above all classes, distinct venues remain per class',async()=>{
+ const shared=screen({rows:[row(),row(2)]});await shared.flush();assert.equal(shared.text().split('Synthetic venue').length-1,1);assert.doesNotMatch(shared.text(),/City is not venue/)
+ const mixed=screen({rows:[row(),row(2,{location:'Other venue'})]});await mixed.flush();assert.equal(mixed.text().split('Synthetic venue').length-1,1);assert.equal(mixed.text().split('Other venue').length-1,1)
+ assert.match(text(mixed.nodes().filter(n=>n.type==='li')[0]),/Synthetic venue/);assert.match(text(mixed.nodes().filter(n=>n.type==='li')[1]),/Other venue/)
+})

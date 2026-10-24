@@ -1,5 +1,5 @@
 export type Occurrence = { id: number; title: string; description: string | null; city: string | null; start_date: string | null; end_date: string | null; registration_open: boolean }
-export type ClassSummary = { classCount: number; activeClassBookings: number }
+export type ClassSummary = { classCount: number; activeClassBookings: number; classDates: unknown[] }
 export function validOccurrence(value: unknown): value is Occurrence {
   if (!value || typeof value !== 'object') return false
   const v = value as Occurrence
@@ -28,7 +28,7 @@ export async function findOccurrence(id: number, signal: AbortSignal): Promise<O
 export async function loadClassSummary(id: number, signal: AbortSignal): Promise<ClassSummary> {
   let total: number | undefined
   let count = 0, bookings = 0
-  const ids = new Set<number>()
+  const ids = new Set<number>(), classDates: unknown[] = []
   for (let page = 1; page <= 100; page++) {
     const response = await fetch(`/api/admin/event-groups/${id}/classes?page=${page}`, { cache: 'no-store', signal })
     if (!response.ok) throw new Error('クラス集計を取得できませんでした')
@@ -39,10 +39,10 @@ export async function loadClassSummary(id: number, signal: AbortSignal): Promise
     total = data.total
     for (const row of data.schedules) {
       if (!Number.isSafeInteger(row.id) || row.id <= 0 || ids.has(row.id) || !Number.isSafeInteger(row.registeredCount) || row.registeredCount < 0) throw new Error('集計を確認できませんでした')
-      ids.add(row.id); count++; bookings += row.registeredCount
+      ids.add(row.id); classDates.push(row.date); count++; bookings += row.registeredCount
       if (!Number.isSafeInteger(bookings)) throw new Error('集計範囲を超えています')
     }
-    if (count === total) return { classCount: total, activeClassBookings: bookings }
+    if (count === total) return { classCount: total, activeClassBookings: bookings, classDates }
   }
   throw new Error('集計の取得範囲を超えています')
 }

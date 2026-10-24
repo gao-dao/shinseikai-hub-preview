@@ -10,6 +10,7 @@ function compile(file, dependencies, globals = {}) {
 }
 const occurrence = compile('lib/event-groups/validation.ts', {}), schedule = compile('lib/schedules/new-schedule.ts', {})
 const validation = compile('lib/event-groups/occurrence-editor.ts', { './validation': occurrence, '../schedules/new-schedule': schedule })
+const presentation = compile('lib/event-groups/presentation.ts', {})
 const plain = v => JSON.parse(JSON.stringify(v))
 function all(tree) { if (Array.isArray(tree)) return tree.flatMap(all); return tree && typeof tree === 'object' ? [tree, ...all(tree.props?.children)] : [] }
 function text(tree) { if (Array.isArray(tree)) return tree.map(text).join(''); if (tree && typeof tree === 'object') return text(tree.props?.children); return typeof tree === 'string' || typeof tree === 'number' ? String(tree) : '' }
@@ -23,7 +24,7 @@ function setup({ groupId, data = snapshot(), status = 200, result = { state: 'sa
   }
   const jsx = (type, props) => ({ type, props })
   const { default: Component } = compile('app/(app)/admin/event-groups/occurrence-editor.tsx', {
-    react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'fragment' }, 'next/link': { default: 'Link' }, '@/lib/event-groups/occurrence-editor': validation,
+    react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'fragment' }, 'next/link': { default: 'Link' }, '@/lib/event-groups/occurrence-editor': validation, '@/lib/event-groups/presentation': presentation,
     '@/lib/event-groups/occurrence-save': { createOccurrenceSaver: () => ({ restore: () => pending, save: async input => { calls.push(['save', plain(input)]); if (deferred) return new Promise(r => release = r); return result } }) },
   }, { AbortController, fetch: async (url, options) => { calls.push(['fetch', url, options]); return { ok: status === 200, json: async () => ({ snapshot: data }) } }, window: { addEventListener() {}, removeEventListener() {}, confirm: () => { confirmations++; return confirmResult } }, sessionStorage: {}, crypto: {} })
   const render = () => { cursor = 0; return all(Component({ groupId })) }
@@ -129,4 +130,23 @@ test('single and multiple classes send explicit end times, reverse ranges reject
   const c = setup(); await c.mount(); fill(c); c.change('終了時刻（任意）', '11:00'); await c.submit(); assert.equal(c.button('まとめて保存'), undefined)
   c.change('終了時刻（任意）', '13:40'); c.button('＋クラスを追加').props.onClick(); c.change('クラス名', 'B', 1); c.change('開始時刻', '14:00', 1); c.change('終了時刻（任意）', '15:40', 1)
   await c.submit(); await c.save(); assert.deepEqual(c.calls.find(v => v[0] === 'save')[1].classes.map(v => v.end_time), ['13:40', '15:40'])
+})
+
+test('editor displays chronological rows with stable identities, but preserves raw API save order', async () => {
+  const data=snapshot(); data.classes=[{...data.classes[0],id:7,title:'Late',start_time:'15:00'}, {...data.classes[0],id:8,title:'Early',start_time:'10:00'}, {...data.classes[0],id:9,title:'Tie',start_time:'10:00'}]
+  const c=setup({groupId:1,data});await c.mount()
+  assert.deepEqual(c.fields('クラス名').map(v=>v.props.value),['Early','Tie','Late'])
+  const keys=()=>c.render().filter(v=>v.props?.['data-class-key']!==undefined).map(v=>v.props['data-class-key'])
+  assert.deepEqual(keys(),[1,2,0]);c.change('開始時刻','16:00',0)
+  assert.deepEqual(keys(),[1,2,0]);assert.equal(c.fields('クラス名')[0].props.value,'Early')
+  const section=c.render().find(v=>v.props?.['data-class-key']===1)
+  section.props.onBlur({relatedTarget:{},currentTarget:{contains:()=>true}});assert.deepEqual(keys(),[1,2,0])
+  section.props.onBlur({relatedTarget:{},currentTarget:{contains:()=>false}});assert.deepEqual(keys(),[2,0,1])
+  await c.submit();await c.save();const sent=c.calls.find(v=>v[0]==='save')[1]
+  assert.deepEqual(sent.classes.map(v=>v.id),[7,8,9]);assert.equal(sent.classes[1].start_time,'16:00');assert.equal(sent.classes[0].start_time,'15:00')
+})
+test('editor orders across days and explicit sorting changes no identity or dirty state',async()=>{
+ const data=snapshot();data.classes=[{...data.classes[0],id:7,date:'2030-10-24'}, {...data.classes[0],id:8,date:'2030-10-23'}]
+ const c=setup({groupId:1,data});await c.mount();assert.deepEqual(c.render().filter(v=>v.props?.['data-class-key']!==undefined).map(v=>v.props['data-class-key']),[1,0])
+ c.button('日時順に整列').props.onClick();assert.equal(leaveByCancel(c),false);assert.equal(c.confirmations(),0)
 })

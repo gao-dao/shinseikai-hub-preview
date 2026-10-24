@@ -32,7 +32,7 @@ export default function OccurrenceDetail({ group, refreshToken = 0 }: { group: O
     {error && <p role="alert">{error}</p>}
     {!rows && !error && <p role="status">クラス・申込状況を読み込み中...</p>}
     {rows?.length === 0 && <p>クラス未登録</p>}
-    {rows && rows.length > 1 && <section aria-label="クラス情報"><h2>クラス情報</h2><ol className="detail-classes">{rows.map(row => <li key={row.id}><h3>{row.title}</h3><p>{row.date} {timeRange(row)}</p><p>会場：{row.location || '未設定'}</p><Stats row={row} /></li>)}</ol></section>}
+    {rows && rows.length > 1 && <section aria-label="クラス情報"><h2>クラス情報</h2><ol className="detail-classes">{rows.map(row => <li key={row.id}><h3>{row.title}</h3><p>{row.date} {timeRange(row)}</p>{venues.length > 1 && <p>会場：{row.location || '未設定'}</p>}<Stats row={row} /></li>)}</ol></section>}
     <section aria-label="申込状況" className="detail-applications"><h2>申込状況</h2><p>グループ全体の申込受付：<strong>{group.registration_open ? '受付中' : '停止中'}</strong></p>
       {single && <Stats row={single} />}
       {rows && rows.length > 1 && <p>有効クラス申込：{Number.isSafeInteger(bookings) ? `${bookings}件（延べ）` : '集計できません'}。同じ人の複数クラス申込を含みます。</p>}
