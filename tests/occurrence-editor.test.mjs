@@ -23,7 +23,7 @@ test('single class and multi-day occurrence validate with default capacity and r
   assert.ok(validation.validateOccurrenceInput(input).data)
 })
 for (const [name, mutate] of [
-  ['zero classes', v => v.classes = []], ['too many', v => v.classes = Array(101).fill(v.classes[0])], ['bad leap day', v => v.classes[0].date = '2030-02-29'], ['outside period', v => v.classes[0].date = '2030-10-24'], ['missing start', v => v.classes[0].start_time = null], ['bad capacity', v => v.classes[0].capacity = 0], ['new null capacity', v => v.classes[0].capacity = null], ['hidden end time injection', v => v.classes[0].end_time = '14:00'], ['reception injection', v => v.group.registration_open = true], ['foreign id on create', v => v.classes[0].id = 9], ['noninteger id', v => v.group_id = 1.1], ['empty venue', v => v.classes[0].location = ' '], ['empty title', v => v.group.title = ' '], ['invalid type', v => v.classes[0].type = 'other'], ['unknown field', v => v.password = 'synthetic'], ['long title', v => v.group.title = 'a'.repeat(201)], ['invalid date pair', v => v.group.end_date = null],
+  ['zero classes', v => v.classes = []], ['too many', v => v.classes = Array(101).fill(v.classes[0])], ['bad leap day', v => v.classes[0].date = '2030-02-29'], ['outside period', v => v.classes[0].date = '2030-10-24'], ['missing start', v => v.classes[0].start_time = null], ['bad capacity', v => v.classes[0].capacity = 0], ['new null capacity', v => v.classes[0].capacity = null], ['invalid end time', v => v.classes[0].end_time = '25:00'], ['reception injection', v => v.group.registration_open = true], ['foreign id on create', v => v.classes[0].id = 9], ['noninteger id', v => v.group_id = 1.1], ['empty venue', v => v.classes[0].location = ' '], ['empty title', v => v.group.title = ' '], ['invalid type', v => v.classes[0].type = 'other'], ['unknown field', v => v.password = 'synthetic'], ['long title', v => v.group.title = 'a'.repeat(201)], ['invalid date pair', v => v.group.end_date = null],
 ]) test(`validation rejects ${name}`, () => { const v = fixture(); mutate(v); assert.ok(validation.validateOccurrenceInput(v).error) })
 test('edit snapshot remains raw, including NULL, end time and whitespace', () => {
   const v = editing(); v.expected.group.city = ' 東京 '; v.expected.group.description = null
@@ -106,4 +106,25 @@ test('secure key generation failure blocks all transmission', async () => {
   let calls=0
   const c=saving.createOccurrenceSaver(async()=>{calls++},()=>{throw Error('unavailable')},memory())
   assert.equal((await c.save(fixture())).state,'rejected');assert.equal(calls,0)
+})
+
+for (const [name, end, ok] of [['nullable', null, true], ['valid', '14:00', true], ['equal', '12:00', true], ['earlier', '11:59', false], ['seconds', '14:00:30', false], ['bad type', 1400, false]]) test(`explicit end time: ${name}`, () => {
+  const v = fixture(); v.classes[0].end_time = end
+  const result = validation.validateOccurrenceInput(v)
+  assert.equal(!!result.data, ok)
+  if (ok) assert.equal(result.data.classes[0].end_time, end)
+})
+test('omitted end remains omitted; explicit NULL clears it and raw expected remains intact', () => {
+  const v = editing(); assert.equal(Object.hasOwn(validation.validateOccurrenceInput(v).data.classes[0], 'end_time'), false)
+  v.classes[0].end_time = null; const result = validation.validateOccurrenceInput(v).data
+  assert.equal(result.classes[0].end_time, null); assert.equal(result.expected.classes[0].end_time, '15:00')
+})
+test('start change cannot move beyond preserved end; unchanged legacy reversed times remain intact', () => {
+  const v = editing(); v.classes[0].start_time = '16:00'; assert.ok(validation.validateOccurrenceInput(v).error)
+  v.expected.classes[0].start_time = '16:00'; assert.ok(validation.validateOccurrenceInput(v).data)
+})
+
+test('equal minute and zero-second values compare as the same time', () => {
+ const v=fixture();v.classes[0].start_time='12:00:00';v.classes[0].end_time='12:00';assert.ok(validation.validateOccurrenceInput(v).data)
+ v.classes[0].start_time='12:00:01';assert.ok(validation.validateOccurrenceInput(v).error)
 })

@@ -55,10 +55,10 @@ function screen({ rows = [row()], fail = false } = {}) {
   const render = () => { cursor = 0; return Component({ group: current, refreshToken }) }
   return { calls, render, text: () => text(render()), nodes: () => elements(render()), async flush() { render(); for (const fn of effects.splice(0)) fn(); await new Promise(r => setImmediate(r)); render() }, refresh: () => refreshToken++, changeGroup: () => current = { ...group, id: 8 } }
 }
-test('single occurrence shows datetime and venue once, no internal class title or end time', async () => {
+test('single occurrence shows datetime and venue once, no internal class title and minute-only time range', async () => {
   const c = screen(); await c.flush(); const t = c.text()
-  assert.doesNotMatch(t, /Class 1|21:00|City is not venue/); assert.equal(t.split('Synthetic venue').length - 1, 1); assert.equal(t.split('2030-10-23').length - 1, 1)
-  assert.equal(c.nodes().filter(n => n.props?.['aria-label'] === 'クラス情報').length, 0)
+  assert.doesNotMatch(t, /Class 1|City is not venue/); assert.equal(t.split('Synthetic venue').length - 1, 1); assert.equal(t.split('2030-10-23').length - 1, 1)
+  assert.match(t, /12:00〜21:00/); assert.doesNotMatch(t, /12:00:00/); assert.equal(c.nodes().filter(n => n.props?.['aria-label'] === 'クラス情報').length, 0)
   assert.match(t, /停止中/); assert.match(t, /10名/); assert.match(t, /3件/); assert.ok(t.indexOf('開催日時') < t.indexOf('会場')); assert.ok(t.indexOf('会場') < t.indexOf('申込状況'))
 })
 test('multiple classes group each class date, venue and counts in context without collapsing', async () => {
@@ -76,4 +76,10 @@ test('verified zero classes and unknown capacity have explicit explanations', as
 test('only this group is refetched after creation; stale rows are hidden on group change', async () => {
   const c = screen(); await c.flush(); assert.equal(c.calls.length, 1); c.refresh(); await c.flush(); assert.equal(c.calls.length, 2); assert.equal(c.calls[1][0], 7)
   c.changeGroup(); assert.doesNotMatch(c.text(), /Synthetic venue/); await c.flush(); assert.equal(c.calls[2][0], 8)
+})
+
+test('detail ranges hide seconds without mutating raw values; absent end is not guessed', async () => {
+  const data = row(1, { start_time: '13:40:22', end_time: '15:40:33' }); const c = screen({ rows: [data] }); await c.flush()
+  assert.match(c.text(), /13:40〜15:40/); assert.doesNotMatch(c.text(), /:22|:33/); assert.equal(data.end_time, '15:40:33')
+  const empty = screen({ rows: [row(1, { end_time: null })] }); await empty.flush(); assert.doesNotMatch(empty.text(), /〜/)
 })

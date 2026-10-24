@@ -37,8 +37,8 @@ function setup({ groupId, data = snapshot(), status = 200, result = { state: 'sa
   }
 }
 function fill(c) { c.change('開催名', '東京講座'); c.change('開催日', '2030-10-23'); c.change('会場', '合成会場'); c.change('開始時刻', '12:00') }
-test('new editor starts with one class, 10 seats in details, no end-time input', async () => {
-  const c = setup(); await c.mount(); assert.equal(c.fields('開始時刻').length, 1); assert.equal(c.fields('定員')[0].props.value, '10'); assert.equal(c.render().filter(v => v.type === 'input' && /end_time/.test(JSON.stringify(v.props))).length, 0)
+test('new editor starts with one class, 10 seats in details, optional minute-only end-time input', async () => {
+  const c = setup(); await c.mount(); assert.equal(c.fields('開始時刻').length, 1); assert.equal(c.fields('定員')[0].props.value, '10'); assert.equal(c.fields('終了時刻（任意）').length, 1); assert.equal(c.fields('終了時刻（任意）')[0].props.value, ''); assert.equal(c.fields('開始時刻')[0].props.step, '60')
   assert.equal(c.calls.length, 0)
 })
 test('single-class review and atomic save use event title, common date/venue and stopped reception', async () => {
@@ -74,6 +74,7 @@ test('in-flight save disables navigation and repeat submission', async () => {
 test('saved draft recovery displays frozen confirmation and does not fetch or auto-save', async () => {
   const input = { group_id: 1, group: { ...snapshot().group, start_date: '2030-10-23', end_date: '2030-10-23' }, classes: snapshot().classes, expected: snapshot() }
   const c = setup({ groupId: 1, pending: { key: 'synthetic', input } }); await c.mount(); assert.equal(c.calls.length, 0); assert.ok(c.button('同じ保存キー・内容で再確認')); assert.equal(c.button('最新情報を再取得'), undefined)
+  assert.match(text(c.render()), /12:00〜17:00/); assert.doesNotMatch(text(c.render()), /12:00:30/)
 })
 test('failed loading never shows an editable partial group', async () => { const c = setup({ groupId: 1, status: 503 }); await c.mount(); assert.equal(c.render().some(v => v.type === 'form'), false); assert.match(c.text(), /取得できません/); assert.ok(c.button('最新情報を再取得')) })
 test('discarding input to reload requires confirmation', async () => { const c = setup({ groupId: 1 }); await c.mount(); c.change('開始時刻', '13:00'); c.confirm(false); c.button('最新情報を再取得').props.onClick(); assert.equal(c.fields('開始時刻')[0].props.value, '13:00') })
@@ -114,4 +115,18 @@ test('multiple classes have one start field per class and no common start field'
 test('cancel is blocked during a save or an unknown outcome, keeping the original retry path', async () => {
   const c = setup({ deferred: true }); await c.mount(); fill(c); await c.submit(); c.button('まとめて保存').props.onClick(); assert.equal(c.cancel().props['aria-disabled'], true); assert.equal(leaveByCancel(c), true)
   c.resolve({ state: 'unknown', error: '結果不明' }); await new Promise(r => setImmediate(r)); assert.equal(c.cancel().props['aria-disabled'], true); assert.equal(leaveByCancel(c), true); assert.ok(c.button('同じ保存キー・内容で再確認'))
+})
+
+test('minute-only editing retains raw seconds until explicit change and can clear end', async () => {
+  const data = snapshot(); data.classes[0].end_time = '17:00:45'
+  const c = setup({ groupId: 1, data }); await c.mount()
+  assert.equal(c.fields('開始時刻')[0].props.value, '12:00'); assert.equal(c.fields('終了時刻（任意）')[0].props.value, '17:00')
+  c.change('開催名', '変更'); await c.submit(); await c.save()
+  const input = c.calls.find(v => v[0] === 'save')[1]; assert.equal(input.classes[0].start_time, '12:00:30'); assert.equal(Object.hasOwn(input.classes[0], 'end_time'), false); assert.equal(input.expected.classes[0].end_time, '17:00:45')
+  const clear = setup({ groupId: 1 }); await clear.mount(); clear.change('終了時刻（任意）', ''); await clear.submit(); await clear.save(); assert.equal(clear.calls.find(v => v[0] === 'save')[1].classes[0].end_time, null)
+})
+test('single and multiple classes send explicit end times, reverse ranges reject before save', async () => {
+  const c = setup(); await c.mount(); fill(c); c.change('終了時刻（任意）', '11:00'); await c.submit(); assert.equal(c.button('まとめて保存'), undefined)
+  c.change('終了時刻（任意）', '13:40'); c.button('＋クラスを追加').props.onClick(); c.change('クラス名', 'B', 1); c.change('開始時刻', '14:00', 1); c.change('終了時刻（任意）', '15:40', 1)
+  await c.submit(); await c.save(); assert.deepEqual(c.calls.find(v => v[0] === 'save')[1].classes.map(v => v.end_time), ['13:40', '15:40'])
 })

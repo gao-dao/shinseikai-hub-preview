@@ -2,7 +2,7 @@ import { validateEventGroupOccurrence } from './validation'
 import { validateNewSchedule } from '../schedules/new-schedule'
 
 export type OccurrenceGroup = { title: string; description: string | null; city: string | null; start_date: string; end_date: string }
-export type OccurrenceClass = { id: number | null; title: string; date: string; start_time: string | null; location: string; type: '稽古会' | '一般参加'; capacity: number | null; registration_enabled: boolean }
+export type OccurrenceClass = { id: number | null; end_time?: string | null; title: string; date: string; start_time: string | null; location: string; type: '稽古会' | '一般参加'; capacity: number | null; registration_enabled: boolean }
 export type OccurrenceSnapshot = { group: Omit<OccurrenceGroup, 'start_date' | 'end_date'> & { start_date: string | null; end_date: string | null; registration_open: boolean }; classes: (OccurrenceClass & { id: number; end_time: string | null })[] }
 export type OccurrenceInput = { group_id: number | null; group: OccurrenceGroup; classes: OccurrenceClass[]; expected: OccurrenceSnapshot | null }
 const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -37,13 +37,19 @@ export function validateOccurrenceInput(value: unknown): { data: OccurrenceInput
   if (!Array.isArray(value.classes) || value.classes.length < 1 || value.classes.length > 100) return fail('クラスは1〜100件で登録してください。')
   const classes: OccurrenceClass[] = [], ids = new Set<number>()
   for (const row of value.classes) {
-    if (!object(row) || !exact(row, classFields) || (row.id !== null && !validId(row.id))) return fail('クラスの入力項目が不正です。')
+    if (!object(row) || !exact(row, Object.hasOwn(row, 'end_time') ? [...classFields, 'end_time'] : classFields) || (row.id !== null && !validId(row.id))) return fail('クラスの入力項目が不正です。')
     if (row.id !== null) { if (ids.has(row.id as number)) return fail('同じクラスが重複しています。'); ids.add(row.id as number) }
-    const checked = validateNewSchedule({ ...Object.fromEntries(Object.entries(row).filter(([k]) => k !== 'id')), end_time: null, event_group_id: value.group_id ?? 1 })
+    const explicitEnd = Object.hasOwn(row, 'end_time')
+    if (explicitEnd && row.end_time !== null && (typeof row.end_time !== 'string' || !/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(row.end_time))) return fail('終了時刻を時・分で入力してください。')
+    const checked = validateNewSchedule({ ...Object.fromEntries(Object.entries(row).filter(([k]) => k !== 'id')), end_time: explicitEnd ? row.end_time : null, event_group_id: value.group_id ?? 1 })
     if (!checked.data || !checked.data.start_time || !checked.data.location.trim() || Array.from(checked.data.title).length > 200 || Array.from(checked.data.location).length > 500) return fail(checked.error || 'クラス名・開始時刻・会場を確認してください。')
     if (row.id === null && checked.data.capacity === null) return fail('新規クラスの定員を入力してください。')
     if (row.date as string < occurrence.data.start_date || row.date as string > occurrence.data.end_date) return fail('クラスの日付を開催期間内にしてください。')
-    classes.push({ id: row.id as number | null, title: checked.data.title, date: checked.data.date, start_time: checked.data.start_time, location: checked.data.location, type: checked.data.type, capacity: checked.data.capacity, registration_enabled: checked.data.registration_enabled })
+    const saved = row.id === null ? null : (value.expected as OccurrenceSnapshot | null)?.classes.find(item => item.id === row.id)
+    const end = explicitEnd ? row.end_time as string | null : saved?.end_time ?? null
+    // Legacy values remain untouched; validate chronology only when either time changes.
+    if ((explicitEnd || checked.data.start_time !== saved?.start_time) && end !== null && (end.length === 5 ? end + ':00' : end) < (checked.data.start_time.length === 5 ? checked.data.start_time + ':00' : checked.data.start_time)) return fail('終了時刻は開始時刻以降にしてください。')
+    classes.push({ ...(explicitEnd ? { end_time: row.end_time as string | null } : {}), id: row.id as number | null, title: checked.data.title, date: checked.data.date, start_time: checked.data.start_time, location: checked.data.location, type: checked.data.type, capacity: checked.data.capacity, registration_enabled: checked.data.registration_enabled })
   }
   if (value.group_id === null && ids.size) return fail('新規開催回に既存クラスは指定できません。')
   if (value.group_id !== null) {

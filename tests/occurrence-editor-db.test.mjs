@@ -31,7 +31,7 @@ test('atomic occurrence editor in isolated local PostgreSQL', { skip: process.en
     create schema auth; create table auth.users(id uuid primary key);
     create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
     grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;`)
-  for (const name of ['20260918_initial_baseline.sql','20261015_add_registration_management.sql','20261022_add_event_group_occurrence_details.sql','20261024_add_atomic_occurrence_editor.sql']) await sql(await readFile(`supabase/migrations/${name}`,'utf8'))
+  for (const name of ['20260918_initial_baseline.sql','20261015_add_registration_management.sql','20261022_add_event_group_occurrence_details.sql','20261024_add_atomic_occurrence_editor.sql','20261025_add_occurrence_end_time_editing.sql']) await sql(await readFile(`supabase/migrations/${name}`,'utf8'))
   const admin='00000000-0000-4000-8000-000000000001', other='00000000-0000-4000-8000-000000000002'
   await sql(`insert into auth.users values ('${admin}'),('${other}'); insert into public.profiles values ('${admin}','admin'),('${other}','admin');`)
   const asAdmin = text => `set role authenticated; set request.jwt.claim.sub = '${admin}'; ${text}`
@@ -42,6 +42,22 @@ test('atomic occurrence editor in isolated local PostgreSQL', { skip: process.en
   const payload = () => ({ group_id:null, group:{title:'Synthetic occurrence',description:null,city:'Synthetic city',start_date:'2030-01-01',end_date:'2030-01-02'},classes:[{id:null,title:'A',date:'2030-01-01',start_time:'12:00',location:'Synthetic venue',type:'一般参加',capacity:10,registration_enabled:false},{id:null,title:'B',date:'2030-01-02',start_time:'14:00',location:'Synthetic venue',type:'稽古会',capacity:10,registration_enabled:false}],expected:null })
   const edit = async id => { const expected=await read(id);return {group_id:id,group:Object.fromEntries(Object.entries(expected.group).filter(([k])=>k!=='registration_open')),classes:expected.classes.map(row=>Object.fromEntries(Object.entries(row).filter(([k])=>k!=='end_time'))),expected} }
   const counts = () => sql('select json_build_array((select count(*) from public.event_groups),(select count(*) from public.schedules),(select count(*) from occurrence_private.save_requests));')
+  await t.test('explicit end times create, preserve raw seconds, change and clear without altering reception', async()=>{
+    const p=payload();p.classes[0].end_time='13:40';const result=await save(p)
+    assert.equal((await read(result.group_id)).classes[0].end_time,'13:40')
+    await sql(`update public.schedules set end_time='13:40:35',start_time='12:00:20' where id=${result.class_ids[0]};`)
+    let v=await edit(result.group_id);v.group.title='Edited';await save(v)
+    let after=await read(result.group_id);assert.equal(after.classes[0].end_time,'13:40:35');assert.equal(after.classes[0].start_time,'12:00:20');assert.equal(after.group.registration_open,false)
+    v=await edit(result.group_id);v.classes[0].end_time='15:40';await save(v);assert.equal((await read(result.group_id)).classes[0].end_time,'15:40')
+    v=await edit(result.group_id);v.classes[0].end_time=null;await save(v);assert.equal((await read(result.group_id)).classes[0].end_time,null)
+  })
+  await t.test('invalid end and reversed range roll back every class and save key',async()=>{
+    for(const end of ['11:59','25:00','13:00:22',123]) {
+      const p=payload();p.classes[1].end_time=end;const before=await counts();await assert.rejects(save(p));assert.equal(await counts(),before)
+    }
+    const result=await save(payload());await sql(`update public.schedules set end_time='13:00' where id=${result.class_ids[0]};`)
+    const v=await edit(result.group_id),before=await read(result.group_id);v.classes[0].start_time='14:00';await assert.rejects(save(v));assert.deepEqual(await read(result.group_id),before)
+  })
   await t.test('migration grants only authenticated RPC execute, not table access', async()=>{
     assert.equal(await sql("select has_function_privilege('anon','public.admin_save_occurrence(uuid,jsonb)','execute') or has_function_privilege('service_role','public.admin_save_occurrence(uuid,jsonb)','execute');"),'f')
     assert.equal(await sql("select has_table_privilege('authenticated','occurrence_private.save_requests','select');"),'f')

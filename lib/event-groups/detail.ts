@@ -1,8 +1,8 @@
-export type DetailClass = { id: number; title: string; date: string; start_time: string | null; location: string; capacity: number | null; registeredCount: number; registration_enabled: boolean }
+export type DetailClass = { id: number; title: string; date: string; start_time: string | null; end_time: string | null; location: string; capacity: number | null; registeredCount: number; registration_enabled: boolean }
 function valid(value: unknown): value is DetailClass {
   if (!value || typeof value !== 'object') return false
   const v = value as DetailClass
-  return Number.isSafeInteger(v.id) && v.id > 0 && ['title', 'date', 'location'].every(k => typeof v[k as keyof DetailClass] === 'string') && (v.start_time === null || typeof v.start_time === 'string') && (v.capacity === null || (Number.isSafeInteger(v.capacity) && v.capacity > 0)) && Number.isSafeInteger(v.registeredCount) && v.registeredCount >= 0 && typeof v.registration_enabled === 'boolean'
+  return Number.isSafeInteger(v.id) && v.id > 0 && ['title', 'date', 'location'].every(k => typeof v[k as keyof DetailClass] === 'string') && (v.start_time === null || typeof v.start_time === 'string') && (v.end_time === null || typeof v.end_time === 'string') && (v.capacity === null || (Number.isSafeInteger(v.capacity) && v.capacity > 0)) && Number.isSafeInteger(v.registeredCount) && v.registeredCount >= 0 && typeof v.registration_enabled === 'boolean'
 }
 // Complete reads only: never classify a paginated first row as a standalone event.
 export async function loadDetailClasses(id: number, signal: AbortSignal): Promise<DetailClass[]> {

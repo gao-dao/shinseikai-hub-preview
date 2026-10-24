@@ -4,10 +4,10 @@ import { useEffect, useRef, useState } from 'react'
 import { validateOccurrenceInput, validSnapshot, type OccurrenceInput, type OccurrenceSnapshot } from '@/lib/event-groups/occurrence-editor'
 import { createOccurrenceSaver } from '@/lib/event-groups/occurrence-save'
 
-type Row = { key: number; id: number | null; title: string; date: string; location: string; start: string; capacity: string; enabled: boolean; type: '稽古会' | '一般参加'; ownDate: boolean; ownLocation: boolean }
-const blankRow = (key: number): Row => ({ key, id: null, title: '', date: '', location: '', start: '', capacity: '10', enabled: false, type: '一般参加', ownDate: false, ownLocation: false })
+type Row = { key: number; id: number | null; title: string; date: string; location: string; start: string; end: string; capacity: string; enabled: boolean; type: '稽古会' | '一般参加'; ownDate: boolean; ownLocation: boolean }
+const blankRow = (key: number): Row => ({ key, id: null, title: '', date: '', location: '', start: '', end: '', capacity: '10', enabled: false, type: '一般参加', ownDate: false, ownLocation: false })
 function draftFingerprint(title: string, description: string, city: string, date: string, venue: string, rows: Row[]) {
-  return JSON.stringify({ title, description, city, classes: rows.map(row => ({ id: row.id, title: rows.length === 1 && row.id === null ? title : row.title, date: row.ownDate ? row.date : date, location: row.ownLocation ? row.location : venue, start: row.start, capacity: row.capacity, enabled: row.enabled, type: row.type })) })
+  return JSON.stringify({ title, description, city, classes: rows.map(row => ({ id: row.id, title: rows.length === 1 && row.id === null ? title : row.title, date: row.ownDate ? row.date : date, location: row.ownLocation ? row.location : venue, start: row.start, end: row.end, capacity: row.capacity, enabled: row.enabled, type: row.type })) })
 }
 export default function OccurrenceEditor({ groupId }: { groupId?: number }) {
   const [title, setTitle] = useState(''), [description, setDescription] = useState(''), [city, setCity] = useState('')
@@ -39,7 +39,7 @@ export default function OccurrenceEditor({ groupId }: { groupId?: number }) {
         setExpected(snapshot); setTitle(snapshot.group.title); setDescription(snapshot.group.description ?? ''); setCity(snapshot.group.city ?? '')
         const commonDate = snapshot.classes[0]?.date ?? snapshot.group.start_date ?? '', commonVenue = snapshot.classes[0]?.location ?? ''
         setDate(commonDate); setVenue(commonVenue)
-        const loadedRows: Row[] = snapshot.classes.length ? snapshot.classes.map((row, i) => ({ key: i, id: row.id, title: row.title, date: row.date, location: row.location, start: row.start_time ?? '', capacity: row.capacity === null ? '' : String(row.capacity), enabled: row.registration_enabled, type: row.type, ownDate: row.date !== commonDate, ownLocation: row.location !== commonVenue })) : [blankRow(0)]
+        const loadedRows: Row[] = snapshot.classes.length ? snapshot.classes.map((row, i) => ({ key: i, id: row.id, title: row.title, date: row.date, location: row.location, start: row.start_time?.slice(0, 5) ?? '', end: row.end_time?.slice(0, 5) ?? '', capacity: row.capacity === null ? '' : String(row.capacity), enabled: row.registration_enabled, type: row.type, ownDate: row.date !== commonDate, ownLocation: row.location !== commonVenue })) : [blankRow(0)]
         setRows(loadedRows)
         setBaseline(draftFingerprint(snapshot.group.title, snapshot.group.description ?? '', snapshot.group.city ?? '', commonDate, commonVenue, loadedRows))
         counter.current = Math.max(snapshot.classes.length, 1)
@@ -58,7 +58,11 @@ export default function OccurrenceEditor({ groupId }: { groupId?: number }) {
   function confirm(event: React.FormEvent) {
     event.preventDefault(); setError('')
     if (busyRef.current || loading || fatal) return
-    const classes = rows.map(row => ({ id: row.id, title: rows.length === 1 && row.id === null ? title : row.title, date: row.ownDate ? row.date : date, location: row.ownLocation ? row.location : venue, start_time: row.start || null, capacity: row.capacity === '' ? null : /^[1-9][0-9]*$/.test(row.capacity) ? Number(row.capacity) : -1, registration_enabled: row.enabled, type: row.type }))
+    const classes = rows.map(row => {
+      const original = expected?.classes.find(item => item.id === row.id)
+      const start = original && row.start === (original.start_time?.slice(0, 5) ?? '') ? original.start_time : row.start || null
+      const changedEnd = row.end !== (original?.end_time?.slice(0, 5) ?? '')
+      return ({ ...(changedEnd ? { end_time: row.end || null } : {}), id: row.id, title: rows.length === 1 && row.id === null ? title : row.title, date: row.ownDate ? row.date : date, location: row.ownLocation ? row.location : venue, start_time: start, capacity: row.capacity === '' ? null : /^[1-9][0-9]*$/.test(row.capacity) ? Number(row.capacity) : -1, registration_enabled: row.enabled, type: row.type }) })
     const dates = classes.map(row => row.date).sort()
     const result = validateOccurrenceInput({ group_id: groupId ?? null, group: { title, description: description || null, city: city || null, start_date: dates[0], end_date: dates[dates.length - 1] }, classes, expected })
     if (!result.data) { setError(result.error); return }
@@ -98,14 +102,16 @@ export default function OccurrenceEditor({ groupId }: { groupId?: number }) {
       {!review && !loading && !fatal && <form onSubmit={confirm}>
         <section><h2>基本情報</h2><label>開催名<input value={title} maxLength={200} required onChange={e => setTitle(e.target.value)} /></label>
           <div className="grid"><label>{rows.length === 1 ? '開催日' : '開催日（共通）'}<input type="date" required value={rows.length === 1 && rows[0].ownDate ? rows[0].date : date} onChange={e => { setDate(e.target.value); if (rows.length === 1) changeRow(rows[0].key, { ownDate: false }) }} /></label>
-            {rows.length === 1 && <label>開始時刻<input type="time" step="1" required value={rows[0].start} onChange={e => changeRow(rows[0].key, { start: e.target.value })} /></label>}
+            {rows.length === 1 && <label>開始時刻<input type="time" step="60" required value={rows[0].start} onChange={e => changeRow(rows[0].key, { start: e.target.value })} /></label>}
+            {rows.length === 1 && <label>終了時刻（任意）<input type="time" step="60" value={rows[0].end} onChange={e => changeRow(rows[0].key, { end: e.target.value })} /></label>}
             <label>{rows.length === 1 ? '会場' : '会場（共通）'}<input required maxLength={500} value={rows.length === 1 && rows[0].ownLocation ? rows[0].location : venue} onChange={e => { setVenue(e.target.value); if (rows.length === 1) changeRow(rows[0].key, { ownLocation: false }) }} /></label></div>
           <details><summary>開催回の詳細設定</summary><label>開催地（都市・任意）<input value={city} onChange={e => setCity(e.target.value)} /></label><label>説明（任意）<textarea value={description} onChange={e => setDescription(e.target.value)} /></label></details>
         </section>
         {rows.map((row, i) => <section key={row.key}><h2>{rows.length > 1 ? `クラス ${i + 1}` : '受付・詳細設定'}</h2>
           {(rows.length > 1) && <label>クラス名<input required value={row.title} maxLength={200} onChange={e => changeRow(row.key, { title: e.target.value })} /></label>}
           <p>クラス受付：{row.enabled ? '有効' : '無効（詳細設定で変更できます）'}</p>
-          {rows.length > 1 && <label>開始時刻<input type="time" step="1" required value={row.start} onChange={e => changeRow(row.key, { start: e.target.value })} /></label>}
+          {rows.length > 1 && <label>開始時刻<input type="time" step="60" required value={row.start} onChange={e => changeRow(row.key, { start: e.target.value })} /></label>}
+          {rows.length > 1 && <label>終了時刻（任意）<input type="time" step="60" value={row.end} onChange={e => changeRow(row.key, { end: e.target.value })} /></label>}
           <details><summary>クラスの詳細設定（定員・個別日程・受付）</summary>
             {rows.length > 1 && <>
             <label><input type="checkbox" checked={row.ownDate} onChange={e => changeRow(row.key, { ownDate: e.target.checked, date: row.date || date })} />このクラスだけ日付を変更</label>{row.ownDate && <label>個別の開催日<input type="date" required value={row.date} onChange={e => changeRow(row.key, { date: e.target.value })} /></label>}
@@ -121,7 +127,7 @@ export default function OccurrenceEditor({ groupId }: { groupId?: number }) {
         <button className="primary" type="submit">開催回と全クラスを確認</button>
       </form>}
       {review && <section aria-label="保存前の確認"><h2>保存前の確認</h2><p>開催地：{review.group.city ?? '未設定'} ／ 説明：{review.group.description || 'なし'}</p><p>{review.group.title} ／ {review.group.start_date} 〜 {review.group.end_date}</p>
-        <ul>{review.classes.map((row, i) => <li key={i}><strong>{row.title}</strong><p>{row.date} {row.start_time} ／ {row.location}</p><p>種別：{row.type} ／ 定員：{row.capacity ?? '未設定'}名 ／ クラス受付：{row.registration_enabled ? '有効' : '無効'}</p></li>)}</ul>
+        <ul>{review.classes.map((row, i) => <li key={i}><strong>{row.title}</strong><p>{row.date} {row.start_time?.slice(0, 5)}{(Object.hasOwn(row, 'end_time') ? row.end_time : review.expected?.classes.find(item => item.id === row.id)?.end_time) ? `〜${(Object.hasOwn(row, 'end_time') ? row.end_time : review.expected?.classes.find(item => item.id === row.id)?.end_time)?.slice(0, 5)}` : ''} ／ {row.location}</p><p>種別：{row.type} ／ 定員：{row.capacity ?? '未設定'}名 ／ クラス受付：{row.registration_enabled ? '有効' : '無効'}</p></li>)}</ul>
         <p>開催期間はクラスの日付から決まります。全クラスを一括保存し、受付状態は自動で開始しません。</p>
         {!unknown && <button disabled={busy} onClick={() => { setReview(null); setError('') }}>入力へ戻る</button>}
         <button className="primary" disabled={busy} onClick={() => void save()}>{busy ? '保存結果を確認中...' : unknown ? '同じ保存キー・内容で再確認' : 'まとめて保存'}</button>
