@@ -17,7 +17,7 @@ const source = ts.transpileModule(fs.readFileSync('app/api/admin/event-groups/ro
 function setup({ authorization = { ok: true }, queryResult = { data: [], count: 0, error: null }, throws = false } = {}) {
   const calls = []
   const query = {}
-  for (const method of ['select', 'order', 'range', 'insert', 'single']) {
+  for (const method of ['select', 'eq', 'order', 'range', 'insert', 'single']) {
     query[method] = (...args) => {
       calls.push([method, ...args])
       return ['range', 'single'].includes(method) ? Promise.resolve(queryResult) : query
@@ -74,7 +74,7 @@ test('GET selects only group metadata with bounded pagination', async () => {
   assert.equal(response.body.eventGroups, data)
   assert.equal(response.body.total, 51)
   assert.deepEqual(context.calls.find(call => call[0] === 'range'), ['range', 50, 99])
-  assert.equal(context.calls.find(call => call[0] === 'select')[1], 'id, title, description, registration_open, city, start_date, end_date')
+  assert.equal(context.calls.find(call => call[0] === 'select')[1], 'id, title, description, registration_open, city, start_date, end_date, is_cancelled, is_hidden, state_version')
   assert.equal(context.calls[0][0], 'authorize')
   noCache(response)
 })
@@ -155,7 +155,7 @@ test('POST saves normalized occurrence fields and returns them without changing 
     assert.equal(result.body.eventGroup, data)
     const payload = context.calls.find(call => call[0] === 'insert')[1]
     assert.deepEqual(JSON.parse(JSON.stringify(payload)), { title: '会', description: null, city: '福岡', start_date, end_date, registration_open: false })
-    assert.equal(context.calls.find(call => call[0] === 'select')[1], 'id, title, description, registration_open, city, start_date, end_date')
+    assert.equal(context.calls.find(call => call[0] === 'select')[1], 'id, title, description, registration_open, city, start_date, end_date, is_cancelled, is_hidden, state_version')
     noCache(result)
   }
 })
@@ -200,4 +200,9 @@ test('POST rejects invalid occurrence fields before creating a Supabase client',
     assert.deepEqual(context.calls, [['authorize']])
     noCache(result)
   }
+})
+
+for(const [visibility,hidden] of [['visible',false],['hidden',true]])test(`admin ${visibility} filter is before count/page range`,async()=>{
+ const c=setup({queryResult:{data:[],count:0,error:null}});const result=await c.get(`1&visibility=${visibility}`)
+ assert.equal(result.status,200);assert.deepEqual(c.calls.find(v=>v[0]==='eq'),['eq','is_hidden',hidden]);assert.ok(c.calls.findIndex(v=>v[0]==='eq')<c.calls.findIndex(v=>v[0]==='range'))
 })

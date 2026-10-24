@@ -15,7 +15,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     if (!/^[1-9][0-9]*$/.test(id) || !Number.isSafeInteger(Number(id)) || !/^[1-9][0-9]*$/.test(value) || !Number.isSafeInteger(page) || page > 1_000_000) return fail('講習会IDまたはページ番号が不正です', 400)
     const supabase = createAnonymousClient()
     const { data: group, error: groupError } = await supabase.from('event_groups').select('id')
-      .eq('id', Number(id)).eq('registration_open', true).maybeSingle()
+      .eq('id', Number(id)).eq('registration_open', true).eq('is_cancelled', false).eq('is_hidden', false).maybeSingle()
     if (groupError) return fail('講習会を確認できませんでした', 500)
     if (!group) return fail('受付中の講習会が見つかりません', 404)
     const { data, error, count } = await supabase.from('schedules')

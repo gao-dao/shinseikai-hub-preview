@@ -41,12 +41,12 @@ export async function GET(_request: Request, context: Context) {
     const { id } = await context.params
     if (!validId(id)) return fail('講習会グループIDが不正です', 400)
     const supabase = await createClient()
-    const { data, error } = await supabase.from('event_groups').select('id, registration_open').eq('id', Number(id)).maybeSingle()
+    const { data, error } = await supabase.from('event_groups').select('id, registration_open, is_cancelled, is_hidden, state_version').eq('id', Number(id)).maybeSingle()
     if (error) return fail('講習会グループを確認できませんでした', 500)
     if (!data) return fail('講習会グループが見つかりません', 404)
     if (typeof data.registration_open !== 'boolean') return fail('受付状態を確認できませんでした', 500)
-    const reason = await openingCondition(supabase, Number(id))
-    return NextResponse.json({ id: data.id, registration_open: data.registration_open, canOpen: reason === null, reason }, { headers })
+    const reason = data.is_cancelled || data.is_hidden ? '開催中止・非表示中は受付を開始できません。' : await openingCondition(supabase, Number(id))
+    return NextResponse.json({ id: data.id, registration_open: data.registration_open, state_version: data.state_version, canOpen: reason === null, reason }, { headers })
   } catch {
     return fail('受付開始に必要な情報を確認できませんでした', 500)
   }
@@ -65,14 +65,16 @@ export async function PATCH(request: Request, context: Context) {
     try { body = await request.json() } catch { return fail('JSON形式が不正です', 400) }
     if (!body || typeof body !== 'object' || Array.isArray(body)) return fail('入力内容が不正です', 400)
     const input = body as Record<string, unknown>
-    if (Object.keys(input).some(key => key !== 'registration_open' && key !== 'expected_registration_open') ||
-        typeof input.registration_open !== 'boolean' || typeof input.expected_registration_open !== 'boolean') return fail('受付状態の指定が不正です', 400)
+    if (Object.keys(input).some(key => key !== 'registration_open' && key !== 'expected_registration_open' && key !== 'expected_state_version') ||
+        typeof input.registration_open !== 'boolean' || typeof input.expected_registration_open !== 'boolean' || !Number.isSafeInteger(input.expected_state_version) || (input.expected_state_version as number) < 0) return fail('受付状態の指定が不正です', 400)
     const supabase = await createClient()
-    const { data: group, error: readError } = await supabase.from('event_groups').select('id, registration_open').eq('id', Number(id)).maybeSingle()
+    const { data: group, error: readError } = await supabase.from('event_groups').select('id, registration_open, is_cancelled, is_hidden, state_version').eq('id', Number(id)).maybeSingle()
     if (readError) return fail('講習会グループを確認できませんでした', 500)
     if (!group) return fail('講習会グループが見つかりません', 404)
     if (typeof group.registration_open !== 'boolean') return fail('受付状態を確認できませんでした', 500)
+    if (group.state_version !== input.expected_state_version) return fail('開催状態が変更されています。最新情報を再取得してください。', 409)
     if (group.registration_open !== input.expected_registration_open) return fail('受付状態が別の操作で変更されています。一覧を再取得してください', 409)
+    if (input.registration_open && (group.is_cancelled || group.is_hidden)) return fail('開催中止・非表示中は受付を開始できません。', 409)
     if (input.registration_open) {
       const reason = await openingCondition(supabase, Number(id))
       if (reason) return fail(reason, 409)
@@ -81,9 +83,9 @@ export async function PATCH(request: Request, context: Context) {
     // is changed; optimistic matching prevents overwriting another state change.
     const { data, error } = await supabase.from('event_groups')
       .update({ registration_open: input.registration_open })
-      .eq('id', Number(id)).eq('registration_open', input.expected_registration_open)
-      .select('id, registration_open').maybeSingle()
-    if (error) return fail('受付状態を更新できませんでした', error.code === '40001' || error.code === '40P01' ? 409 : 500)
+      .eq('id', Number(id)).eq('registration_open', input.expected_registration_open).eq('state_version', input.expected_state_version)
+      .select('id, registration_open, is_cancelled, is_hidden, state_version').maybeSingle()
+    if (error) return fail('受付状態を更新できませんでした', ['23514', '40001', '40P01'].includes(error.code) ? 409 : 500)
     if (!data) return fail('受付状態が変更またはグループが削除されました。一覧を再取得してください', 409)
     if (data.id !== Number(id) || data.registration_open !== input.registration_open) return fail('受付状態の更新結果を確認できませんでした', 500)
     return NextResponse.json({ eventGroup: data }, { headers })

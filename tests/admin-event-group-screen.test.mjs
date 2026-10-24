@@ -41,7 +41,7 @@ function setup({ group = original, postStatus = 201, patchStatus = 200, patchThr
   const Detail = () => null
   const confirmations = []; let confirmResult = true
   const { default: Component } = compile('app/(app)/admin/event-groups/event-groups.tsx', {
-    '@/lib/event-groups/admin-overview': { ...overview, findOccurrence: async id => { const group = groups.find(item => item.id === id); if (!group) throw new Error('開催回が見つかりません'); return { ...group } } }, react, 'react/jsx-runtime': jsxRuntime, 'next/link': { default: () => null }, './registration-control': { default: Control }, './group-classes': { default: Classes }, './occurrence-detail': { default: Detail }, '../new-schedule-form': { default: ScheduleForm }, '@/lib/event-groups/validation': validation,
+    '@/lib/event-groups/admin-overview': { ...overview, findOccurrence: async id => { const group = groups.find(item => item.id === id); if (!group) throw new Error('開催回が見つかりません'); return { ...group } } }, react, 'react/jsx-runtime': jsxRuntime, 'next/link': { default: () => null }, './registration-control': { default: Control }, './group-classes': { default: Classes }, './occurrence-detail': { default: Detail }, './occurrence-state': { default: () => null }, '../new-schedule-form': { default: ScheduleForm }, '@/lib/event-groups/validation': validation,
   }, { window: { confirm: message => { confirmations.push(message); return confirmResult } }, fetch: async (url, options = {}) => {
     calls.push({ url, options })
     const body = options.body ? JSON.parse(options.body) : null

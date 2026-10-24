@@ -11,6 +11,7 @@ type Schedule = {
   start_time: string | null
   end_time: string | null
   location: string
+  event_group: { is_cancelled: boolean; is_hidden: boolean } | null
   type: ScheduleType
 }
 
@@ -23,9 +24,9 @@ export default function SchedulePage() {
 
   useEffect(() => {
     supabase.from('schedules')
-      .select('*')
+      .select('*, event_group:event_groups(is_cancelled, is_hidden)')
       .order('date', { ascending: true })
-      .then(({ data }) => { if (data) setSchedules(data as Schedule[]) })
+      .then(({ data }) => { if (data) setSchedules((data as unknown as Schedule[]).filter(row => !row.event_group?.is_hidden)) })
   }, [supabase])
 
   return (
@@ -54,7 +55,7 @@ export default function SchedulePage() {
               <div key={s.id} className="sitem">
                 <div className="sdot" style={{ background: dotColor[s.type] }} />
                 <div className="sinfo">
-                  <div className="stitle">{s.title}</div>
+                  <div className="stitle">{s.title}{s.event_group?.is_cancelled && <strong>（開催中止）</strong>}</div>
                   <div className="smeta">
                     <span>📅 {s.date}</span>
                     {(s.start_time || s.end_time) && (

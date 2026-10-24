@@ -5,7 +5,7 @@ import { validateEventGroupOccurrence } from '@/lib/event-groups/validation'
 
 export const dynamic = 'force-dynamic'
 const headers = { 'Cache-Control': 'private, no-store, max-age=0', Vary: 'Cookie' }
-const columns = 'id, title, description, registration_open, city, start_date, end_date'
+const columns = 'id, title, description, registration_open, city, start_date, end_date, is_cancelled, is_hidden, state_version'
 const pageSize = 50
 
 function failure(error: string, status: number) {
@@ -21,9 +21,11 @@ export async function GET(request: Request) {
     if (!/^[1-9]\d*$/.test(value) || !Number.isSafeInteger(page) || page > 1_000_000) {
       return failure('ページ番号が不正です', 400)
     }
+    const visibility = new URL(request.url).searchParams.get('visibility') ?? 'visible'
+    if (!['visible', 'hidden'].includes(visibility)) return failure('表示条件が不正です', 400)
     const supabase = await createClient()
     const { data, error, count } = await supabase.from('event_groups')
-      .select(columns, { count: 'exact' })
+      .select(columns, { count: 'exact' }).eq('is_hidden', visibility === 'hidden')
       .order('created_at', { ascending: false }).order('id', { ascending: false })
       .range((page - 1) * pageSize, page * pageSize - 1)
     if (error) return failure('講習会グループを取得できませんでした', 500)

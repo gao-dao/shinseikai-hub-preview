@@ -45,9 +45,9 @@ test('failure on later page never returns a partial total', async () => {
 test('changing totals during pagination are rejected', async () => {
   const c = loaders([classes(1, [{ id: 1, registeredCount: 2 }, { id: 2, registeredCount: 0 }]), classes(2, [{ id: 3, registeredCount: 1 }], 4)]); await assert.rejects(c.api.loadClassSummary(7, signal))
 })
-test('detail lookup finds an occurrence beyond page one without another API or guessing', async () => {
-  const c = loaders([{ page: 1, pageSize: 1, total: 2, eventGroups: [{ ...group, id: 6 }] }, { page: 2, pageSize: 1, total: 2, eventGroups: [group] }])
-  assert.equal((await c.api.findOccurrence(7, signal)).id, 7); assert.equal(c.calls.length, 2)
+test('detail lookup uses exact ID endpoint so hidden groups remain reachable', async () => {
+  const c = loaders([{ eventGroup: { ...group, is_hidden: true } }])
+  assert.equal((await c.api.findOccurrence(7, signal)).is_hidden, true); assert.equal(c.calls.length, 1); assert.equal(c.calls[0].url, '/api/admin/event-groups/7')
 })
 test('missing occurrence and invalid group metadata fail closed', async () => {
   await assert.rejects(loaders([{ page: 1, pageSize: 50, total: 0, eventGroups: [] }]).api.findOccurrence(7, signal))
@@ -55,7 +55,7 @@ test('missing occurrence and invalid group metadata fail closed', async () => {
 })
 function elements(node) { if (Array.isArray(node)) return node.flatMap(elements); if (!node || typeof node !== 'object') return []; return [node, ...elements(node.props?.children)] }
 for (const summary of [undefined, 'error', { classCount: 3, activeClassBookings: 6 }]) test(`overview presents known, unknown and failed aggregates honestly: ${JSON.stringify(summary)}`, () => {
-  const values = [1, 0, { eventGroups: [group], total: 1, pageSize: 50 }, summary ? { 7: summary } : {}, false, '', '2026-10-23']; let index = 0
+  const values = [1, 0, { eventGroups: [group], total: 1, pageSize: 50 }, summary ? { 7: summary } : {}, false, '', 'visible', '2026-10-23']; let index = 0
   const Component = compile('app/(app)/admin/event-groups/occurrence-list.tsx', {
     react: { useState: () => [values[index++], () => {}], useEffect() {} },
     'react/jsx-runtime': jsxRuntime, 'next/link': { default: () => null }, '@/lib/event-groups/admin-overview': {}, '@/lib/event-groups/presentation': presentation,
@@ -115,7 +115,7 @@ function overviewScreen({groups, summary, now='2026-10-23T14:59:59Z'}) {
  const react={useState(initial){const i=cursor++;if(!(i in slots))slots[i]=typeof initial==='function'?initial():initial;return[slots[i],v=>slots[i]=typeof v==='function'?v(slots[i]):v]},useEffect(fn,deps){const i=cursor++,old=slots[i];if(!old||deps.some((v,j)=>v!==old.deps[j])){slots[i]={deps};effects.push(fn)}}}
  const Component=compile('app/(app)/admin/event-groups/occurrence-list.tsx',{
   react,'react/jsx-runtime':jsxRuntime,'next/link':{default:'Link'},'@/lib/event-groups/presentation':{...presentation,tokyoDay:()=>presentation.tokyoDay(instant)},
-  '@/lib/event-groups/admin-overview':{loadOccurrencePage:async()=>({eventGroups:groups,total:groups.length,pageSize:50}),loadClassSummary:async id=>{if(summary[id]=== 'error')throw Error('mock');return summary[id]}}
+  '@/lib/event-groups/admin-overview':{loadOccurrencePage:async(_page,_signal,visibility='visible')=>{const rows=groups.filter(g=>!!g.is_hidden===(visibility==='hidden'));return{eventGroups:rows,total:rows.length,pageSize:50}},loadClassSummary:async id=>{if(summary[id]=== 'error')throw Error('mock');return summary[id]}}
  },{AbortController,setInterval:fn=>{timers.push(fn);return 1},clearInterval(){}}).default
  const render=()=>{cursor=0;return elements(Component())}
  return{render,async mount(){render();for(const fn of effects.splice(0))fn();await new Promise(r=>setImmediate(r));render()},tick(iso){instant=new Date(iso);timers.forEach(fn=>fn())}}
@@ -130,4 +130,15 @@ test('overview keeps every group accessible in upcoming, unknown and ended secti
  assert.ok(groups.every(g=>g.registration_open));assert.equal(c.render().filter(n=>n.type==='article').length,4)
  c.tick('2026-10-23T15:00:00Z');assert.deepEqual(ids('開催予定'),[]);assert.deepEqual(ids('開催終了'),['/admin/event-groups/1','/admin/event-groups/2'])
  assert.ok(groups.every(g=>g.registration_open))
+})
+
+test('hidden groups have a separate recoverable list; switching visibility resets page',async()=>{
+ const groups=[{...group,id:1},{...group,id:2,is_hidden:true,is_cancelled:true}]
+ const summary=Object.fromEntries(groups.map(g=>[g.id,{classCount:1,activeClassBookings:1,classDates:['2026-10-23']}]))
+ const c=overviewScreen({groups,summary});await c.mount()
+ const links=()=>c.render().filter(n=>n.type==='Link'&&n.props.className==='detail').map(n=>n.props.href)
+ assert.deepEqual(links(),['/admin/event-groups/1'])
+ c.render().find(n=>n.type==='button'&&n.props.children==='非表示の開催回').props.onClick();await c.mount()
+ assert.deepEqual(links(),['/admin/event-groups/2']);assert.ok(c.render().some(n=>n.type==='strong'&&n.props.children==='開催中止'))
+ c.render().find(n=>n.type==='button'&&n.props.children==='通常の開催回').props.onClick();await c.mount();assert.deepEqual(links(),['/admin/event-groups/1'])
 })

@@ -4,12 +4,13 @@ import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import RegistrationControl from './registration-control'
 import GroupClasses from './group-classes'
+import OccurrenceState from './occurrence-state'
 import OccurrenceDetail from './occurrence-detail'
 import { findOccurrence } from '@/lib/event-groups/admin-overview'
 import NewScheduleForm from '../new-schedule-form'
 import { validateEventGroupOccurrence, type EventGroupOccurrence } from '@/lib/event-groups/validation'
 
-type Group = { id: number; title: string; description: string | null; registration_open: boolean } & EventGroupOccurrence
+type Group = { id: number; title: string; description: string | null; registration_open: boolean; is_cancelled?: boolean; is_hidden?: boolean; state_version?: number } & EventGroupOccurrence
 type List = { eventGroups: Group[]; page: number; pageSize: number; total: number }
 
 export default function EventGroups({ groupId, createOnly = false }: { groupId?: number; createOnly?: boolean } = {}) {
@@ -293,12 +294,13 @@ export default function EventGroups({ groupId, createOnly = false }: { groupId?:
         {classSuccess[group.id] && <p role="status">{classSuccess[group.id]}</p>}
         {!groupId && <GroupClasses key={`${group.id}-${classRefresh[group.id] ?? 0}`} groupId={group.id}
           hideEndTime={!!groupId} initiallyExpanded={!!groupId || (classRefresh[group.id] ?? 0) > 0} />}
-        <div className="occurrence-state-change"><p>受付状態を変更する操作</p><RegistrationControl id={group.id} title={group.title} registrationOpen={group.registration_open} onUpdated={() => setReload(value => value + 1)} /></div>
+        <div className="occurrence-state-change"><p>受付状態を変更する操作</p><RegistrationControl id={group.id} title={group.title} registrationOpen={group.registration_open} stateVersion={group.state_version} onUpdated={() => setReload(value => value + 1)} /></div>
         <section id={`applications-${group.id}`} className="occurrence-applications"><h3>申込管理</h3>
           <p>開催回別のサーバー絞り込みは未対応です。ここでは一部の申込を全件として表示しません。</p>
           <Link href="/admin/registrations">全開催回の申込一覧を開く →</Link><p>一覧の「対象講習会」で「{group.title}」を確認してください。情報編集・クラス追加・取消は申込一覧で行えます。</p>
         </section>
         {groupId && <button type="button" disabled={loading || addingGroup !== null || editSaving} onClick={() => setReload(value => value + 1)}>一覧を再取得</button>}
+        {groupId && <OccurrenceState group={group} disabled={editing !== null || addingGroup !== null || saving || editSaving} onUpdated={() => setReload(value => value + 1)} />}
         </section>
       </article>)}
       {!groupId && result && <nav aria-label="講習会グループのページ切替" style={{ display: 'flex', gap: 16 }}>

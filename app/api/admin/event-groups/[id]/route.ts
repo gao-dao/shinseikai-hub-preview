@@ -62,3 +62,17 @@ export async function PATCH(request: Request, context: Context) {
     return fail('開催情報を更新できませんでした。登録状況を確認してから再操作してください', 500)
   }
 }
+
+export async function GET(_request: Request, context: Context) {
+  try {
+    const auth = await requireAdmin()
+    if (!auth.ok) return fail(auth.error, auth.status)
+    const { id } = await context.params
+    if (!/^[1-9][0-9]*$/.test(id) || !Number.isSafeInteger(Number(id))) return fail('開催回IDが不正です', 400)
+    const supabase = await createClient()
+    const { data, error } = await supabase.from('event_groups').select('id, title, description, city, start_date, end_date, registration_open, is_cancelled, is_hidden, state_version').eq('id', Number(id)).maybeSingle()
+    if (error) return fail('開催回を取得できませんでした', 500)
+    if (!data) return fail('開催回が見つかりません', 404)
+    return NextResponse.json({ eventGroup: data }, { headers })
+  } catch { return fail('開催回を取得できませんでした', 500) }
+}

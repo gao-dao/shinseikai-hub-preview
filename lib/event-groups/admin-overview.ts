@@ -1,4 +1,4 @@
-export type Occurrence = { id: number; title: string; description: string | null; city: string | null; start_date: string | null; end_date: string | null; registration_open: boolean }
+export type Occurrence = { id: number; title: string; description: string | null; city: string | null; start_date: string | null; end_date: string | null; registration_open: boolean; is_cancelled?: boolean; is_hidden?: boolean; state_version?: number }
 export type ClassSummary = { classCount: number; activeClassBookings: number; classDates: unknown[] }
 export function validOccurrence(value: unknown): value is Occurrence {
   if (!value || typeof value !== 'object') return false
@@ -6,8 +6,8 @@ export function validOccurrence(value: unknown): value is Occurrence {
   return Number.isSafeInteger(v.id) && v.id > 0 && typeof v.title === 'string' && typeof v.registration_open === 'boolean' &&
     ['description', 'city', 'start_date', 'end_date'].every(key => v[key as keyof Occurrence] === null || typeof v[key as keyof Occurrence] === 'string')
 }
-export async function loadOccurrencePage(page: number, signal: AbortSignal) {
-  const response = await fetch(`/api/admin/event-groups?page=${page}`, { cache: 'no-store', signal })
+export async function loadOccurrencePage(page: number, signal: AbortSignal, visibility: 'visible' | 'hidden' = 'visible') {
+  const response = await fetch(`/api/admin/event-groups?page=${page}&visibility=${visibility}`, { cache: 'no-store', signal })
   if (!response.ok) throw new Error('開催回を取得できませんでした。ログイン状態を確認してください。')
   const data = await response.json()
   if (!Array.isArray(data.eventGroups) || !data.eventGroups.every(validOccurrence) || data.page !== page ||
@@ -17,13 +17,11 @@ export async function loadOccurrencePage(page: number, signal: AbortSignal) {
   return data as { eventGroups: Occurrence[]; page: number; pageSize: number; total: number }
 }
 export async function findOccurrence(id: number, signal: AbortSignal): Promise<Occurrence> {
-  for (let page = 1; page <= 1000; page++) {
-    const data = await loadOccurrencePage(page, signal)
-    const found = data.eventGroups.find(v => v.id === id)
-    if (found) return found
-    if (page * data.pageSize >= data.total) break
-  }
-  throw new Error('開催回が見つからないか、取得範囲を超えています。一覧から再確認してください。')
+  const response = await fetch(`/api/admin/event-groups/${id}`, { cache: 'no-store', signal })
+  if (!response.ok) throw new Error('開催回が見つからないか取得できませんでした。')
+  const data = await response.json()
+  if (!validOccurrence(data.eventGroup) || data.eventGroup.id !== id) throw new Error('開催回の情報を確認できませんでした。')
+  return data.eventGroup
 }
 export async function loadClassSummary(id: number, signal: AbortSignal): Promise<ClassSummary> {
   let total: number | undefined

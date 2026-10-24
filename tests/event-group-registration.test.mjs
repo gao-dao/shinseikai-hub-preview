@@ -18,7 +18,7 @@ function compile(path, dependencies = {}, globals = {}) {
 
 // No real Supabase modules, environment files or network are available here.
 function setup({ authorization = { ok: true }, current = false, counts = [2, 1, 0], countError = null,
-  readError = null, missing = false, updateError = null, zeroUpdated = false, throws = false } = {}) {
+  readError = null, missing = false, updateError = null, zeroUpdated = false, throws = false, stateVersion = 0, cancelled = false, hidden = false } = {}) {
   const calls = []
   const route = compile('app/api/admin/event-groups/[id]/registration/route.ts', {
     'next/server': { NextResponse: { json: (body, options = {}) => ({ body, status: options.status ?? 200, headers: options.headers }) } },
@@ -37,7 +37,7 @@ function setup({ authorization = { ok: true }, current = false, counts = [2, 1, 
           if (method === 'update') payload = args[0]
           if (method === 'maybeSingle') return Promise.resolve(payload ? {
             data: zeroUpdated ? null : { id: 5, registration_open: payload.registration_open }, error: updateError,
-          } : { data: missing ? null : { id: 5, registration_open: current }, error: readError })
+          } : { data: missing ? null : { id: 5, registration_open: current, state_version: stateVersion, is_cancelled: cancelled, is_hidden: hidden }, error: readError })
           return query
         }
         query.then = (resolve, reject) => Promise.resolve({ count: counts[invalid ? 2 : enabled ? 1 : 0], error: countError }).then(resolve, reject)
@@ -48,7 +48,7 @@ function setup({ authorization = { ok: true }, current = false, counts = [2, 1, 
   return {
     calls,
     get: (id = '5') => route.GET(new Request('http://localhost/api/admin/event-groups/5/registration'), { params: Promise.resolve({ id }) }),
-    patch: (body = { registration_open: !current, expected_registration_open: current }, { id = '5', raw = false, headers = { 'Content-Type': 'application/json', Origin: 'http://localhost' } } = {}) =>
+    patch: (body = { registration_open: !current, expected_registration_open: current, expected_state_version: 0 }, { id = '5', raw = false, headers = { 'Content-Type': 'application/json', Origin: 'http://localhost' } } = {}) =>
       route.PATCH(new Request('http://localhost/api/admin/event-groups/5/registration', { method: 'PATCH', headers, body: raw ? body : JSON.stringify(body) }), { params: Promise.resolve({ id }) }),
   }
 }
@@ -133,7 +133,7 @@ test('stop succeeds even if class info is unavailable and never reads or updates
 })
 
 test('malformed state and forbidden title/description edits are rejected', async () => {
-  for (const body of [null, [], {}, { registration_open: 'true', expected_registration_open: false }, { registration_open: true }, { registration_open: true, expected_registration_open: false, title: 'changed' }, { registration_open: false, expected_registration_open: true, description: 'changed' }]) {
+  for (const body of [null, [], {}, { registration_open: 'true', expected_registration_open: false, expected_state_version: 0 }, { registration_open: true }, { registration_open: true, expected_registration_open: false, title: 'changed' }, { registration_open: false, expected_registration_open: true, description: 'changed' }]) {
     const context = setup()
     const response = await context.patch(body)
     assert.equal(response.status, 400)
@@ -160,7 +160,7 @@ test('read failures, missing groups and invalid current state never update', asy
   for (const [options, status] of [[{ readError: { message: 'sensitive detail' } }, 500], [{ missing: true }, 404], [{ current: null }, 500], [{ throws: true }, 500]]) {
     for (const method of ['get', 'patch']) {
       const context = setup(options)
-      const response = await (method === 'get' ? context.get() : context.patch({ registration_open: true, expected_registration_open: false }))
+      const response = await (method === 'get' ? context.get() : context.patch({ registration_open: true, expected_registration_open: false, expected_state_version: 0 }))
       assert.equal(response.status, status)
       assert.doesNotMatch(JSON.stringify(response.body), /sensitive/)
       noUpdate(context)
@@ -171,7 +171,7 @@ test('read failures, missing groups and invalid current state never update', asy
 
 test('stale state, zero affected rows and update errors do not report success', async () => {
   const stale = setup({ current: true })
-  assert.equal((await stale.patch({ registration_open: true, expected_registration_open: false })).status, 409)
+  assert.equal((await stale.patch({ registration_open: true, expected_registration_open: false, expected_state_version: 0 })).status, 409)
   noUpdate(stale)
   for (const [options, status] of [[{ zeroUpdated: true }, 409], [{ updateError: { code: '42501', message: 'sensitive detail' } }, 500], [{ updateError: { code: '40001', message: 'sensitive detail' } }, 409]]) {
     const response = await setup(options).patch()
@@ -200,10 +200,10 @@ function control({ registrationOpen = false, canOpen = true, checkOk = true, pat
       calls.push([patch ? 'patch' : 'check', url, options])
       return { ok: patch ? patchOk : checkOk, status: patch ? patchOk ? 200 : 409 : checkOk ? 200 : 500,
         json: async () => patch ? patchOk ? { eventGroup: { id: 5, registration_open: wrongResult ? registrationOpen : !registrationOpen } } : { error: '予定の設定を確認してください。' }
-          : { id: 5, registration_open: registrationOpen, canOpen, reason: canOpen ? null : '受付対象のクラスがありません。' } }
+          : { id: 5, registration_open: registrationOpen, state_version: 0, canOpen, reason: canOpen ? null : '受付対象のクラスがありません。' } }
     },
   })
-  const render = () => { index = 0; refIndex = 0; return elements(Component({ id: 5, title: '講習会', registrationOpen, onUpdated: () => calls.push(['updated']) })) }
+  const render = () => { index = 0; refIndex = 0; return elements(Component({ id: 5, title: '講習会', registrationOpen, stateVersion: 0, onUpdated: () => calls.push(['updated']) })) }
   return { calls, render, change: () => render().find(item => item.type === 'button').props.onClick() }
 }
 
@@ -212,7 +212,7 @@ test('screen checks start conditions before confirmation and refreshes only afte
   await context.change()
   assert.deepEqual(context.calls.map(call => call[0]), ['check', 'confirm', 'patch', 'updated'])
   const patch = context.calls.find(call => call[0] === 'patch')
-  assert.deepEqual(JSON.parse(patch[2].body), { registration_open: true, expected_registration_open: false })
+  assert.deepEqual(JSON.parse(patch[2].body), { registration_open: true, expected_registration_open: false, expected_state_version: 0 })
   assert.equal(patch[2].cache, 'no-store')
 })
 
@@ -260,3 +260,9 @@ for (const registrationOpen of [true, false]) test(`group reception label explic
   assert.equal(button.props['aria-label'], `講習会：グループ全体の受付を${action}`)
   assert.equal(c.calls.length, 0)
 })
+
+test('reception PATCH refuses stale lifecycle versions and checks version in atomic UPDATE',async()=>{
+ const stale=setup({stateVersion:2});assert.equal((await stale.patch()).status,409);noUpdate(stale)
+ const fresh=setup();assert.equal((await fresh.patch()).status,200);assert.ok(fresh.calls.some(v=>v[0]==='eq'&&v[1]==='state_version'&&v[2]===0))
+})
+for(const flags of [{hidden:true},{cancelled:true}])test(`blocked lifecycle prevents reopening ${JSON.stringify(flags)}`,async()=>{const c=setup(flags);assert.equal((await c.get()).body.canOpen,false);assert.equal((await c.patch()).status,409);noUpdate(c)})

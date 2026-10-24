@@ -2,9 +2,9 @@
 
 import { useRef, useState } from 'react'
 
-type Props = { id: number; title: string; registrationOpen: boolean; onUpdated: () => void }
+type Props = { id: number; title: string; registrationOpen: boolean; stateVersion?: number; onUpdated: () => void }
 
-export default function RegistrationControl({ id, title, registrationOpen, onUpdated }: Props) {
+export default function RegistrationControl({ id, title, registrationOpen, stateVersion, onUpdated }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const inFlight = useRef(false)
@@ -16,6 +16,7 @@ export default function RegistrationControl({ id, title, registrationOpen, onUpd
     setBusy(true)
     setError('')
     try {
+      let expectedVersion = stateVersion
       if (!registrationOpen) {
         const check = await fetch(url, { cache: 'no-store' })
         if (!check.ok) {
@@ -27,17 +28,19 @@ export default function RegistrationControl({ id, title, registrationOpen, onUpd
           setError('受付状態を確認できませんでした。一覧を再取得してください。')
           return
         }
+        expectedVersion = eligibility.state_version
         if (eligibility.canOpen !== true) {
           setError(typeof eligibility.reason === 'string' ? eligibility.reason : '受付開始に必要な情報を確認できませんでした。')
           return
         }
       }
+      if (!Number.isSafeInteger(expectedVersion) || expectedVersion! < 0) { setError('開催状態を確認できません。最新情報を再取得してください。'); return }
       const action = registrationOpen ? '停止' : '開始'
       const detail = registrationOpen ? '既存の申込・取消履歴は変更されません。' : '受付対象のクラスへの申込を受け付ける設定になります。'
       if (!window.confirm(`「${title}」の申込受付を${action}しますか？\n${detail}`)) return
       const response = await fetch(url, {
         method: 'PATCH', cache: 'no-store', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ registration_open: !registrationOpen, expected_registration_open: registrationOpen }),
+        body: JSON.stringify({ registration_open: !registrationOpen, expected_registration_open: registrationOpen, expected_state_version: expectedVersion }),
       })
       if (!response.ok) {
         if (response.status === 401) { setError('ログインし直してください。'); return }

@@ -23,6 +23,7 @@ function seats(schedule_id = 1, changes = {}) { return { schedule_id, capacity: 
 
 // Only a mock anonymous client is exposed. No env files, real network or DB.
 function setup({ groups = [{ id: 1, title: '講習会', description: '説明', registration_open: true }], schedules = [schedule()], counts = [seats()], groupError = null, classError = null, rpcError = null, rpcThrows = false, missingCount = false } = {}) {
+  groups = groups.map(row => ({ is_cancelled: false, is_hidden: false, ...row }))
   const calls = []
   const dependencies = {
     'next/server': { NextResponse: { json: (body, options = {}) => ({ body, status: options.status ?? 200, headers: options.headers }) } },
@@ -304,4 +305,8 @@ test('events opens the chosen public group form and prevents switching groups wh
   assert.ok(tree.filter(item=>item.type==='button'&&item.props.children==='この講習会に申し込む').every(item=>item.props.disabled))
   form.props.onClose()
   assert.equal(context.render().some(item=>item.props?.group),false)
+})
+
+for(const flags of [{is_hidden:true},{is_cancelled:true},{is_cancelled:true,is_hidden:true}])test(`public list and direct class URL reject lifecycle flags ${JSON.stringify(flags)}`,async()=>{
+ const c=setup({groups:[{id:1,title:'Blocked',description:null,registration_open:true,...flags}]});const result=await c.list();assert.equal(result.body.total,0);assert.equal((await c.classes()).status,404);assert.equal(c.calls.filter(v=>v[0]==='rpc').length,0)
 })

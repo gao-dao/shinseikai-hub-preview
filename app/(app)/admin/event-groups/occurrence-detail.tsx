@@ -27,6 +27,8 @@ export default function OccurrenceDetail({ group, refreshToken = 0 }: { group: O
   const period = group.start_date ? group.end_date && group.end_date !== group.start_date ? `${group.start_date} 〜 ${group.end_date}` : group.start_date : dates.length === 1 ? dates[0] : dates.length > 1 ? `${dates[0]} 〜 ${dates[dates.length - 1]}` : '未設定'
   const bookings = rows?.reduce((sum, row) => sum + row.registeredCount, 0)
   return <div className="detail-reading">
+    {group.is_cancelled && <p role="status"><strong>開催中止</strong>：新規申込は受け付けません。既存申込は自動取消されません。</p>}
+    {group.is_hidden && <p role="status">一覧から非表示（管理者のみ閲覧可能）</p>}
     <dl className="detail-basics" aria-label="開催日時と会場"><div><dt>開催日時</dt><dd>{single ? `${single.date} ${timeRange(single)}` : period}</dd></div><div><dt>会場</dt><dd>{rows === null ? error ? '確認できません' : '確認中' : rows.length === 0 ? 'クラス未登録のため未設定' : single ? single.location || '未設定' : venues.length === 1 ? venues[0] || '未設定' : 'クラスごとに異なります（下記参照）'}</dd></div></dl>
     {group.description && <p className="detail-description">{group.description}</p>}
     {error && <p role="alert">{error}</p>}
