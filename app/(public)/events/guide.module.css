@@ -1,0 +1,19 @@
+.page { min-height: 100dvh; padding: 20px; background: #faf7f0; color: #1e293b; }
+.inner { max-width: 800px; margin: auto; }
+.nav { display: flex; flex-wrap: wrap; gap: 20px; padding-bottom: 24px; font-size: 14px; }
+.page a { color: #6b1f2b; text-underline-offset: 4px; }
+.page a:focus-visible { outline: 2px solid #6b1f2b; outline-offset: 4px; }
+.page h1 { font-size: 26px; font-weight: 700; margin: 12px 0 24px; overflow-wrap: anywhere; }
+.page h2 { font-size: 19px; font-weight: 700; margin: 24px 0 12px; }
+.page p { margin: 10px 0; line-height: 1.8; overflow-wrap: anywhere; }
+.list { list-style: none; padding: 0; }
+.list li { border-bottom: 1px solid #ded8ce; }
+.item { display: block; padding: 20px 0; text-decoration: none; }
+.item strong { display: block; font-size: 19px; margin-bottom: 8px; }
+.item span { display: block; color: #52616e; line-height: 1.8; }
+.classes { list-style: none; padding: 0; }
+.classes li { padding: 12px 0; border-bottom: 1px solid #ded8ce; }
+.description { white-space: pre-wrap; }
+.pagination { display: flex; gap: 24px; padding: 24px 0; }
+.participation { border-top: 1px solid #ded8ce; margin-top: 28px; padding-top: 8px; }
+@media(min-width: 768px) { .page { padding: 32px; } }

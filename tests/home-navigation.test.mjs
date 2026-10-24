@@ -22,10 +22,10 @@ function nodes(tree) {
   return [tree, ...nodes(tree.props?.children)]
 }
 const Link = 'Link'
-test('public homepage needs no session or DB and prioritizes existing announcements', () => {
+test('public homepage needs no session or DB and prioritizes event announcements', () => {
   const Home = load('app/page.tsx', { 'next/link': { default: Link }, './home.module.css': { default: {} } })
   const links = nodes(Home()).filter(n => n.type === Link)
-  assert.ok(links.some(n => n.props.href === '/schedule' && n.props.children[0] === '開催案内を見る '))
+  assert.equal(links.length, 3)
   assert.ok(links.some(n => n.props.href === '/events'))
   assert.ok(links.some(n => n.props.href === '/videos'))
   assert.ok(links.some(n => n.props.href === '/login'))

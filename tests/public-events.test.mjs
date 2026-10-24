@@ -234,12 +234,12 @@ function ui() {
   return { state, effects, calls, exports, render, setResponse(value) { response = value } }
 }
 
-test('events page has no authentication dependency and opts out of static caching', () => {
+test('legacy registration mode remains available without authentication', async () => {
   const Client = () => null
-  const page = compile('app/(public)/events/page.tsx', { 'react/jsx-runtime': jsxRuntime, './events-list': { default: Client } })
+  const page = compile('app/(public)/events/page.tsx', { 'react/jsx-runtime': jsxRuntime, './events-list': { default: Client }, 'next/link': { default: () => null }, '@/lib/event-groups/public-guide-server': { loadGuidePage() { assert.fail('Legacy registration must not fetch guide data') } }, '@/lib/event-groups/public-guide': {}, './guide.module.css': { default: {} } })
   assert.equal(page.dynamic, 'force-dynamic')
   assert.equal(page.revalidate, 0)
-  assert.equal(page.default().type, Client)
+  assert.equal((await page.default({ searchParams: Promise.resolve({ view: 'registration' }) })).type, Client)
 })
 
 test('public UI renders metadata, seats, unknown states and no registration form', () => {

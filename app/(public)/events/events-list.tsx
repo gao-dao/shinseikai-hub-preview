@@ -116,7 +116,8 @@ export default function EventsList() {
       @media(max-width:640px) { .events-page { padding: 16px 12px 40px; } .events-group { padding: 16px; } }
     `}</style>
     <div className="events-inner">
-      <Link href="/schedule">スケジュールへ</Link>
+      <Link href="/events">開催案内へ</Link>
+      {' ／ '}<Link href="/schedule">スケジュールへ</Link>
       <h1>公開講習会</h1>
       <p>公開受付中の講習会とクラス情報です。残席は確認時点の情報です。</p>
       {registrationGroup && <RegistrationForm key={registrationGroup.id} group={registrationGroup} onClose={() => setRegistrationGroup(null)} />}

@@ -45,7 +45,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
   const links = [
     { href: '/', label: 'ホーム' },
-    { href: '/schedule', label: '開催案内' },
+    { href: '/events', label: '開催案内' },
+    { href: '/schedule', label: 'スケジュール' },
     ...(session.logged ? [{ href: '/videos', label: '動画ライブラリ' }] : []),
     ...(session.admin ? [{ href: '/admin/event-groups', label: '開催回管理' }] : []),
   ]
