@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import RegistrationForm from './registration-form'
 import type { PublicClass } from '@/lib/registrations/public-availability'
 import { publicClassLabel } from '@/lib/registrations/public-class-display'
@@ -69,6 +69,7 @@ export default function EventsList() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [registrationGroup, setRegistrationGroup] = useState<Group | null>(null)
+  const registrationStart = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -90,6 +91,12 @@ export default function EventsList() {
     void load()
     return () => controller.abort()
   }, [page, reload])
+
+  useEffect(() => {
+    if (!registrationGroup || !registrationStart.current) return
+    registrationStart.current.focus({ preventScroll: true })
+    registrationStart.current.scrollIntoView({ behavior: 'instant', block: 'start' })
+  }, [registrationGroup])
 
   return <main className="events-page">
     <style>{`
@@ -120,7 +127,9 @@ export default function EventsList() {
       {' ／ '}<Link href="/schedule">スケジュールへ</Link>
       <h1>公開講習会</h1>
       <p>Web申込を受付中の講習会です。クラスの申込状況をご確認ください。</p>
-      {registrationGroup && <RegistrationForm key={registrationGroup.id} group={registrationGroup} onClose={() => setRegistrationGroup(null)} />}
+      {registrationGroup && <div ref={registrationStart} tabIndex={-1} aria-label={`${registrationGroup.title}の参加申込`}>
+        <RegistrationForm key={registrationGroup.id} group={registrationGroup} onClose={() => setRegistrationGroup(null)} />
+      </div>}
       <button disabled={loading} onClick={() => { setPage(1); setReload(value => value + 1) }}>講習会一覧を更新</button>
       {loading && <p role="status">講習会を読み込み中...</p>}
       {error && <p role="alert">{error}</p>}

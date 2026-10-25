@@ -226,7 +226,7 @@ function ui() {
     const slot = index++
     if (!(slot in state)) state[slot] = initial
     return [state[slot], value => { state[slot] = typeof value === 'function' ? value(state[slot]) : value }]
-  }, useEffect(fn) { effects.push(fn) } }
+  }, useRef(initial) { const slot = index++; if (!(slot in state)) state[slot] = { current: initial }; return state[slot] }, useEffect(fn) { effects.push(fn) } }
   let response = { ok: true, json: async () => ({ eventGroups: [], page: 1, pageSize: 50, total: 0 }) }
   const exports = compile('app/(public)/events/events-list.tsx', { react, '@/lib/registrations/public-class-display': display, 'react/jsx-runtime': jsxRuntime, 'next/link': { default: () => null }, './registration-form': { default: () => null } }, {
     AbortController, fetch: async (...args) => { calls.push(args); return response },
@@ -302,9 +302,18 @@ test('events opens the chosen public group form and prevents switching groups wh
   const form=tree.find(item=>item.props?.group?.id===5)
   assert.ok(form)
   assert.equal(form.props.group.title,'講習会5')
+  const start=tree.find(item=>item.props?.['aria-label']==='講習会5の参加申込')
+  assert.equal(start.props.tabIndex,-1)
+  const movement=[]
+  start.props.ref.current={focus: options=>movement.push(['focus',options]),scrollIntoView: options=>movement.push(['scroll',options])}
+  context.effects[1]()
+  assert.equal(JSON.stringify(movement),JSON.stringify([['focus',{preventScroll:true}],['scroll',{behavior:'instant',block:'start'}]]))
+
   assert.ok(tree.filter(item=>item.type==='button'&&item.props.children==='この講習会に申し込む').every(item=>item.props.disabled))
   form.props.onClose()
   assert.equal(context.render().some(item=>item.props?.group),false)
+  context.effects[1]()
+  assert.equal(movement.length,2)
 })
 
 for(const flags of [{is_hidden:true},{is_cancelled:true},{is_cancelled:true,is_hidden:true}])test(`public list and direct class URL reject lifecycle flags ${JSON.stringify(flags)}`,async()=>{
