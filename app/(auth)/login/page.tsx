@@ -1,6 +1,6 @@
 'use client'
 import { useRef, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 
 type Role = 'member' | 'admin'
 
@@ -9,7 +9,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
   const busy = useRef(false)
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -44,7 +43,7 @@ export default function LoginPage() {
     width: '100%', background: '#FFFFFF',
     border: '1px solid #EDE8DF', borderRadius: '10px',
     color: '#1E293B', fontSize: '14px', padding: '12px 14px',
-    outline: 'none', boxSizing: 'border-box',
+    boxSizing: 'border-box',
     fontFamily: "'Noto Sans JP', sans-serif",
     transition: 'border-color .2s',
   }
@@ -74,6 +73,12 @@ export default function LoginPage() {
         }
         .role-btn:hover:not(.active) { border-color: #6B1F2B; color: #6B1F2B; }
         .input-focus:focus { border-color: #6B1F2B !important; }
+        .login-card :focus-visible { outline: 2px solid #6B1F2B; outline-offset: 3px; }
+        .login-card button, .login-public-link { min-height: 44px; }
+        .login-card button:disabled { opacity: .5; cursor: not-allowed; }
+        .login-public-link { display: flex; align-items: center; justify-content: center; padding: 12px; border: 1px solid #EDE8DF; border-radius: 10px; color: #52616e; text-underline-offset: 4px; }
+        .login-public-link.primary { color: #6B1F2B; border-color: #6B1F2B; }
+
       `}</style>
       <div className="login-card" style={{
         width: '100%', maxWidth: '400px',
@@ -93,11 +98,11 @@ export default function LoginPage() {
         <form onSubmit={handleLogin}>
           {/* ロール選択 */}
           <div style={{ marginBottom: '24px' }}>
-            <label style={{
+            <div id="login-role-label" style={{
               display: 'block', fontSize: '11px', fontWeight: '700',
               color: '#64748B', marginBottom: '10px', textTransform: 'uppercase', letterSpacing: '0.1em'
-            }}>ログイン種別</label>
-            <div style={{ display: 'flex', gap: '10px' }}>
+            }}>ログイン種別</div>
+            <div role="group" aria-labelledby="login-role-label" style={{ display: 'flex', gap: '10px' }}>
               {(['member', 'admin'] as Role[]).map(r => (
                 <button
                   key={r}
@@ -105,6 +110,7 @@ export default function LoginPage() {
                   disabled={loading}
                   onClick={() => setRole(r)}
                   className={`role-btn${role === r ? ' active' : ''}`}
+                  aria-pressed={role === r}
                 >
                   {r === 'member' ? '会　員' : '管理者'}
                 </button>
@@ -117,8 +123,9 @@ export default function LoginPage() {
             <label style={{
               display: 'block', fontSize: '11px', fontWeight: '700',
               color: '#64748B', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.1em'
-            }}>パスワード</label>
+            }} htmlFor="login-password">パスワード</label>
             <input
+              id="login-password"
               type="password"
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -153,20 +160,8 @@ export default function LoginPage() {
           </button>
 
           <div style={{ textAlign: 'center', marginTop: '32px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            <button
-              type="button"
-              onClick={() => router.push('/schedule')}
-              style={{
-                background: '#FAF7F0', border: '1px solid #EDE8DF', borderRadius: '10px',
-                color: '#64748B', padding: '12px', fontSize: '13px', cursor: 'pointer',
-                fontFamily: "'Noto Sans JP', sans-serif", fontWeight: '500',
-                transition: 'all .2s'
-              }}
-              onMouseOver={e => { e.currentTarget.style.borderColor = '#6B1F2B'; e.currentTarget.style.color = '#6B1F2B'; }}
-              onMouseOut={e => { e.currentTarget.style.borderColor = '#EDE8DF'; e.currentTarget.style.color = '#64748B'; }}
-            >
-              🗓️ ログインせずにスケジュールを見る
-            </button>
+            <Link className="login-public-link primary" href="/events">開催案内を見る</Link>
+            <Link className="login-public-link" href="/schedule">スケジュールを見る</Link>
           </div>
         </form>
       </div>

@@ -58,6 +58,14 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
   const [updatingSchedule, setUpdatingSchedule] = useState(false)
   const updatingScheduleRef = useRef(false)
   const [editScheduleKey, setEditScheduleKey] = useState(0)
+  const editHeading = useRef<HTMLHeadingElement>(null)
+  const [editFocusRequest, setEditFocusRequest] = useState(0)
+  useEffect(() => {
+    if (!editFocusRequest || !editHeading.current) return
+    editHeading.current.focus({ preventScroll: true })
+    editHeading.current.scrollIntoView({ behavior: 'instant', block: 'start' })
+  }, [editFocusRequest])
+
 
   const changeAdminPassword = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -145,7 +153,7 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
     setEditVideo(v)
     setVTitle(v.title); setVDesc(v.description ?? ''); setVUrl(v.url)
     setVDuration(v.duration ?? ''); setVTag(v.tag ?? '')
-    window.scrollTo(0, 0)
+    setEditFocusRequest(value => value + 1)
   }
 
   const addSchedule = async (e: React.FormEvent) => {
@@ -231,7 +239,7 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
     setEditSchedule(s)
     setSTitle(s.title); setSDate(s.date); setSStart(s.start_time || '')
     setSEnd(s.end_time || ''); setSLocation(s.location); setSType(s.type)
-    window.scrollTo(0, 0)
+    setEditFocusRequest(value => value + 1)
   }
 
   if (loading) return <div style={{ padding: '40px', color: '#6868a0', textAlign: 'center' }}>読み込み中...</div>
@@ -240,7 +248,7 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
   const inputStyle = {
     width: '100%', background: '#fff', border: '1px solid #EDE8DF',
     borderRadius: '10px', color: '#1E293B', fontSize: '13px',
-    padding: '12px 14px', outline: 'none', marginBottom: '12px',
+    padding: '12px 14px', marginBottom: '12px',
     fontFamily: "'Noto Sans JP', sans-serif", boxSizing: 'border-box' as const,
     transition: 'border-color .2s'
   }
@@ -259,7 +267,7 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
         .sp { flex: 1; overflow-y: auto; padding: 24px 20px; background: #FAF7F0; }
         .sec-hd { font-size: 13px; font-weight: 700; color: #6B1F2B; letter-spacing: .15em; text-transform: uppercase; margin-bottom: 20px; display: flex; align-items: center; gap: 12px; }
         .sec-hd::before, .sec-hd::after { content: ''; flex: 1; height: 1px; background: #EDE8DF; }
-        .tabs { display: flex; gap: 10px; margin-bottom: 24px; }
+        .tabs { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 24px; }
         .tab { flex: 1; padding: 12px; background: #fff; border: 1px solid #EDE8DF; border-radius: 12px; color: #64748B; font-size: 12px; font-weight: 500; cursor: pointer; text-align: center; transition: all .2s; box-shadow: 0 2px 4px rgba(0,0,0,.04); }
         .tab:hover { border-color: #6B1F2B; color: #6B1F2B; }
         .tab.act { background: #6B1F2B; border-color: #6B1F2B; color: #fff; font-weight: 700; box-shadow: 0 4px 12px rgba(107,31,43,.2); }
@@ -277,38 +285,47 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
         .cancel-btn { width: 100%; padding: 12px; background: transparent; border: 1px solid #EDE8DF; border-radius: 10px; color: #64748B; font-size: 13px; font-weight: 500; cursor: pointer; margin-top: 10px; transition: all .2s; }
         .cancel-btn:hover { background: #F8FAFC; border-color: #94A3B8; color: #475569; }
         .list-hd { font-size: 11px; font-weight: 700; letter-spacing: .1em; color: #94A3B8; margin-bottom: 14px; text-transform: uppercase; }
+        .management-tools :focus-visible { outline: 2px solid #6B1F2B; outline-offset: 3px; }
+        .management-tools .tab, .management-tools button, .management-tools a.edit-btn { min-height: 44px; }
+        .management-tools .tab, .management-tools a.edit-btn { display: inline-flex; align-items: center; justify-content: center; }
+        .management-tools .tab { min-width: 120px; }
+        .management-tools button:disabled { opacity: .5; cursor: not-allowed; }
+        .management-tools .list-hd { scroll-margin-top: 16px; }
+        .management-tools .list-card { flex-wrap: wrap; }
+        .management-tools .list-title { overflow-wrap: anywhere; }
+        @media(max-width:640px) { .management-tools .form-card { padding: 16px; } .management-tools .edit-btn, .management-tools .del-btn { font-size: 13px; } }
       `}</style>
-      <div className="sp">
+      <div className="sp management-tools">
         <div className="sec-hd">{tab === 'schedules' ? '予定管理' : tab === 'passwords' ? 'パスワード管理' : '動画管理'}</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'flex-end', marginBottom: '16px' }}>
           <Link href="/admin/event-groups" prefetch={false} className="edit-btn" style={{ textDecoration: 'none' }}>
-            開催回一覧
+            開催回管理
           </Link>
           <Link href="/admin/registrations" prefetch={false} className="edit-btn" style={{ textDecoration: 'none' }}>
             参加申込一覧
           </Link>
         </div>
         <div className="tabs">
-          <Link className="tab" href="/admin/videos">▶ 動画管理</Link>
-          <Link className="tab" href="/admin/schedules">📅 予定管理</Link>
-          <Link className="tab" href="/admin/passwords">🔑 パスワード管理</Link>
+          <Link className={`tab${tab === 'videos' ? ' act' : ''}`} aria-current={tab === 'videos' ? 'page' : undefined} href="/admin/videos">▶ 動画管理</Link>
+          <Link className={`tab${tab === 'schedules' ? ' act' : ''}`} aria-current={tab === 'schedules' ? 'page' : undefined} href="/admin/schedules">📅 予定管理</Link>
+          <Link className={`tab${tab === 'passwords' ? ' act' : ''}`} aria-current={tab === 'passwords' ? 'page' : undefined} href="/admin/passwords">🔑 パスワード管理</Link>
         </div>
 
         {tab === 'videos' && (
           <>
             <div className={`form-card${editVideo ? ' editing' : ''}`}>
-              <div className="list-hd">{editVideo ? '✏️ 動画を編集' : '＋ 動画を追加'}</div>
+              <h2 className="list-hd" ref={editHeading} tabIndex={-1}>{editVideo ? '動画を編集' : '動画を追加'}</h2>
               <form onSubmit={addVideo}>
-                <label style={labelStyle}>タイトル *</label>
-                <input style={inputStyle} value={vTitle} onChange={e => setVTitle(e.target.value)} required placeholder="基本形 第一段" />
-                <label style={labelStyle}>説明</label>
-                <input style={inputStyle} value={vDesc} onChange={e => setVDesc(e.target.value)} placeholder="正拳突き・前蹴りの基礎" />
-                <label style={labelStyle}>動画URL *</label>
-                <input style={inputStyle} value={vUrl} onChange={e => setVUrl(e.target.value)} required placeholder="https://www.youtube.com/watch?v=xxxxx" />
-                <label style={labelStyle}>再生時間</label>
-                <input style={inputStyle} value={vDuration} onChange={e => setVDuration(e.target.value)} placeholder="12:34" />
-                <label style={labelStyle}>タグ</label>
-                <select style={inputStyle} value={vTag} onChange={e => setVTag(e.target.value)}>
+                <label htmlFor="management-vTitle" style={labelStyle}>タイトル *</label>
+                <input id="management-vTitle" style={inputStyle} value={vTitle} onChange={e => setVTitle(e.target.value)} required placeholder="基本形 第一段" />
+                <label htmlFor="management-vDesc" style={labelStyle}>説明</label>
+                <input id="management-vDesc" style={inputStyle} value={vDesc} onChange={e => setVDesc(e.target.value)} placeholder="正拳突き・前蹴りの基礎" />
+                <label htmlFor="management-vUrl" style={labelStyle}>動画URL *</label>
+                <input id="management-vUrl" style={inputStyle} value={vUrl} onChange={e => setVUrl(e.target.value)} required placeholder="https://www.youtube.com/watch?v=xxxxx" />
+                <label htmlFor="management-vDuration" style={labelStyle}>再生時間</label>
+                <input id="management-vDuration" style={inputStyle} value={vDuration} onChange={e => setVDuration(e.target.value)} placeholder="12:34" />
+                <label htmlFor="management-vTag" style={labelStyle}>タグ</label>
+                <select id="management-vTag" style={inputStyle} value={vTag} onChange={e => setVTag(e.target.value)}>
                   <option>基本型</option><option>稽古動画</option><option>参考動画</option>
                 </select>
                 <button type="submit" style={btnStyle}>{editVideo ? '更新する' : '追加する'}</button>
@@ -334,21 +351,21 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
           <>
             {!editSchedule && <NewScheduleForm onCreated={() => { void fetchSchedules(); scheduleStatuses.refresh() }} onBusyChange={setCreatingSchedule} />}
             {editSchedule && <div className={`form-card${editSchedule ? ' editing' : ''}`}>
-              <div className="list-hd">{editSchedule ? '✏️ 予定を編集' : '＋ 予定を追加'}</div>
+              <h2 className="list-hd" ref={editHeading} tabIndex={-1}>予定を編集</h2>
               <form onSubmit={addSchedule}>
                 <fieldset disabled={creatingSchedule || updatingSchedule} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-                <label style={labelStyle}>タイトル *</label>
-                <input style={inputStyle} value={sTitle} onChange={e => setSTitle(e.target.value)} required placeholder="通常稽古" />
-                <label style={labelStyle}>日付 *</label>
-                <input style={inputStyle} type="date" value={sDate} onChange={e => setSDate(e.target.value)} required />
-                <label style={labelStyle}>開始時間</label>
-                <input style={inputStyle} type="time" value={sStart} onChange={e => setSStart(e.target.value)} />
-                <label style={labelStyle}>終了時間</label>
-                <input style={inputStyle} type="time" value={sEnd} onChange={e => setSEnd(e.target.value)} />
-                <label style={labelStyle}>場所</label>
-                <input style={inputStyle} value={sLocation} onChange={e => setSLocation(e.target.value)} placeholder="道場A" />
-                <label style={labelStyle}>種別</label>
-                <select style={inputStyle} value={sType} onChange={e => setSType(e.target.value as ScheduleType)}>
+                <label htmlFor="management-sTitle" style={labelStyle}>タイトル *</label>
+                <input id="management-sTitle" style={inputStyle} value={sTitle} onChange={e => setSTitle(e.target.value)} required placeholder="通常稽古" />
+                <label htmlFor="management-sDate" style={labelStyle}>日付 *</label>
+                <input id="management-sDate" style={inputStyle} type="date" value={sDate} onChange={e => setSDate(e.target.value)} required />
+                <label htmlFor="management-sStart" style={labelStyle}>開始時間</label>
+                <input id="management-sStart" style={inputStyle} type="time" value={sStart} onChange={e => setSStart(e.target.value)} />
+                <label htmlFor="management-sEnd" style={labelStyle}>終了時間</label>
+                <input id="management-sEnd" style={inputStyle} type="time" value={sEnd} onChange={e => setSEnd(e.target.value)} />
+                <label htmlFor="management-sLocation" style={labelStyle}>場所</label>
+                <input id="management-sLocation" style={inputStyle} value={sLocation} onChange={e => setSLocation(e.target.value)} placeholder="道場A" />
+                <label htmlFor="management-sType" style={labelStyle}>種別</label>
+                <select id="management-sType" style={inputStyle} value={sType} onChange={e => setSType(e.target.value as ScheduleType)}>
                   <option value="稽古会">稽古会</option>
                   <option value="一般参加">一般参加</option>
                 </select>
@@ -395,10 +412,10 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
             <div className="form-card">
               <div className="list-hd">🔑 管理者パスワード変更</div>
               <form onSubmit={changeAdminPassword}>
-                <label style={labelStyle}>新しいパスワード *（6文字以上）</label>
-                <input style={inputStyle} type="password" value={adminNewPw} onChange={e => setAdminNewPw(e.target.value)} required minLength={6} />
-                <label style={labelStyle}>確認用パスワード *</label>
-                <input style={inputStyle} type="password" value={adminNewPw2} onChange={e => setAdminNewPw2(e.target.value)} required minLength={6} />
+                <label htmlFor="management-adminNewPw" style={labelStyle}>新しいパスワード *（6文字以上）</label>
+                <input id="management-adminNewPw" style={inputStyle} type="password" value={adminNewPw} onChange={e => setAdminNewPw(e.target.value)} required minLength={6} />
+                <label htmlFor="management-adminNewPw2" style={labelStyle}>確認用パスワード *</label>
+                <input id="management-adminNewPw2" style={inputStyle} type="password" value={adminNewPw2} onChange={e => setAdminNewPw2(e.target.value)} required minLength={6} />
                 <button type="submit" style={btnStyle}>更新する</button>
                 {adminPwMsg && <div className={adminPwMsg.includes('エラー') ? 'error' : 'success'}>{adminPwMsg}</div>}
               </form>
@@ -412,10 +429,10 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
                 <span style={{ color: '#c8a84b' }}>事前に .env.local の MEMBER_SHARED_EMAIL を設定してください。</span>
               </p>
               <form onSubmit={changeMemberPassword}>
-                <label style={labelStyle}>新しいパスワード *（6文字以上）</label>
-                <input style={inputStyle} type="password" value={memberNewPw} onChange={e => setMemberNewPw(e.target.value)} required minLength={6} />
-                <label style={labelStyle}>確認用パスワード *</label>
-                <input style={inputStyle} type="password" value={memberNewPw2} onChange={e => setMemberNewPw2(e.target.value)} required minLength={6} />
+                <label htmlFor="management-memberNewPw" style={labelStyle}>新しいパスワード *（6文字以上）</label>
+                <input id="management-memberNewPw" style={inputStyle} type="password" value={memberNewPw} onChange={e => setMemberNewPw(e.target.value)} required minLength={6} />
+                <label htmlFor="management-memberNewPw2" style={labelStyle}>確認用パスワード *</label>
+                <input id="management-memberNewPw2" style={inputStyle} type="password" value={memberNewPw2} onChange={e => setMemberNewPw2(e.target.value)} required minLength={6} />
                 <button type="submit" style={btnStyle}>更新する</button>
                 {memberPwMsg && <div className={memberPwMsg.includes('エラー') ? 'error' : 'success'}>{memberPwMsg}</div>}
               </form>

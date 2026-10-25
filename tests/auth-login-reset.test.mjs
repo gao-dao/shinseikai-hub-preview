@@ -12,6 +12,7 @@ function screen(file, initial, dependencies, globals = {}) {
   const mocks = {
     react: { useRef: value => ({ current: value }), useState(value) { const slot = index++; if (!(slot in state)) state[slot] = value; return [state[slot], next => { state[slot] = next }] } },
     'react/jsx-runtime': { jsx, jsxs: jsx },
+    'next/link': { default: () => null },
     ...dependencies,
   }
   vm.runInNewContext(ts.transpileModule(fs.readFileSync(file, 'utf8'), {
