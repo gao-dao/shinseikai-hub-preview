@@ -35,13 +35,11 @@ function screen({count=3,status=200,confirm=true,patchStatus=200}={}) {
 test('confirmation includes title, all history count and cancellation warning; success reloads',async()=>{const c=screen();await c.click('一覧から非表示にする');await new Promise(r=>setImmediate(r));assert.equal(c.confirmations.length,1);assert.match(c.confirmations[0],/Synthetic occurrence/);assert.match(c.confirmations[0],/3件/);assert.match(c.confirmations[0],/自動取消されません/);assert.match(c.confirmations[0],/連絡は別途必要/);assert.equal(c.updated(),1);assert.equal(c.calls.length,2);assert.equal(JSON.parse(c.calls[1].options.body).expected_state_version,2)})
 test('declined confirmation and unknown counts send no PATCH',async()=>{for(const options of [{confirm:false},{count:null},{status:503}]){const c=screen(options);await c.click('一覧から非表示にする');await new Promise(r=>setImmediate(r));assert.equal(c.calls.length,1);assert.equal(c.updated(),0)}})
 test('409 does not auto retry or claim success',async()=>{const c=screen({patchStatus:409});await c.click('一覧から非表示にする');await new Promise(r=>setImmediate(r));assert.equal(c.calls.length,2);assert.equal(c.updated(),0);assert.ok(c.render().some(n=>n.props?.role==='alert'))})
-test('member schedule retains unassigned rows and cancelled dates/venues but excludes hidden rows',async()=>{
- let cursor=0;const slots=[],effects=[],calls=[]
- const rows=[{id:1,title:'Cancelled',date:'2030-01-01',start_time:'12:00',end_time:'14:00',location:'Synthetic venue',type:'一般参加',event_group:{is_cancelled:true,is_hidden:false}},{id:2,title:'Hidden',event_group:{is_hidden:true}},{id:3,title:'Unassigned',date:'2030-01-02',location:'Other venue',type:'稽古会',event_group:null}]
- const react={useState(initial){const i=cursor++;if(!(i in slots))slots[i]=initial;return[slots[i],v=>slots[i]=v]},useMemo(fn){return fn()},useEffect(fn){effects.push(fn)}}
- const jsx=(type,props)=>({type,props});const client={from(table){calls.push(['from',table]);return{select(columns){calls.push(['select',columns]);return{order:async()=>({data:rows})}}}}}
- const Component=compile('app/(app)/schedule/page.tsx',{react,'react/jsx-runtime':{jsx,jsxs:jsx},'@/lib/supabase/client':{createClient:()=>client}}).default
- const render=()=>{cursor=0;return Component()};const text=n=>Array.isArray(n)?n.map(text).join(''):n&&typeof n==='object'?n.type==='style'?'':text(n.props?.children):typeof n==='string'?n:''
- render();effects.splice(0).forEach(fn=>fn());await new Promise(r=>setImmediate(r));const output=text(render())
- assert.match(output,/Cancelled/);assert.match(output,/開催中止/);assert.match(output,/2030-01-01/);assert.match(output,/Synthetic venue/);assert.match(output,/Unassigned/);assert.doesNotMatch(output,/Hidden/);assert.match(calls[1][1],/event_group:event_groups/)
+test('schedule delegates public visibility to the anonymous server loader', async()=>{
+ const jsx=(type,props)=>({type,props})
+ let loaded=0
+ const Component=compile('app/(app)/schedule/page.tsx',{'react/jsx-runtime':{jsx,jsxs:jsx},'next/link':{default:()=>null},'./schedule.module.css':{default:{}},'@/lib/schedule/public-schedule':{loadScheduleIndex:async()=>{loaded++;return[{key:'schedule-3',title:'Unassigned',period:'2030-01-02',place:'Other venue',type:'稽古会',href:null}]}}}).default
+ const text=n=>Array.isArray(n)?n.map(text).join(''):n&&typeof n==='object'?text(n.props?.children):typeof n==='string'?n:''
+ const output=text(await Component())
+ assert.equal(loaded,1);assert.match(output,/Unassigned/);assert.match(output,/Other venue/)
 })
