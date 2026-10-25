@@ -273,8 +273,8 @@ export default function EventGroups({ groupId, createOnly = false }: { groupId?:
         </>}
         <section className="occurrence-management" aria-label="管理操作">
         {groupId && <h2>管理操作</h2>}
-        <div className="occurrence-navigation"><Link href={`/admin/event-groups/${group.id}/edit`} onClick={event => { if (classBusy.current || editBusy.current || (classDirty.current && !window.confirm('未保存の予定入力を破棄して編集画面へ移動しますか？'))) event.preventDefault() }}>開催回と全クラスをまとめて編集 →</Link></div>
-        {groupId && editForm}
+        <div className="occurrence-navigation"><Link href={`/admin/event-groups/${group.id}/edit`} onClick={event => { if (classBusy.current || editBusy.current || (classDirty.current && !window.confirm('未保存の予定入力を破棄して編集画面へ移動しますか？'))) event.preventDefault() }}>{groupId ? '編集 →' : '開催回と全クラスをまとめて編集 →'}</Link></div>
+        {!groupId && <>
         <button type="button" disabled={editing !== null || addingGroup !== null} onClick={() => beginEdit(group)}>開催情報を編集</button>
         {!groupId && <h3 id={`classes-${group.id}`}>クラス・受付</h3>}
         <button type="button" disabled={editing !== null || creatingClass} aria-expanded={addingGroup?.id === group.id}
@@ -292,6 +292,7 @@ export default function EventGroups({ groupId, createOnly = false }: { groupId?:
           <button type="button" disabled={creatingClass} onClick={closeClassForm}>予定追加を閉じる</button>
         </div>}
         {classSuccess[group.id] && <p role="status">{classSuccess[group.id]}</p>}
+        </>}
         {!groupId && <GroupClasses key={`${group.id}-${classRefresh[group.id] ?? 0}`} groupId={group.id}
           hideEndTime={!!groupId} initiallyExpanded={!!groupId || (classRefresh[group.id] ?? 0) > 0} />}
         <div className="occurrence-state-change"><p>受付状態を変更する操作</p><RegistrationControl id={group.id} title={group.title} registrationOpen={group.registration_open} stateVersion={group.state_version} onUpdated={() => setReload(value => value + 1)} /></div>

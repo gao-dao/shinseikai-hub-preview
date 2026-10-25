@@ -140,13 +140,53 @@ test('editor displays chronological rows with stable identities, but preserves r
   assert.deepEqual(keys(),[1,2,0]);c.change('開始時刻','16:00',0)
   assert.deepEqual(keys(),[1,2,0]);assert.equal(c.fields('クラス名')[0].props.value,'Early')
   const section=c.render().find(v=>v.props?.['data-class-key']===1)
-  section.props.onBlur({relatedTarget:{},currentTarget:{contains:()=>true}});assert.deepEqual(keys(),[1,2,0])
-  section.props.onBlur({relatedTarget:{},currentTarget:{contains:()=>false}});assert.deepEqual(keys(),[2,0,1])
+  assert.equal(section.props.onBlur,undefined);assert.deepEqual(keys(),[1,2,0])
+  await c.submit();c.button('入力へ戻る').props.onClick();assert.deepEqual(keys(),[2,0,1])
   await c.submit();await c.save();const sent=c.calls.find(v=>v[0]==='save')[1]
   assert.deepEqual(sent.classes.map(v=>v.id),[7,8,9]);assert.equal(sent.classes[1].start_time,'16:00');assert.equal(sent.classes[0].start_time,'15:00')
 })
 test('editor orders across days and explicit sorting changes no identity or dirty state',async()=>{
  const data=snapshot();data.classes=[{...data.classes[0],id:7,date:'2030-10-24'}, {...data.classes[0],id:8,date:'2030-10-23'}]
  const c=setup({groupId:1,data});await c.mount();assert.deepEqual(c.render().filter(v=>v.props?.['data-class-key']!==undefined).map(v=>v.props['data-class-key']),[1,0])
- c.button('日時順に整列').props.onClick();assert.equal(leaveByCancel(c),false);assert.equal(c.confirmations(),0)
+ assert.equal(c.button('日時順に整列'),undefined);assert.equal(leaveByCancel(c),false);assert.equal(c.confirmations(),0)
+})
+
+test('single review shows event name, date and venue once without the internal class title',async()=>{
+ const c=setup();await c.mount();fill(c);await c.submit()
+ const review=c.render().find(v=>v.props?.['aria-label']==='保存前の確認'), content=text(review)
+ for(const value of ['東京講座','2030-10-23','合成会場'])assert.equal(content.split(value).length-1,1)
+ assert.match(content,/12:00/);assert.match(content,/定員：10名/);assert.match(content,/クラス受付：無効/)
+})
+test('renaming a single existing event retains its hidden saved class name and ID',async()=>{
+ const c=setup({groupId:1});await c.mount();c.change('開催名','変更後の開催名');await c.submit()
+ const content=text(c.render().find(v=>v.props?.['aria-label']==='保存前の確認'))
+ assert.match(content,/変更後の開催名/);assert.equal(content.includes('既存クラス'),false)
+ await c.save();const sent=c.calls.find(v=>v[0]==='save')[1]
+ assert.equal(sent.group.title,'変更後の開催名');assert.equal(sent.classes[0].title,'既存クラス');assert.equal(sent.classes[0].id,7);assert.equal(sent.expected.classes[0].title,'既存クラス')
+})
+test('multiple review lists shared date and venue once while preserving class times and settings',async()=>{
+ const c=setup();await c.mount();fill(c);c.button('＋クラスを追加').props.onClick();c.change('クラス名','午後の部',1);c.change('開始時刻','14:00',1);await c.submit()
+ const content=text(c.render().find(v=>v.props?.['aria-label']==='保存前の確認'))
+ assert.equal(content.split('2030-10-23').length-1,1);assert.equal(content.split('合成会場').length-1,1)
+ assert.match(content,/午後の部/);assert.match(content,/12:00/);assert.match(content,/14:00/)
+ assert.equal(content.split('定員：10名').length-1,2)
+})
+test('individual date and venue remain visible outside collapsed settings and appear accurately in review',async()=>{
+ const c=setup();await c.mount();fill(c);c.button('＋クラスを追加').props.onClick();c.change('クラス名','別日クラス',1);c.change('開始時刻','14:00',1)
+ for(const label of ['このクラスだけ日付を変更','このクラスだけ会場を変更']){
+  const checkbox=c.render().filter(v=>v.type==='label'&&text(v).includes(label))[1];all(checkbox).find(v=>v.type==='input').props.onChange({target:{checked:true}})
+ }
+ c.change('個別の開催日','2030-10-24');c.change('個別の会場','別の会場')
+ const section=c.render().find(v=>v.props?.['data-class-key']===1)
+ const hint=all(section).find(v=>v.props?.className==='individual-setting')
+ assert.match(text(hint),/2030-10-24/);assert.match(text(hint),/別の会場/)
+ assert.equal(all(section).find(v=>v.type==='details').props.open,undefined)
+ await c.submit();const content=text(c.render().find(v=>v.props?.['aria-label']==='保存前の確認'))
+ assert.match(content,/2030-10-24/);assert.match(content,/別の会場/);assert.match(content,/合成会場/)
+})
+test('cancel is the only exit to the original page and no focus-driven sorting handlers remain',async()=>{
+ const c=setup({groupId:1});await c.mount()
+ const exits=c.render().filter(v=>v.type==='Link'&&v.props.href==='/admin/event-groups/1')
+ assert.equal(exits.length,1);assert.equal(text(exits[0]),'キャンセル')
+ assert.equal(c.render().some(v=>v.props?.onBlur),false);assert.equal(c.button('日時順に整列'),undefined)
 })

@@ -71,6 +71,7 @@ export default function OccurrenceEditor({ groupId }: { groupId?: number }) {
     const dates = classes.map(row => row.date).sort()
     const result = validateOccurrenceInput({ group_id: groupId ?? null, group: { title, description: description || null, city: city || null, start_date: dates[0], end_date: dates[dates.length - 1] }, classes, expected })
     if (!result.data) { setError(result.error); return }
+    sortDisplay()
     setReview(result.data)
   }
   async function save() {
@@ -96,8 +97,14 @@ export default function OccurrenceEditor({ groupId }: { groupId?: number }) {
     if (rows.length === 1) { setDate(first.ownDate ? first.date : date); setVenue(first.ownLocation ? first.location : venue) }
     setRows(old => [...old.map(row => ({ ...row, title: row.title || title, ...(old.length === 1 ? { ownDate: false, ownLocation: false } : {}) })), blankRow(counter.current++)])
   }
+  const reviewRows = review ? chronologicalRows(review.classes, row => row.date, row => row.start_time ?? '') : []
+  const commonReviewDate = reviewRows.length && reviewRows.every(row => row.date === reviewRows[0].date) ? reviewRows[0].date : null
+  const commonReviewVenue = reviewRows.length && reviewRows.every(row => row.location === reviewRows[0].location) ? reviewRows[0].location : null
+  const reviewTime = (row: OccurrenceInput['classes'][number]) => {
+    const end = Object.hasOwn(row, 'end_time') ? row.end_time : review?.expected?.classes.find(item => item.id === row.id)?.end_time
+    return `${row.start_time?.slice(0, 5) ?? '未設定'}${end ? `〜${end.slice(0, 5)}` : ''}`
+  }
   return <main className="editor">
-    <Link href={cancelHref} onClick={leave}>{groupId ? '← 開催回詳細へ' : '← 開催回一覧'}</Link>
     <h1>{groupId ? '開催回をまとめて編集' : '開催回を作成'}</h1>
     <p>講習会・稽古会・単独開催を同じ画面で登録できます。保存と受付開始は別の操作です。</p>
     {loading && <p role="status">全クラスを読み込み中...</p>}
@@ -105,15 +112,16 @@ export default function OccurrenceEditor({ groupId }: { groupId?: number }) {
     {saved !== null ? <section><h2>開催回とクラスを保存しました</h2><p role="status">グループ全体の受付状態は変更していません。</p><p>募集するクラスの受付を有効にしてから、開催回の詳細でグループ全体の受付を開始してください。</p><Link href={`/admin/event-groups/${saved}`}>開催回の詳細・受付操作へ</Link></section> : <>
       {groupId && !unknown && <button type="button" disabled={busy || loading} onClick={fresh}>最新情報を再取得</button>}
       {!review && !loading && !fatal && <form onSubmit={confirm}>
-        <section onBlur={event => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) sortDisplay() }}><h2>基本情報</h2><label>開催名<input value={title} maxLength={200} required onChange={e => setTitle(e.target.value)} /></label>
+        <section><h2>基本情報</h2><label>開催名<input value={title} maxLength={200} required onChange={e => setTitle(e.target.value)} /></label>
           <div className="grid"><label>{rows.length === 1 ? '開催日' : '開催日（共通）'}<input type="date" required value={rows.length === 1 && rows[0].ownDate ? rows[0].date : date} onChange={e => { setDate(e.target.value); if (rows.length === 1) changeRow(rows[0].key, { ownDate: false }) }} /></label>
             {rows.length === 1 && <label>開始時刻<input type="time" step="60" required value={rows[0].start} onChange={e => changeRow(rows[0].key, { start: e.target.value })} /></label>}
             {rows.length === 1 && <label>終了時刻（任意）<input type="time" step="60" value={rows[0].end} onChange={e => changeRow(rows[0].key, { end: e.target.value })} /></label>}
             <label>{rows.length === 1 ? '会場' : '会場（共通）'}<input required maxLength={500} value={rows.length === 1 && rows[0].ownLocation ? rows[0].location : venue} onChange={e => { setVenue(e.target.value); if (rows.length === 1) changeRow(rows[0].key, { ownLocation: false }) }} /></label></div>
           <details><summary>開催回の詳細設定</summary><label>開催地（都市・任意）<input value={city} onChange={e => setCity(e.target.value)} /></label><label>説明（任意）<textarea value={description} onChange={e => setDescription(e.target.value)} /></label></details>
         </section>
-        {displayRows.map((row, i) => <section key={row.key} data-class-key={row.key} onBlur={event => { if (event.relatedTarget && !event.currentTarget.contains(event.relatedTarget as Node)) sortDisplay() }}><h2>{rows.length > 1 ? `クラス ${i + 1}` : '受付・詳細設定'}</h2>
+        {displayRows.map((row, i) => <section key={row.key} data-class-key={row.key}><h2>{rows.length > 1 ? `クラス ${i + 1}` : '受付・詳細設定'}</h2>
           {(rows.length > 1) && <label>クラス名<input required value={row.title} maxLength={200} onChange={e => changeRow(row.key, { title: e.target.value })} /></label>}
+          {rows.length > 1 && (row.ownDate || row.ownLocation) && <p className="individual-setting">個別設定：{row.ownDate ? `開催日 ${row.date || '未設定'}` : ''}{row.ownDate && row.ownLocation ? ' ／ ' : ''}{row.ownLocation ? `会場 ${row.location || '未設定'}` : ''}</p>}
           <p>クラス受付：{row.enabled ? '有効' : '無効（詳細設定で変更できます）'}</p>
           {rows.length > 1 && <label>開始時刻<input type="time" step="60" required value={row.start} onChange={e => changeRow(row.key, { start: e.target.value })} /></label>}
           {rows.length > 1 && <label>終了時刻（任意）<input type="time" step="60" value={row.end} onChange={e => changeRow(row.key, { end: e.target.value })} /></label>}
@@ -128,12 +136,21 @@ export default function OccurrenceEditor({ groupId }: { groupId?: number }) {
           </details>
           {row.id === null && rows.length > 1 ? <button type="button" onClick={() => { setRows(old => old.filter(r => r.key !== row.key)) }}>この入力行を取り除く</button> : row.id !== null && <p>登録済みクラスはこの画面から削除しません。申込・取消履歴は保持します。</p>}
         </section>)}
-        {rows.length > 1 && <><p>クラスは日時順で表示します。入力中は順序を固定し、入力欄を離れた時点で整列します。保存順は変わりません。</p><button type="button" onClick={sortDisplay}>日時順に整列</button></>}
+        {rows.length > 1 && <p>入力中の順序は固定し、確認画面で日時順に表示します。</p>}
         <button type="button" disabled={rows.length >= 100} onClick={addClass}>＋クラスを追加</button>
         <button className="primary" type="submit">開催回と全クラスを確認</button>
       </form>}
-      {review && <section aria-label="保存前の確認"><h2>保存前の確認</h2><p>開催地：{review.group.city ?? '未設定'} ／ 説明：{review.group.description || 'なし'}</p><p>{review.group.title} ／ {review.group.start_date} 〜 {review.group.end_date}</p>
-        <ul>{chronologicalRows(review.classes, row => row.date, row => row.start_time ?? '').map((row, i) => <li key={i}><strong>{row.title}</strong><p>{row.date} {row.start_time?.slice(0, 5)}{(Object.hasOwn(row, 'end_time') ? row.end_time : review.expected?.classes.find(item => item.id === row.id)?.end_time) ? `〜${(Object.hasOwn(row, 'end_time') ? row.end_time : review.expected?.classes.find(item => item.id === row.id)?.end_time)?.slice(0, 5)}` : ''} ／ {row.location}</p><p>種別：{row.type} ／ 定員：{row.capacity ?? '未設定'}名 ／ クラス受付：{row.registration_enabled ? '有効' : '無効'}</p></li>)}</ul>
+      {review && <section aria-label="保存前の確認"><h2>保存前の確認</h2>
+        <h3>{review.group.title}</h3>
+        <p>開催日：{commonReviewDate ?? `${review.group.start_date}〜${review.group.end_date}`}{reviewRows.length === 1 ? ` ${reviewTime(reviewRows[0])}` : ''}</p>
+        {commonReviewVenue && <p>会場：{commonReviewVenue}</p>}
+        {review.group.city && <p>地域：{review.group.city}</p>}
+        {review.group.description && <p className="review-description">{review.group.description}</p>}
+        {reviewRows.length === 1 ? <p>種別：{reviewRows[0].type} ／ 定員：{reviewRows[0].capacity ?? '未設定'}名 ／ クラス受付：{reviewRows[0].registration_enabled ? '有効' : '無効'}</p> : <ul>{reviewRows.map((row, i) => <li key={row.id ?? `new-${i}`}><strong>{row.title}</strong>
+          <p>{!commonReviewDate ? `${row.date} ` : ''}{reviewTime(row)}</p>
+          {!commonReviewVenue && <p>会場：{row.location}</p>}
+          <p>種別：{row.type} ／ 定員：{row.capacity ?? '未設定'}名 ／ クラス受付：{row.registration_enabled ? '有効' : '無効'}</p>
+        </li>)}</ul>}
         <p>開催期間はクラスの日付から決まります。全クラスを一括保存し、受付状態は自動で開始しません。</p>
         {!unknown && <button disabled={busy} onClick={() => { setReview(null); setError('') }}>入力へ戻る</button>}
         <button className="primary" disabled={busy} onClick={() => void save()}>{busy ? '保存結果を確認中...' : unknown ? '同じ保存キー・内容で再確認' : 'まとめて保存'}</button>
@@ -141,6 +158,6 @@ export default function OccurrenceEditor({ groupId }: { groupId?: number }) {
       </section>}
       <nav aria-label="編集を中止"><Link className="cancel" href={cancelHref} aria-disabled={busy || unknown} onClick={leave}>キャンセル</Link>{unknown && <p>保存結果の確認が完了するまでキャンセルできません。</p>}</nav>
     </>}
-    <style jsx>{`.editor{width:100%;max-width:1000px;margin:auto;padding:32px;overflow:auto;color:#29353b}h1{font-size:28px}section{background:white;border:1px solid #e7e1d8;border-radius:14px;padding:24px;margin:20px 0}label{display:block;margin:14px 0}input:not([type=checkbox]),textarea,select{display:block;width:100%;padding:12px;border:1px solid #c9c9c9;border-radius:8px;margin-top:8px;font:inherit}input[type=checkbox]{margin-right:8px}button{min-height:44px;padding:10px 16px;margin:8px 8px 8px 0;border:1px solid #d9d2c8;border-radius:8px;cursor:pointer;background:white;font:inherit}button:disabled{opacity:.5;cursor:default}.primary{background:#6b1f2b;color:white}summary{cursor:pointer;padding:12px 0}li{margin-bottom:16px}p[role=alert]{color:#b91c1c;white-space:pre-wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:16px}.cancel{display:inline-flex;align-items:center;min-height:44px;padding:10px 16px;text-decoration:underline;text-underline-offset:4px}a[aria-disabled=true]{opacity:.5;cursor:default}a{color:#6b1f2b}@media(max-width:640px){.editor{padding:20px 16px}.grid{grid-template-columns:1fr;gap:0}section{padding:16px}button{width:100%;margin-right:0}}`}</style>
+    <style jsx>{`.editor{width:100%;max-width:1000px;margin:auto;padding:32px;overflow:auto;color:#29353b}h1{font-size:28px}section{background:white;border:1px solid #e7e1d8;border-radius:14px;padding:24px;margin:20px 0}label{display:block;margin:14px 0}input:not([type=checkbox]),textarea,select{display:block;width:100%;padding:12px;border:1px solid #c9c9c9;border-radius:8px;margin-top:8px;font:inherit}input[type=checkbox]{margin-right:8px}button{min-height:44px;padding:10px 16px;margin:8px 8px 8px 0;border:1px solid #d9d2c8;border-radius:8px;cursor:pointer;background:white;font:inherit}button:disabled{opacity:.5;cursor:default}.primary{background:#6b1f2b;color:white}summary{cursor:pointer;padding:12px 0}li{margin-bottom:16px}.individual-setting{overflow-wrap:anywhere;border-left:3px solid #6b1f2b;padding-left:10px}.review-description{white-space:pre-wrap;overflow-wrap:anywhere}p[role=alert]{color:#b91c1c;white-space:pre-wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:16px}.cancel{display:inline-flex;align-items:center;min-height:44px;padding:10px 16px;text-decoration:underline;text-underline-offset:4px}a[aria-disabled=true]{opacity:.5;cursor:default}a{color:#6b1f2b}@media(max-width:640px){.editor{padding:20px 16px}.grid{grid-template-columns:1fr;gap:0}section{padding:16px}button{width:100%;margin-right:0}}`}</style>
   </main>
 }
