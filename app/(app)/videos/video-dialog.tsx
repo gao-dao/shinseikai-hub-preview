@@ -30,4 +30,3 @@ export default function VideoDialog({ video, opener, onClose }: { video: { title
     </div>
   </dialog>
 }
-
