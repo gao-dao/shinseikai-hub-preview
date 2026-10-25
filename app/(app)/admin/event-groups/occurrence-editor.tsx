@@ -6,7 +6,7 @@ import { chronologicalRows } from '@/lib/event-groups/presentation'
 import { createOccurrenceSaver } from '@/lib/event-groups/occurrence-save'
 
 type Row = { key: number; id: number | null; title: string; date: string; location: string; start: string; end: string; capacity: string; enabled: boolean; type: '稽古会' | '一般参加'; ownDate: boolean; ownLocation: boolean }
-const blankRow = (key: number): Row => ({ key, id: null, title: '', date: '', location: '', start: '', end: '', capacity: '10', enabled: false, type: '一般参加', ownDate: false, ownLocation: false })
+const blankRow = (key: number): Row => ({ key, id: null, title: '', date: '', location: '', start: '', end: '', capacity: '10', enabled: true, type: '一般参加', ownDate: false, ownLocation: false })
 const ordered = (items: Row[], commonDate: string) => chronologicalRows(items, row => row.ownDate ? row.date : commonDate, row => row.start).map(row => row.key)
 function draftFingerprint(title: string, description: string, city: string, date: string, venue: string, rows: Row[]) {
   return JSON.stringify({ title, description, city, classes: rows.map(row => ({ id: row.id, title: rows.length === 1 && row.id === null ? title : row.title, date: row.ownDate ? row.date : date, location: row.ownLocation ? row.location : venue, start: row.start, end: row.end, capacity: row.capacity, enabled: row.enabled, type: row.type })) })
@@ -21,6 +21,7 @@ export default function OccurrenceEditor({ groupId }: { groupId?: number }) {
   const [error, setError] = useState(''), [fatal, setFatal] = useState(false), [review, setReview] = useState<OccurrenceInput | null>(null)
   const [busy, setBusy] = useState(false), [unknown, setUnknown] = useState(false), [saved, setSaved] = useState<number | null>(null)
   const [reload, setReload] = useState(0)
+  const [savedFromRecovery, setSavedFromRecovery] = useState(false)
   const busyRef = useRef(false), counter = useRef(1), saver = useRef<ReturnType<typeof createOccurrenceSaver> | null>(null)
   const [baseline, setBaseline] = useState(() => draftFingerprint('', '', '', '', '', [blankRow(0)]))
   const hasChanges = unknown || (saved === null && !loading && draftFingerprint(title, description, city, date, venue, rows) !== baseline)
@@ -79,7 +80,7 @@ export default function OccurrenceEditor({ groupId }: { groupId?: number }) {
     busyRef.current = true; setBusy(true); setError('')
     try {
       const result = await saver.current.save(review)
-      if (result.state === 'saved') { setSaved(result.groupId); setUnknown(false) }
+      if (result.state === 'saved') { setSavedFromRecovery(unknown); setSaved(result.groupId); setUnknown(false) }
       else { setError(result.error); setUnknown(result.state === 'unknown') }
     } finally { busyRef.current = false; setBusy(false) }
   }
@@ -106,10 +107,10 @@ export default function OccurrenceEditor({ groupId }: { groupId?: number }) {
   }
   return <main className="editor">
     <h1>{groupId ? '開催回をまとめて編集' : '開催回を作成'}</h1>
-    <p>講習会・稽古会・単独開催を同じ画面で登録できます。保存と受付開始は別の操作です。</p>
+    <p>{unknown ? '前回の保存結果を同じキー・内容で確認します。' : groupId ? '新しいクラスは初期設定で受付有効です。既存の受付状態は、明示的に変更しない限り保持します。' : '保存すると開催回のグループ受付を開始します。新しいクラスは初期設定で受付有効です。'}</p>
     {loading && <p role="status">全クラスを読み込み中...</p>}
     {error && <p role="alert">{error}</p>}
-    {saved !== null ? <section><h2>開催回とクラスを保存しました</h2><p role="status">グループ全体の受付状態は変更していません。</p><p>募集するクラスの受付を有効にしてから、開催回の詳細でグループ全体の受付を開始してください。</p><Link href={`/admin/event-groups/${saved}`}>開催回の詳細・受付操作へ</Link></section> : <>
+    {saved !== null ? <section><h2>開催回とクラスを保存しました</h2>{!groupId ? <p role="status">{savedFromRecovery ? '保存結果を確認しました。以前の保存結果の再確認では受付状態を変更しません。現在の状態は詳細画面で確認してください。' : '新規開催回のグループ受付を開始しました。クラス受付をOFFにしたクラスは申込を受け付けません。'}</p> : <><p role="status">グループ全体の受付状態は変更していません。</p>{expected?.group.registration_open ? <p>編集開始時は受付中でした。中止・非表示などによる最新の受付状態は詳細画面で確認できます。</p> : <p>グループ受付は停止中のままです。追加クラスが受付有効でも一般Web申込は受け付けません。</p>}</>}<Link href={`/admin/event-groups/${saved}`}>開催回の詳細・受付操作へ</Link></section> : <>
       {groupId && !unknown && <button type="button" disabled={busy || loading} onClick={fresh}>最新情報を再取得</button>}
       {!review && !loading && !fatal && <form onSubmit={confirm}>
         <section><h2>基本情報</h2><label>開催名<input value={title} maxLength={200} required onChange={e => setTitle(e.target.value)} /></label>
@@ -132,7 +133,7 @@ export default function OccurrenceEditor({ groupId }: { groupId?: number }) {
             </>}
             <label>定員<input type="number" min="1" max="2147483647" step="1" value={row.capacity} onChange={e => changeRow(row.key, { capacity: e.target.value })} /></label>
             <label>種別<select value={row.type} onChange={e => changeRow(row.key, { type: e.target.value as Row['type'] })}><option>一般参加</option><option>稽古会</option></select></label>
-            <label><input type="checkbox" checked={row.enabled} onChange={e => changeRow(row.key, { enabled: e.target.checked })} />クラスの受付を有効にする</label><p>グループ全体の受付は詳細画面で別途開始します。</p>
+            <label><input type="checkbox" checked={row.enabled} onChange={e => changeRow(row.key, { enabled: e.target.checked })} />クラスの受付を有効にする</label><p>一般Web申込にはグループ全体の受付も有効である必要があります。</p>
           </details>
           {row.id === null && rows.length > 1 ? <button type="button" onClick={() => { setRows(old => old.filter(r => r.key !== row.key)) }}>この入力行を取り除く</button> : row.id !== null && <p>登録済みクラスはこの画面から削除しません。申込・取消履歴は保持します。</p>}
         </section>)}
@@ -151,7 +152,7 @@ export default function OccurrenceEditor({ groupId }: { groupId?: number }) {
           {!commonReviewVenue && <p>会場：{row.location}</p>}
           <p>種別：{row.type} ／ 定員：{row.capacity ?? '未設定'}名 ／ クラス受付：{row.registration_enabled ? '有効' : '無効'}</p>
         </li>)}</ul>}
-        <p>開催期間はクラスの日付から決まります。全クラスを一括保存し、受付状態は自動で開始しません。</p>
+        <p>開催期間はクラスの日付から決まります。全クラスを一括保存します。{groupId ? 'グループ全体の受付状態は変更しません。' : unknown ? '同じキー・内容で保存結果を再確認します。保存済みの受付状態は変更しません。' : '保存時にグループ全体の受付を開始します。クラス受付は上記の設定で保存します。'}</p>
         {!unknown && <button disabled={busy} onClick={() => { setReview(null); setError('') }}>入力へ戻る</button>}
         <button className="primary" disabled={busy} onClick={() => void save()}>{busy ? '保存結果を確認中...' : unknown ? '同じ保存キー・内容で再確認' : 'まとめて保存'}</button>
         {unknown && <p>結果不明のため入力変更と新しい保存を停止しています。自動再送は行いません。</p>}

@@ -31,7 +31,7 @@ test('atomic occurrence editor in isolated local PostgreSQL', { skip: process.en
     create schema auth; create table auth.users(id uuid primary key);
     create function auth.uid() returns uuid language sql stable as $$select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid$$;
     grant usage on schema auth to authenticated; grant execute on function auth.uid() to authenticated;`)
-  for (const name of ['20260918_initial_baseline.sql','20261015_add_registration_management.sql','20261022_add_event_group_occurrence_details.sql','20261024_add_atomic_occurrence_editor.sql','20261025_add_occurrence_end_time_editing.sql']) await sql(await readFile(`supabase/migrations/${name}`,'utf8'))
+  for (const name of ['20260918_initial_baseline.sql','20261015_add_registration_management.sql','20261022_add_event_group_occurrence_details.sql','20261024_add_atomic_occurrence_editor.sql','20261025_add_occurrence_end_time_editing.sql','20261026_add_event_group_lifecycle.sql','20261027_open_new_occurrence_registration.sql']) await sql(await readFile(`supabase/migrations/${name}`,'utf8'))
   const admin='00000000-0000-4000-8000-000000000001', other='00000000-0000-4000-8000-000000000002'
   await sql(`insert into auth.users values ('${admin}'),('${other}'); insert into public.profiles values ('${admin}','admin'),('${other}','admin');`)
   const asAdmin = text => `set role authenticated; set request.jwt.claim.sub = '${admin}'; ${text}`
@@ -42,12 +42,41 @@ test('atomic occurrence editor in isolated local PostgreSQL', { skip: process.en
   const payload = () => ({ group_id:null, group:{title:'Synthetic occurrence',description:null,city:'Synthetic city',start_date:'2030-01-01',end_date:'2030-01-02'},classes:[{id:null,title:'A',date:'2030-01-01',start_time:'12:00',location:'Synthetic venue',type:'一般参加',capacity:10,registration_enabled:false},{id:null,title:'B',date:'2030-01-02',start_time:'14:00',location:'Synthetic venue',type:'稽古会',capacity:10,registration_enabled:false}],expected:null })
   const edit = async id => { const expected=await read(id);return {group_id:id,group:Object.fromEntries(Object.entries(expected.group).filter(([k])=>k!=='registration_open')),classes:expected.classes.map(row=>Object.fromEntries(Object.entries(row).filter(([k])=>k!=='end_time'))),expected} }
   const counts = () => sql('select json_build_array((select count(*) from public.event_groups),(select count(*) from public.schedules),(select count(*) from occurrence_private.save_requests));')
+  await t.test('standard single/multiple creation starts group and class reception; explicit OFF is respected',async()=>{
+    for(const count of [1,2]) {
+      const p=payload();p.classes=p.classes.slice(0,count).map(row=>({...row,registration_enabled:true}));const r=await save(p),after=await read(r.group_id)
+      assert.equal(after.group.registration_open,true);assert.ok(after.classes.every(row=>row.registration_enabled));
+      assert.equal(await sql(`select is_cancelled or is_hidden from public.event_groups where id=${r.group_id};`),'f')
+    }
+    const p=payload();p.classes[0].registration_enabled=true;const r=await save(p),after=await read(r.group_id)
+    assert.equal(after.group.registration_open,true);assert.deepEqual(after.classes.map(row=>row.registration_enabled),[true,false])
+  })
+  await t.test('stopped/cancelled/hidden groups and existing OFF classes stay unchanged when adding an ON class',async()=>{
+    for(const state of ['stopped','cancelled','hidden','both']) {
+      const r=await save(payload());
+      await sql(`update public.event_groups set registration_open=false,is_cancelled=${state==='cancelled'||state==='both'},is_hidden=${state==='hidden'||state==='both'} where id=${r.group_id};`)
+      const before=await sql(`select json_build_array(registration_open,is_cancelled,is_hidden,state_version) from public.event_groups where id=${r.group_id};`)
+      const input=await edit(r.group_id);input.group.title='Edited without reopening';input.classes.push({...payload().classes[0],title:'New ON class',registration_enabled:true})
+      await save(input);assert.equal(await sql(`select json_build_array(registration_open,is_cancelled,is_hidden,state_version) from public.event_groups where id=${r.group_id};`),before)
+      const after=await read(r.group_id);assert.ok(after.classes.filter(row=>r.class_ids.includes(row.id)).every(row=>!row.registration_enabled));assert.equal(after.classes.find(row=>!r.class_ids.includes(row.id)).registration_enabled,true)
+    }
+  })
+  await t.test('replacing RPC preserves properties; replay of an older stopped creation does not reopen it',async()=>{
+    const properties=()=>sql("select json_build_array(pg_get_userbyid(proowner),prosecdef,proconfig,proacl) from pg_proc where oid='public.admin_save_occurrence(uuid,jsonb)'::regprocedure;")
+    const before=await properties()
+    try {
+      await sql(await readFile('supabase/migrations/20261025_add_occurrence_end_time_editing.sql','utf8'))
+      const p=payload(),key=randomUUID(),r=await save(p,key);assert.equal((await read(r.group_id)).group.registration_open,false)
+      await sql(await readFile('supabase/migrations/20261027_open_new_occurrence_registration.sql','utf8'));assert.equal(await properties(),before)
+      const oldCount=await counts();assert.deepEqual(await save(p,key),r);assert.equal(await counts(),oldCount);assert.equal((await read(r.group_id)).group.registration_open,false)
+    } finally { await sql(await readFile('supabase/migrations/20261027_open_new_occurrence_registration.sql','utf8')) }
+  })
   await t.test('explicit end times create, preserve raw seconds, change and clear without altering reception', async()=>{
     const p=payload();p.classes[0].end_time='13:40';const result=await save(p)
     assert.equal((await read(result.group_id)).classes[0].end_time,'13:40')
     await sql(`update public.schedules set end_time='13:40:35',start_time='12:00:20' where id=${result.class_ids[0]};`)
     let v=await edit(result.group_id);v.group.title='Edited';await save(v)
-    let after=await read(result.group_id);assert.equal(after.classes[0].end_time,'13:40:35');assert.equal(after.classes[0].start_time,'12:00:20');assert.equal(after.group.registration_open,false)
+    let after=await read(result.group_id);assert.equal(after.classes[0].end_time,'13:40:35');assert.equal(after.classes[0].start_time,'12:00:20');assert.equal(after.group.registration_open,true)
     v=await edit(result.group_id);v.classes[0].end_time='15:40';await save(v);assert.equal((await read(result.group_id)).classes[0].end_time,'15:40')
     v=await edit(result.group_id);v.classes[0].end_time=null;await save(v);assert.equal((await read(result.group_id)).classes[0].end_time,null)
   })
@@ -65,8 +94,8 @@ test('atomic occurrence editor in isolated local PostgreSQL', { skip: process.en
   await t.test('non-read-committed transactions fail closed before writing',async()=>{
     const before=await counts();await assert.rejects(sql(`begin isolation level repeatable read;${asAdmin(statement(payload(),randomUUID()))}commit;`),/read committed transaction required/);assert.equal(await counts(),before)
   })
-  await t.test('create all classes, NULL end times, capacity and stopped reception atomically',async()=>{
-    const r=await save(payload()), s=await read(r.group_id);assert.equal(s.classes.length,2);assert.equal(s.group.registration_open,false);assert.ok(s.classes.every(row=>row.end_time===null&&row.capacity===10&&!row.registration_enabled))
+  await t.test('create all classes, NULL end times, capacity and group reception ON with explicit class OFF atomically',async()=>{
+    const r=await save(payload()), s=await read(r.group_id);assert.equal(s.classes.length,2);assert.equal(s.group.registration_open,true);assert.ok(s.classes.every(row=>row.end_time===null&&row.capacity===10&&!row.registration_enabled))
   })
   await t.test('same-key same-body replay makes no duplicate rows; changed payload and actor conflict',async()=>{
     const key=randomUUID(), p=payload(), r=await save(p,key), before=await counts();assert.deepEqual(await save(p,key),r);assert.equal(await counts(),before)
@@ -87,7 +116,7 @@ test('atomic occurrence editor in isolated local PostgreSQL', { skip: process.en
   })
   for(const field of ['title','city','start_date','class','end_time','capacity','registration_open'])await t.test(`stale ${field} snapshot refuses all updates`,async()=>{
     const r=await save(payload()), input=await edit(r.group_id)
-    const change={title:`update public.event_groups set title='Other' where id=${r.group_id}`,city:`update public.event_groups set city=null where id=${r.group_id}`,start_date:`update public.event_groups set start_date='2029-12-31' where id=${r.group_id}`,class:`update public.schedules set title='Other' where id=${r.class_ids[0]}`,end_time:`update public.schedules set end_time='20:00' where id=${r.class_ids[0]}`,capacity:`update public.schedules set capacity=11 where id=${r.class_ids[0]}`,registration_open:`update public.event_groups set registration_open=true where id=${r.group_id}`}[field]
+    const change={title:`update public.event_groups set title='Other' where id=${r.group_id}`,city:`update public.event_groups set city=null where id=${r.group_id}`,start_date:`update public.event_groups set start_date='2029-12-31' where id=${r.group_id}`,class:`update public.schedules set title='Other' where id=${r.class_ids[0]}`,end_time:`update public.schedules set end_time='20:00' where id=${r.class_ids[0]}`,capacity:`update public.schedules set capacity=11 where id=${r.class_ids[0]}`,registration_open:`update public.event_groups set registration_open=false where id=${r.group_id}`}[field]
     await sql(change+';');const before=await read(r.group_id);await assert.rejects(save(input),/occurrence changed/);assert.deepEqual(await read(r.group_id),before)
   })
   await t.test('omitting or substituting an existing class never deletes/reassigns it',async()=>{

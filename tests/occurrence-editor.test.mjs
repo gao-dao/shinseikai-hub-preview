@@ -128,3 +128,11 @@ test('equal minute and zero-second values compare as the same time', () => {
  const v=fixture();v.classes[0].start_time='12:00:00';v.classes[0].end_time='12:00';assert.ok(validation.validateOccurrenceInput(v).data)
  v.classes[0].start_time='12:00:01';assert.ok(validation.validateOccurrenceInput(v).error)
 })
+
+test('forward reception migration changes only new-group false to true and preserves the complete RPC',()=>{
+ const before=fs.readFileSync('supabase/migrations/20261025_add_occurrence_end_time_editing.sql','utf8')
+ const after=fs.readFileSync('supabase/migrations/20261027_open_new_occurrence_registration.sql','utf8')
+ const marker='v_start, v_end, false)'
+ assert.equal(before.split(marker).length-1,1)
+ assert.equal(after,'-- Preview forward migration: only new group reception defaults to ON. Existing states and class input are preserved.\n'+before.replace(marker,'v_start, v_end, true)'))
+})

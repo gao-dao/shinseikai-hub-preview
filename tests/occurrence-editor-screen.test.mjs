@@ -42,10 +42,10 @@ test('new editor starts with one class, 10 seats in details, optional minute-onl
   const c = setup(); await c.mount(); assert.equal(c.fields('開始時刻').length, 1); assert.equal(c.fields('定員')[0].props.value, '10'); assert.equal(c.fields('終了時刻（任意）').length, 1); assert.equal(c.fields('終了時刻（任意）')[0].props.value, ''); assert.equal(c.fields('開始時刻')[0].props.step, '60')
   assert.equal(c.calls.length, 0)
 })
-test('single-class review and atomic save use event title, common date/venue and stopped reception', async () => {
+test('single-class review and atomic save use event title, common date/venue and enabled new classes', async () => {
   const c = setup(); await c.mount(); fill(c); await c.submit(); assert.ok(c.button('まとめて保存')); await c.save()
-  const input = c.calls.find(v => v[0] === 'save')[1]; assert.equal(input.classes.length, 1); assert.equal(input.classes[0].title, '東京講座'); assert.equal(input.classes[0].capacity, 10); assert.equal(input.classes[0].registration_enabled, false); assert.equal(input.classes[0].date, '2030-10-23'); assert.equal(input.classes[0].location, '合成会場'); assert.equal(input.group_id, null); assert.equal(input.expected, null)
-  assert.match(c.text(), /保存しました/); assert.match(c.text(), /受付状態は変更していません/)
+  const input = c.calls.find(v => v[0] === 'save')[1]; assert.equal(input.classes.length, 1); assert.equal(input.classes[0].title, '東京講座'); assert.equal(input.classes[0].capacity, 10); assert.equal(input.classes[0].registration_enabled, true); assert.equal(input.classes[0].date, '2030-10-23'); assert.equal(input.classes[0].location, '合成会場'); assert.equal(input.group_id, null); assert.equal(input.expected, null)
+  assert.match(c.text(), /保存しました/); assert.match(c.text(), /グループ受付を開始しました/)
 })
 test('multiple classes inherit date and venue; individual overrides define multi-day range', async () => {
   const c = setup(); await c.mount(); fill(c); c.button('＋クラスを追加').props.onClick(); c.change('クラス名', '第2部', 1); c.change('開始時刻', '14:00', 1)
@@ -155,7 +155,7 @@ test('single review shows event name, date and venue once without the internal c
  const c=setup();await c.mount();fill(c);await c.submit()
  const review=c.render().find(v=>v.props?.['aria-label']==='保存前の確認'), content=text(review)
  for(const value of ['東京講座','2030-10-23','合成会場'])assert.equal(content.split(value).length-1,1)
- assert.match(content,/12:00/);assert.match(content,/定員：10名/);assert.match(content,/クラス受付：無効/)
+ assert.match(content,/12:00/);assert.match(content,/定員：10名/);assert.match(content,/クラス受付：有効/)
 })
 test('renaming a single existing event retains its hidden saved class name and ID',async()=>{
  const c=setup({groupId:1});await c.mount();c.change('開催名','変更後の開催名');await c.submit()
@@ -189,4 +189,46 @@ test('cancel is the only exit to the original page and no focus-driven sorting h
  const exits=c.render().filter(v=>v.type==='Link'&&v.props.href==='/admin/event-groups/1')
  assert.equal(exits.length,1);assert.equal(text(exits[0]),'キャンセル')
  assert.equal(c.render().some(v=>v.props?.onBlur),false);assert.equal(c.button('日時順に整列'),undefined)
+})
+
+test('new single and multi-class inputs default enabled without adding a second reception write',async()=>{
+ for(const multiple of [false,true]){
+  const c=setup();await c.mount();fill(c)
+  if(multiple){c.button('＋クラスを追加').props.onClick();c.change('クラス名','追加クラス',1);c.change('開始時刻','14:00',1)}
+  await c.submit();await c.save();const sent=c.calls.find(v=>v[0]==='save')[1]
+  assert.ok(sent.classes.every(row=>row.registration_enabled===true));assert.ok(sent.classes.every(row=>row.capacity===10))
+  assert.equal(Object.hasOwn(sent.group,'registration_open'),false);assert.equal(c.calls.length,1)
+  assert.match(c.text(),/新規開催回のグループ受付を開始しました/)
+ }
+})
+test('editing and adding keeps existing OFF or ON class state and the raw group snapshot',async()=>{
+ for(const open of [false,true]){
+  const data=snapshot();data.group.registration_open=open
+  data.classes.push({...data.classes[0],id:8,title:'受付有効クラス',registration_enabled:true,start_time:'13:00'})
+  const c=setup({groupId:1,data});await c.mount();c.change('開催名','名称を編集')
+  c.button('＋クラスを追加').props.onClick();c.change('クラス名','新しいクラス',2);c.change('開始時刻','14:00',2)
+  await c.submit();await c.save();const sent=c.calls.find(v=>v[0]==='save')[1]
+  assert.equal(sent.classes.find(row=>row.id===7).registration_enabled,false)
+  assert.equal(sent.classes.find(row=>row.id===8).registration_enabled,true)
+  assert.equal(sent.classes.find(row=>row.id===null).registration_enabled,true)
+  assert.equal(sent.expected.group.registration_open,open);assert.equal(sent.classes.find(row=>row.id===7).capacity,25)
+  assert.equal(c.calls.filter(v=>v[0]==='save').length,1)
+ }
+})
+test('explicit new-class reception OFF remains respected',async()=>{
+ const c=setup();await c.mount();fill(c)
+ const label=c.render().find(v=>v.type==='label'&&text(v).includes('クラスの受付を有効にする'))
+ all(label).find(v=>v.type==='input').props.onChange({target:{checked:false}})
+ await c.submit();await c.save();assert.equal(c.calls.find(v=>v[0]==='save')[1].classes[0].registration_enabled,false)
+})
+
+
+test('recovered old creation never falsely claims reception was opened by replay',async()=>{
+ const first=setup();await first.mount();fill(first);await first.submit();await first.save()
+ const input=first.calls.find(v=>v[0]==='save')[1];input.classes[0].registration_enabled=false
+ const replay=setup({pending:{key:'synthetic',input}});await replay.mount()
+ await replay.button('同じ保存キー・内容で再確認').props.onClick()
+ await new Promise(resolve=>setImmediate(resolve))
+ assert.match(replay.text(),/以前の保存結果の再確認では受付状態を変更しません/)
+ assert.doesNotMatch(replay.text(),/グループ受付を開始しました/)
 })
