@@ -18,6 +18,7 @@ function compile(path, dependencies = {}, globals = {}) {
   return exports
 }
 const availability = compile('lib/registrations/public-availability.ts')
+const display = compile('lib/registrations/public-class-display.ts')
 function schedule(id = 1, changes = {}) { return { id, title: `クラス${id}`, date: '2026-10-20', start_time: '10:00', end_time: '11:00', capacity: 10, registration_enabled: true, event_group_id: 1, ...changes } }
 function seats(schedule_id = 1, changes = {}) { return { schedule_id, capacity: 10, registered_count: 2, remaining_capacity: 8, is_full: false, ...changes } }
 
@@ -227,7 +228,7 @@ function ui() {
     return [state[slot], value => { state[slot] = typeof value === 'function' ? value(state[slot]) : value }]
   }, useEffect(fn) { effects.push(fn) } }
   let response = { ok: true, json: async () => ({ eventGroups: [], page: 1, pageSize: 50, total: 0 }) }
-  const exports = compile('app/(public)/events/events-list.tsx', { react, 'react/jsx-runtime': jsxRuntime, 'next/link': { default: () => null }, './registration-form': { default: () => null } }, {
+  const exports = compile('app/(public)/events/events-list.tsx', { react, '@/lib/registrations/public-class-display': display, 'react/jsx-runtime': jsxRuntime, 'next/link': { default: () => null }, './registration-form': { default: () => null } }, {
     AbortController, fetch: async (...args) => { calls.push(args); return response },
   })
   const render = (Component = exports.default, props = {}) => { index = 0; effects.length = 0; return elements(Component(props)) }
@@ -242,18 +243,17 @@ test('legacy registration mode remains available without authentication', async 
   assert.equal((await page.default({ searchParams: Promise.resolve({ view: 'registration' }) })).type, Client)
 })
 
-test('public UI renders metadata, seats, unknown states and no registration form', () => {
+test('public UI renders metadata and availability without capacity or seat numbers', () => {
   const { exports } = ui()
   const item = availability.publicClassAvailability(schedule(), seats())
   const html = renderToStaticMarkup(React.createElement(exports.PublicClassCard, { item }))
   assert.match(html, /クラス1/)
   assert.match(html, /2026-10-20/)
-  assert.match(html, /定員：10名/)
-  assert.match(html, /残席：8名/)
+  assert.doesNotMatch(html, /定員|残席/)
   assert.match(html, /受付可能/)
   assert.doesNotMatch(html, /<form|type="submit"/)
   const unknown = renderToStaticMarkup(React.createElement(exports.PublicClassCard, { item: availability.publicClassAvailability(schedule()) }))
-  assert.match(unknown, /残席確認不可/)
+  assert.match(unknown, /申込状況を確認できません/)
   assert.doesNotMatch(unknown, /受付可能/)
 })
 
@@ -309,4 +309,22 @@ test('events opens the chosen public group form and prevents switching groups wh
 
 for(const flags of [{is_hidden:true},{is_cancelled:true},{is_cancelled:true,is_hidden:true}])test(`public list and direct class URL reject lifecycle flags ${JSON.stringify(flags)}`,async()=>{
  const c=setup({groups:[{id:1,title:'Blocked',description:null,registration_open:true,...flags}]});const result=await c.list();assert.equal(result.body.total,0);assert.equal((await c.classes()).status,404);assert.equal(c.calls.filter(v=>v[0]==='rpc').length,0)
+})
+
+for (const [name, enabled, registered, missing, label, selectable] of [
+  ['open',true,2,false,'受付可能',true],
+  ['stopped with seats',false,2,false,'満席',false],
+  ['stopped with zero seats',false,10,false,'満席',false],
+  ['open with zero seats',true,10,false,'申込不可',false],
+  ['availability failed',true,0,true,'申込状況を確認できません',false],
+  ['stopped despite availability failure',false,0,true,'満席',false],
+]) test(`public card presentation preserves eligibility and hides counts: ${name}`,()=>{
+ const {exports}=ui()
+ const source=schedule(1,{registration_enabled:enabled})
+ const item=availability.publicClassAvailability(source,missing?undefined:{capacity:10,registered_count:registered,remaining_capacity:Math.max(10-registered,0),is_full:registered>=10})
+ const before=JSON.stringify(item)
+ const html=renderToStaticMarkup(React.createElement(exports.PublicClassCard,{item}))
+ assert.ok(html.includes(label));assert.doesNotMatch(html,/定員|残席|残り[0-9]/)
+ if(label!=='満席')assert.doesNotMatch(html,/満席/)
+ assert.equal(item.canRegister,selectable);assert.equal(JSON.stringify(item),before);assert.equal(source.registration_enabled,enabled)
 })

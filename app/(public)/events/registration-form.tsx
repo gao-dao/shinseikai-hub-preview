@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { validateProxyRegistration } from '@/lib/registrations/proxy-registration'
 import { PublicRegistrationAttempt, loadPublicRegistrationClasses } from '@/lib/registrations/public-form'
 import type { PublicClass } from '@/lib/registrations/public-availability'
+import { publicClassLabel } from '@/lib/registrations/public-class-display'
 import TurnstileWidget from './turnstile-widget'
 
 type Input = NonNullable<ReturnType<typeof validateProxyRegistration>['data']>
@@ -44,7 +45,7 @@ export default function RegistrationForm({ group, onClose }: { group: { id: numb
       try {
         const result = await loadPublicRegistrationClasses(group.id, fetch, controller.signal)
         if (!controller.signal.aborted) { setClasses(result); setSelected(value => value.filter(id => result.some(item => item.id === id && item.canRegister))) }
-      } catch { if (!controller.signal.aborted) { setClasses([]); setClassesError('クラス・残席を取得できませんでした。受付停止中の場合もあります。一覧を更新してください。') } }
+      } catch { if (!controller.signal.aborted) { setClasses([]); setClassesError('申込状況を確認できません。開催回が受付停止中の場合もあります。一覧を更新してください。') } }
       finally { if (!controller.signal.aborted) setLoading(false) }
     }
     void load()
@@ -99,7 +100,7 @@ export default function RegistrationForm({ group, onClose }: { group: { id: numb
       <input id="public-contact" required value={contact} onChange={event => setContact(event.target.value)} />
       <label htmlFor="public-notes">備考（2000文字以内）</label>
       <textarea id="public-notes" rows={3} value={notes} onChange={event => setNotes(event.target.value)} />
-      {loading && <p role="status">クラス・残席を読み込み中...</p>}
+      {loading && <p role="status">申込状況を読み込み中...</p>}
       {classesError && <p role="alert">{classesError}</p>}
       <fieldset disabled={loading || !!classesError}>
         <legend>参加するクラス（複数選択可・最大50件）</legend>
@@ -108,11 +109,11 @@ export default function RegistrationForm({ group, onClose }: { group: { id: numb
           <input type="checkbox" checked={selected.includes(item.id)} disabled={!item.canRegister || (!selected.includes(item.id) && selected.length >= 50)}
             onChange={event => { if (event.target.checked && !item.canRegister) return; setSelected(value => event.target.checked ? value.includes(item.id) ? value : [...value, item.id] : value.filter(id => id !== item.id)) }} />
           {' '}{item.title} ／ {item.date} {item.start_time ?? '開始時刻未設定'}〜{item.end_time ?? '終了時刻未設定'}
-          <span>定員：{item.capacity ?? '未設定'} ／ 残席：{item.remainingCapacity ?? '確認不可'} ／ {item.status}</span>
+          <span>{publicClassLabel(item)}</span>
         </label>)}
       </fieldset>
-      <p>残席は確認時点の情報です。送信時に受付状態・定員を再確認します。</p>
-      <button type="button" disabled={loading} onClick={() => setReload(value => value + 1)}>クラス・残席を再取得</button>{' '}
+      <p>送信時に申込可否を再確認します。</p>
+      <button type="button" disabled={loading} onClick={() => setReload(value => value + 1)}>申込状況を再取得</button>{' '}
       <button type="submit" disabled={loading || !!classesError}>入力内容を確認する</button>
     </form>}
     {(stage === 'confirming' || stage === 'pending') && review && <>

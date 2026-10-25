@@ -265,7 +265,7 @@ function hooks() {
 function form({store=storage(),postResponse=response(),postError=false,pendingPost=false,classes=[row(11),row(12),row(13,{canRegister:false,remainingCapacity:0,status:'満員'})],classesFail=false}={}) {
   const harness=hooks(),calls=[],logs=[],Widget=()=>null;let release
   const {default:Component}=compile('app/(public)/events/registration-form.tsx',{
-    react:harness.react,'react/jsx-runtime':jsxRuntime,'@/lib/registrations/proxy-registration':proxy,'@/lib/registrations/public-form':model,'./turnstile-widget':{default:Widget},
+    '@/lib/registrations/public-class-display':compile('lib/registrations/public-class-display.ts'),react:harness.react,'react/jsx-runtime':jsxRuntime,'@/lib/registrations/proxy-registration':proxy,'@/lib/registrations/public-form':model,'./turnstile-widget':{default:Widget},
   },{crypto:{randomUUID:()=>key1},window:{sessionStorage:store,addEventListener(){},removeEventListener(){}},console:{log:(...args)=>logs.push(args),error:(...args)=>logs.push(args)},fetch:async(url,options)=>{
     calls.push([url,options]);if(options?.method==='POST'){if(postError)throw new Error('SECRET');if(pendingPost)return new Promise(resolve=>{release=resolve});return postResponse}
     if(classesFail)throw new Error('SECRET');return {ok:true,json:async()=>({schedules:classes,page:1,pageSize:50,total:classes.length})}
@@ -337,7 +337,7 @@ test('reloaded pending marker blocks new form submission and class retrieval err
 test('Turnstile widget uses public key and registration action, clears expired tokens and ignores stale callbacks',async()=>{
   const harness=hooks(),tokens=[],rendered=[],removed=[],Script=()=>null
   const win={turnstile:{render:(_,options)=>{rendered.push(options);return String(rendered.length)},remove:id=>removed.push(id)}}
-  const {default:Widget}=compile('app/(public)/events/turnstile-widget.tsx',{react:harness.react,'react/jsx-runtime':jsxRuntime,'next/script':{default:Script}},{window:win,process:{env:{NEXT_PUBLIC_TURNSTILE_SITE_KEY:'SYNTHETIC_PUBLIC_SITEKEY'}}})
+  const {default:Widget}=compile('app/(public)/events/turnstile-widget.tsx',{'@/lib/registrations/public-class-display':compile('lib/registrations/public-class-display.ts'),react:harness.react,'react/jsx-runtime':jsxRuntime,'next/script':{default:Script}},{window:win,process:{env:{NEXT_PUBLIC_TURNSTILE_SITE_KEY:'SYNTHETIC_PUBLIC_SITEKEY'}}})
   const onToken=value=>tokens.push(value)
   const render=generation=>{harness.reset();return elements(Widget({onToken,generation}))}
   let tree=render(0);tree.find(item=>item.type==='div'&&item.props.ref).props.ref.current={}
@@ -354,7 +354,7 @@ test('Turnstile widget uses public key and registration action, clears expired t
 
 test('Turnstile missing public configuration renders an error and no script, without bypass',()=>{
   const harness=hooks(),Script=()=>null
-  const {default:Widget}=compile('app/(public)/events/turnstile-widget.tsx',{react:harness.react,'react/jsx-runtime':jsxRuntime,'next/script':{default:Script}},{process:{env:{NODE_ENV:'development'}}})
+  const {default:Widget}=compile('app/(public)/events/turnstile-widget.tsx',{'@/lib/registrations/public-class-display':compile('lib/registrations/public-class-display.ts'),react:harness.react,'react/jsx-runtime':jsxRuntime,'next/script':{default:Script}},{process:{env:{NODE_ENV:'development'}}})
   harness.reset();const tree=elements(Widget({onToken(){},generation:0}))
   assert.ok(tree.some(item=>item.props?.role==='alert'));assert.equal(tree.some(item=>item.type===Script),false)
 })
@@ -396,4 +396,28 @@ for(const value of [null,'','0','-1','1.5','NaN','100000',' 60','60 ','Wed, 21 O
   const result=await instance.submit('token',async()=>({status:429,headers:{get:()=>value},json:()=>{throw new Error('must-not-parse')}}))
   assert.equal(result.kind,'rejected');assert.equal(result.retryAfterSeconds,undefined)
   assert.doesNotMatch(JSON.stringify(result),/script|Wed|secret/)
+})
+
+for(const [name,changes,label,disabled] of [
+ ['open',{canRegister:true,remainingCapacity:8,status:'受付可能'},'受付可能',false],
+ ['stopped with seats',{canRegister:false,remainingCapacity:8,status:'クラス受付停止中'},'満席',true],
+ ['stopped with no seats',{canRegister:false,remainingCapacity:0,status:'クラス受付停止中'},'満席',true],
+ ['zero seats',{canRegister:false,remainingCapacity:0,status:'満員'},'申込不可',true],
+ ['unknown seats',{canRegister:false,remainingCapacity:null,status:'残席確認不可'},'申込状況を確認できません',true],
+])test(`public form hides numeric capacity and preserves selection: ${name}`,async()=>{
+ const saved=row(11,changes),before=JSON.stringify(saved),context=form({classes:[saved]});await context.mount()
+ const nodes=context.render()
+ assert.ok(nodes.some(item=>item.type==='span'&&item.props.children===label))
+ assert.equal(nodes.find(item=>item.type==='input'&&item.props.type==='checkbox').props.disabled,disabled)
+ const labels=nodes.filter(item=>item.type==='span').map(item=>item.props.children).join(' ')
+ assert.doesNotMatch(labels,/定員|残席|残り[0-9]/)
+ if(label!=='満席')assert.ok(!nodes.some(item=>item.props?.children==='満席'))
+ assert.equal(JSON.stringify(saved),before);assert.equal(context.calls.some(call=>call[1]?.method==='POST'),false)
+})
+test('unavailable group/classes never become full labels and prevent confirmation',async()=>{
+ const context=form({classesFail:true});await context.mount()
+ assert.ok(context.render().some(item=>item.props?.role==='alert'))
+ assert.ok(!context.render().some(item=>item.props?.children==='満席'))
+ assert.equal(context.render().find(item=>item.type==='button'&&item.props.children==='入力内容を確認する').props.disabled,true)
+ assert.equal(context.calls.some(call=>call[1]?.method==='POST'),false)
 })

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import RegistrationForm from './registration-form'
 import type { PublicClass } from '@/lib/registrations/public-availability'
+import { publicClassLabel } from '@/lib/registrations/public-class-display'
 
 type Group = { id: number; title: string; description: string | null }
 type GroupList = { eventGroups: Group[]; page: number; pageSize: number; total: number }
@@ -13,8 +14,7 @@ export function PublicClassCard({ item }: { item: PublicClass }) {
   return <li className="events-class">
     <h3>{item.title}</h3>
     <p>開催日時：{item.date} {item.start_time ?? '開始時刻未設定'}〜{item.end_time ?? '終了時刻未設定'}</p>
-    <p>定員：{item.capacity === null ? '未設定' : `${item.capacity}名`} ／ 残席：{item.remainingCapacity === null ? '確認できません' : `${item.remainingCapacity}名`}</p>
-    <p className={item.canRegister ? 'events-available' : 'events-unavailable'}>受付状況：<strong>{item.status}</strong></p>
+    <p className={item.canRegister ? 'events-available' : 'events-unavailable'}>受付状況：<strong>{publicClassLabel(item)}</strong></p>
   </li>
 }
 
@@ -33,11 +33,11 @@ export function EventClasses({ groupId }: { groupId: number }) {
       setError('')
       try {
         const response = await fetch(`/api/event-groups/${groupId}/classes?page=${page}`, { cache: 'no-store', credentials: 'omit', signal: controller.signal })
-        if (!response.ok) throw new Error(response.status === 404 ? 'この講習会は受付停止中、または見つかりません。一覧を更新してください。' : 'クラス・残席を確認できませんでした。受付可否は不明です。')
+        if (!response.ok) throw new Error(response.status === 404 ? 'この講習会は受付停止中、または見つかりません。一覧を更新してください。' : '申込状況を確認できませんでした。受付可否は不明です。')
         const data: ClassList = await response.json()
         if (!controller.signal.aborted) setResult(data)
       } catch (cause) {
-        if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : 'クラス・残席を確認できませんでした。')
+        if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '申込状況を確認できませんでした。')
       } finally {
         if (!controller.signal.aborted) setLoading(false)
       }
@@ -47,7 +47,7 @@ export function EventClasses({ groupId }: { groupId: number }) {
   }, [groupId, page, reload])
 
   return <div aria-label="クラス一覧">
-    {loading && <p role="status">クラス・残席を読み込み中...</p>}
+    {loading && <p role="status">申込状況を読み込み中...</p>}
     {error && <p role="alert">{error}</p>}
     {result && result.schedules.length === 0 && <p>表示するクラスはありません。</p>}
     {result && <>
@@ -58,7 +58,7 @@ export function EventClasses({ groupId }: { groupId: number }) {
         <button disabled={loading || page * result.pageSize >= result.total} onClick={() => setPage(value => value + 1)}>次のクラス</button>
       </nav>
     </>}
-    <button disabled={loading} onClick={() => setReload(value => value + 1)}>クラス・残席を更新</button>
+    <button disabled={loading} onClick={() => setReload(value => value + 1)}>申込状況を更新</button>
   </div>
 }
 
@@ -119,7 +119,7 @@ export default function EventsList() {
       <Link href="/events">開催案内へ</Link>
       {' ／ '}<Link href="/schedule">スケジュールへ</Link>
       <h1>公開講習会</h1>
-      <p>公開受付中の講習会とクラス情報です。残席は確認時点の情報です。</p>
+      <p>Web申込を受付中の講習会です。クラスの申込状況をご確認ください。</p>
       {registrationGroup && <RegistrationForm key={registrationGroup.id} group={registrationGroup} onClose={() => setRegistrationGroup(null)} />}
       <button disabled={loading} onClick={() => { setPage(1); setReload(value => value + 1) }}>講習会一覧を更新</button>
       {loading && <p role="status">講習会を読み込み中...</p>}
