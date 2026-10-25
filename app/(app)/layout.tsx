@@ -48,7 +48,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     { href: '/events', label: '開催案内' },
     { href: '/schedule', label: 'スケジュール' },
     ...(session.logged ? [{ href: '/videos', label: '動画ライブラリ' }] : []),
-    ...(session.admin ? [{ href: '/admin/event-groups', label: '開催回管理' }] : []),
+    ...(session.admin ? [{ href: '/admin', label: '管理ホーム' }] : []),
   ]
   return <>
     <style>{`
@@ -70,7 +70,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <header className="hub-header">
         <Link href="/" className="hub-brand">心勢会HUB</Link>
         <nav className="hub-nav" aria-label={session.admin ? '管理者メニュー' : session.logged ? '会員メニュー' : '公開メニュー'}>
-          {links.map(link => <Link key={link.href} href={link.href} aria-current={(link.href.startsWith('/admin') ? pathname.startsWith('/admin') : pathname === link.href) ? 'page' : undefined}>{link.label}</Link>)}
+          {links.map(link => <Link key={link.href} href={link.href} aria-current={(pathname === link.href) ? 'page' : undefined}>{link.label}</Link>)}
           {session.checked && (session.logged
             ? <button type="button" disabled={signingOut} onClick={logout}>{signingOut ? 'ログアウト中…' : 'ログアウト'}</button>
             : <Link href="/login">ログイン →</Link>)}

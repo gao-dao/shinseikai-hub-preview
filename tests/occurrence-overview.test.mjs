@@ -75,10 +75,13 @@ for (const tab of ['schedules', 'videos', 'passwords']) for (const status of [40
   if (status === 200) assert.equal((await Page()).props.initialTab, tab)
   else await assert.rejects(Page(), /REDIRECT/)
 })
-test('admin entry redirects to the occurrence list', () => {
-  let path
-  const Page = compile('app/(app)/admin/page.tsx', { 'next/navigation': { redirect: value => { path = value } } }).default
-  Page(); assert.equal(path, '/admin/event-groups')
+test('admin home is guarded before rendering management links', async () => {
+ const Page = compile('app/(app)/admin/page.tsx', {
+  'next/navigation': { redirect: value => { throw Error(`REDIRECT:${value}`) } },
+  '@/lib/supabase/require-admin': { requireAdmin: async () => ({ ok: false, status: 401 }) },
+  'next/link': { default: () => null }, './event-groups/admin-index.module.css': { default: {} }, 'react/jsx-runtime': jsxRuntime,
+ }).default
+ await assert.rejects(Page(), /REDIRECT:\/login/)
 })
 
 test('summary collects all class dates without inventing dates for missing values',async()=>{

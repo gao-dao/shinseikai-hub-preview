@@ -240,6 +240,7 @@ function adminForm({ ok = true, historyKnown = true } = {}) {
   }
   const query = {
     select: () => query,
+    is: () => query,
     order: async () => { calls.push(['refresh']); return { data: [] } },
     update: payload => { calls.push(['update', payload]); return { eq: async () => ({ error: null }) } },
   }
@@ -247,7 +248,7 @@ function adminForm({ ok = true, historyKnown = true } = {}) {
     react: harness.react, 'react/jsx-runtime': jsxRuntime,
     '@/lib/supabase/client': { createClient: () => ({ from: table => { assert.equal(table, 'schedules'); return query } }) },
     'next/navigation': { useRouter: () => ({}) }, 'next/link': { default: () => null },
-    './schedule-registration-status': { useScheduleRegistrationStatuses: () => ({ statuses: historyKnown ? { '12': { hasRegistrationHistory: false, activeRegistrationCount: 0 } } : {}, loading: false, error: '', refresh() { calls.push(['refresh-status']) } }), ScheduleRegistrationStatus: () => null },
+    './schedule-registration-status': { useScheduleRegistrationStatuses: () => ({ statuses: historyKnown ? { '12': { event_group_id: null, hasRegistrationHistory: false, activeRegistrationCount: 0 } } : {}, loading: false, error: '', refresh() { calls.push(['refresh-status']) } }), ScheduleRegistrationStatus: () => null },
     './schedule-deletion': { scheduleDeletionBlockReason: () => 'unknown' },
     './new-schedule-form': { default: NewForm }, '@/lib/schedules/new-schedule': validation,
     './edit-schedule-fields': { default: EditFields }, '@/lib/schedules/edit-schedule': compile('lib/schedules/edit-schedule.ts'),
@@ -277,16 +278,16 @@ function adminForm({ ok = true, historyKnown = true } = {}) {
 test('new form uses POST and only refreshes/resets after success; failures retain inputs', async () => {
   for (const ok of [true, false]) {
     const context = adminForm({ ok })
-    const before = context.render().find(item => item.type === context.ExtraFields)
+    const before = context.render().find(item => item.props?.name === 'new_capacity')
     const form = context.render().find(item => item.type === 'form')
     await form.props.onSubmit({ preventDefault() {}, currentTarget: { new_event_group_id: '5', new_capacity: '10', new_registration_enabled: 'on' } })
     const post = context.calls.find(call => call[0] === 'post')
     assert.equal(post[1], '/api/admin/schedules')
-    assert.equal(post[2].event_group_id, 5)
-    assert.equal(post[2].registration_enabled, true)
+    assert.equal(post[2].event_group_id, null)
+    assert.equal(post[2].registration_enabled, false)
     assert.equal(context.calls.some(call => call[0] === 'refresh'), ok)
     const afterTree = context.render()
-    const after = afterTree.find(item => item.type === context.ExtraFields)
+    const after = afterTree.find(item => item.props?.name === 'new_capacity')
     assert.equal(after.key !== before.key, ok)
     assert.equal(afterTree.find(item => item.props?.placeholder === '通常稽古').props.value, ok ? '' : '予定')
   }
@@ -304,8 +305,8 @@ test('editing uses PATCH with all fields and snapshot; only success refreshes an
     assert.equal(patch[1], '/api/admin/schedules/12')
     assert.equal(patch[2].title, '予定')
     assert.equal(patch[2].capacity, 20)
-    assert.equal(patch[2].event_group_id, 5)
-    assert.equal(patch[2].registration_enabled, true)
+    assert.equal(patch[2].event_group_id, null)
+    assert.equal(patch[2].registration_enabled, false)
     assert.equal(patch[2].expected.event_group_id, null)
     assert.equal(context.calls.some(call => call[0] === 'update'), false)
     assert.equal(context.calls.some(call => call[0] === 'refresh'), ok)
@@ -329,7 +330,7 @@ test('unknown history blocks edit submission; cancel clears fields and switches 
   assert.equal(tree.find(item => item.type === context.EditFields).props.schedule.id, 13)
   tree.find(item => item.props?.className === 'cancel-btn').props.onClick()
   tree = context.render()
-  assert.equal(tree.some(item => item.type === context.ExtraFields), true)
+  assert.equal(tree.some(item => item.props?.name === 'new_capacity'), true)
   assert.equal(tree.find(item => item.props?.placeholder === '通常稽古').props.value, '')
   assert.equal(tree.some(item => item.type === context.EditFields), false)
 })

@@ -30,7 +30,7 @@ export default function LoginPage() {
       const result = await response.json()
       if (result.success !== true) throw new Error('LOGIN_UNCONFIRMED')
       // A fresh document avoids reusing a browser client with an older session.
-      window.location.assign(role === 'admin' ? '/admin/event-groups' : '/videos')
+      window.location.assign(role === 'admin' ? '/admin' : '/videos')
     } catch {
       setError('ログイン結果を確認できませんでした。画面を再読み込みして確認してください。')
     } finally {

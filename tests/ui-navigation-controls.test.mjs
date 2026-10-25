@@ -67,7 +67,7 @@ for (const tab of ['videos', 'schedules', 'passwords']) test(`management navigat
 for (const tab of ['videos', 'schedules']) test(`${tab} editing moves to the rendered form once and keeps values on cancel`, () => {
   const { h, render } = tools(tab)
   const row = tab === 'videos' ? { id: 1, title: '対象動画', description: '説明', url: 'https://example.invalid/video', duration: '10:00', tag: '基本型' }
-    : { id: 1, title: '対象予定', date: '2030-01-01', start_time: '10:00', end_time: '11:00', location: '会場', type: '稽古会' }
+    : { id: 1, title: '対象予定', date: '2030-01-01', start_time: '10:00', end_time: '11:00', location: '会場', type: '稽古会', event_group_id: null, registration_enabled: false, capacity: null }
   h.state[tab === 'videos' ? 3 : 4] = [row]
   render().find(n => n.type === 'button' && n.props.children === '編集').props.onClick()
   let tree = render(); const heading = tree.find(n => n.type === 'h2' && n.props.tabIndex === -1)

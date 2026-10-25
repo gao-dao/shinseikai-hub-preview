@@ -5,6 +5,7 @@ import NewScheduleFields, { type Group } from './new-schedule-fields'
 import { parseRegistrationFields, validateNewSchedule, type NewSchedule } from '@/lib/schedules/new-schedule'
 
 type Props = {
+  independentOnly?: boolean
   hideEndTime?: boolean
   fixedGroup?: Group
   onCreated?: () => void
@@ -12,7 +13,7 @@ type Props = {
   onDirtyChange?: (dirty: boolean) => void
 }
 
-export default function NewScheduleForm({ hideEndTime = false, fixedGroup, onCreated, onBusyChange, onDirtyChange }: Props) {
+export default function NewScheduleForm({ independentOnly = false, hideEndTime = false, fixedGroup, onCreated, onBusyChange, onDirtyChange }: Props) {
   const [title, setTitle] = useState('')
   const [date, setDate] = useState('')
   const [start, setStart] = useState('')
@@ -27,13 +28,14 @@ export default function NewScheduleForm({ hideEndTime = false, fixedGroup, onCre
   async function create(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (inFlight.current) return
+    if (independentOnly && fixedGroup) { setMessage('エラー: 独立予定に開催回を指定できません'); return }
     if (fixedGroup && (!Number.isSafeInteger(fixedGroup.id) || fixedGroup.id <= 0)) {
       setMessage('エラー: 対象グループを確認してください'); return
     }
     const form = new FormData(event.currentTarget)
     // Never trust a hidden/select value when the caller fixes the group.
-    const groupId = fixedGroup ? String(fixedGroup.id) : String(form.get('new_event_group_id') ?? '')
-    const fields = parseRegistrationFields(groupId, String(form.get('new_capacity') ?? ''), form.get('new_registration_enabled') === 'on')
+    const groupId = independentOnly ? '' : fixedGroup ? String(fixedGroup.id) : String(form.get('new_event_group_id') ?? '')
+    const fields = parseRegistrationFields(groupId, String(form.get('new_capacity') ?? ''), !independentOnly && form.get('new_registration_enabled') === 'on')
     if (fields.error) { setMessage('エラー: ' + fields.error); return }
     const validation = validateNewSchedule({ title, date, start_time: start || null, end_time: end || null, location, type, ...fields.data })
     if (!validation.data) { setMessage('エラー: ' + validation.error); return }
@@ -70,7 +72,7 @@ export default function NewScheduleForm({ hideEndTime = false, fixedGroup, onCre
         <label>種別<select name="type" value={type} onChange={event => setType(event.target.value as NewSchedule['type'])}>
           <option value="稽古会">稽古会</option><option value="一般参加">一般参加</option>
         </select></label>
-        <NewScheduleFields key={fieldsKey} fixedGroup={fixedGroup} />
+        {independentOnly ? <label>定員（任意・1〜2147483647）<input key={fieldsKey} name="new_capacity" type="text" inputMode="numeric" pattern="[1-9][0-9]*" placeholder="未設定" /></label> : <NewScheduleFields key={fieldsKey} fixedGroup={fixedGroup} />}
         <button type="submit">{saving ? '作成中...' : '追加する'}</button>
         {message && <p role={message.startsWith('エラー:') ? 'alert' : 'status'}>{message}</p>}
       </fieldset>

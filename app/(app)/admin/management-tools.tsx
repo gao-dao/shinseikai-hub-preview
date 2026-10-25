@@ -98,8 +98,8 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
   }, [supabase])
 
   const fetchSchedules = useCallback(async () => {
-    const { data } = await supabase.from('schedules').select('*').order('date', { ascending: true })
-    if (data) setSchedules(data as Schedule[])
+    const { data } = await supabase.from('schedules').select('*').is('event_group_id', null).order('date', { ascending: true })
+    if (data) setSchedules((data as Schedule[]).filter(row => row.event_group_id === null))
   }, [supabase])
 
   useEffect(() => {
@@ -167,13 +167,17 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
       type: sType
     }
     if (editSchedule) {
+      if (editSchedule.event_group_id !== null || editSchedule.registration_enabled !== false) {
+        setSMsg('エラー: 開催回所属または受付設定を確認できない予定は、この画面では編集できません。開催回管理で確認してください'); return
+      }
       if (updatingScheduleRef.current) return
       const form = new FormData(e.currentTarget as HTMLFormElement)
-      const fields = parseRegistrationFields(String(form.get('edit_event_group_id') ?? ''), String(form.get('edit_capacity') ?? ''), form.get('edit_registration_enabled') === 'true')
+      const fields = parseRegistrationFields('', String(form.get('edit_capacity') ?? ''), editSchedule.registration_enabled)
       if (fields.error) { setSMsg('エラー: ' + fields.error); return }
       const validation = validateNewSchedule({ ...payload, ...fields.data })
       if (!validation.data) { setSMsg('エラー: ' + validation.error); return }
       const history = !scheduleStatuses.loading && !scheduleStatuses.error ? scheduleStatuses.statuses[String(editSchedule.id)] : undefined
+      if (history && history.event_group_id !== null) { setSMsg('エラー: 開催回との所属関係が変更されています。最新情報を再取得し、開催回管理で確認してください'); return }
       const restriction = scheduleEditRestriction(validation.data, editSchedule, history)
       if (restriction) { setSMsg('エラー: ' + restriction); return }
       updatingScheduleRef.current = true
@@ -220,10 +224,12 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
         id,
         getBlockReason: () => {
           const latest = latestScheduleStatuses.current
-          return scheduleDeletionBlockReason({ loading: latest.loading, error: latest.error, status: latest.statuses[String(id)] })
+          const status = latest.statuses[String(id)]
+          if (status && status.event_group_id !== null) return '開催回に所属する予定は、この画面では削除できません。開催回管理で確認してください。'
+          return scheduleDeletionBlockReason({ loading: latest.loading, error: latest.error, status })
         },
         confirmDelete: () => confirm('このスケジュールを削除しますか？'),
-        remove: () => supabase.from('schedules').delete().eq('id', id).select('id'),
+        remove: () => supabase.from('schedules').delete().eq('id', id).is('event_group_id', null).select('id'),
         refresh: fetchSchedules,
       })
       setDeleteError(message)
@@ -234,6 +240,7 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
   }
 
   const startEditSchedule = (s: Schedule) => {
+    if (s.event_group_id !== null) { setSMsg('開催回に所属するクラスは開催回管理で編集してください'); return }
     setEditScheduleKey(value => value + 1)
     setSMsg('')
     setEditSchedule(s)
@@ -349,7 +356,7 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
 
         {tab === 'schedules' && (
           <>
-            {!editSchedule && <NewScheduleForm onCreated={() => { void fetchSchedules(); scheduleStatuses.refresh() }} onBusyChange={setCreatingSchedule} />}
+            {!editSchedule && <NewScheduleForm independentOnly onCreated={() => { void fetchSchedules(); scheduleStatuses.refresh() }} onBusyChange={setCreatingSchedule} />}
             {editSchedule && <div className={`form-card${editSchedule ? ' editing' : ''}`}>
               <h2 className="list-hd" ref={editHeading} tabIndex={-1}>予定を編集</h2>
               <form onSubmit={addSchedule}>
@@ -369,7 +376,7 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
                   <option value="稽古会">稽古会</option>
                   <option value="一般参加">一般参加</option>
                 </select>
-                {<EditScheduleFields key={`${editSchedule.id}-${editScheduleKey}`} schedule={editSchedule}
+                {<EditScheduleFields independentOnly key={`${editSchedule.id}-${editScheduleKey}`} schedule={editSchedule}
                   history={scheduleStatuses.statuses[String(editSchedule.id)]} historyLoading={scheduleStatuses.loading} historyError={scheduleStatuses.error}
                   groupTitle={scheduleStatuses.statuses[String(editSchedule.id)]?.event_groups?.title} />}
                 <button type="submit" style={btnStyle} disabled={!!editSchedule && (scheduleStatuses.loading || !!scheduleStatuses.error || !scheduleStatuses.statuses[String(editSchedule.id)])}>{editSchedule ? updatingSchedule ? '更新中...' : '更新する' : creatingSchedule ? '作成中...' : '追加する'}</button>
@@ -378,14 +385,16 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
                 </fieldset>
               </form>
             </div>}
-            <div className="list-hd">登録済み予定 ({schedules.length}件)</div>
+            <p style={{ marginBottom: 16 }}>開催回に属さない独立予定を管理します。開催回のクラスは<Link href="/admin/event-groups">開催回管理</Link>で編集してください。</p>
+            <div className="list-hd">登録済み独立予定 ({schedules.filter(row => row.event_group_id === null).length}件)</div>
             <div style={{ marginBottom: '14px' }}>
               <button type="button" className="edit-btn" disabled={scheduleStatuses.loading} onClick={scheduleStatuses.refresh}>申込状況を再取得</button>
               {scheduleStatuses.error && <p role="alert" style={{ color: '#B91C1C', marginTop: '8px' }}>{scheduleStatuses.error} 履歴の有無は不明です。</p>}
               {deleteError && <p role="alert" style={{ color: '#B91C1C', marginTop: '8px' }}>{deleteError}</p>}
             </div>
-            {schedules.map(s => {
-              const deleteReason = scheduleDeletionBlockReason({ loading: scheduleStatuses.loading, error: scheduleStatuses.error, status: scheduleStatuses.statuses[String(s.id)] })
+            {schedules.filter(row => row.event_group_id === null).map(s => {
+              const scopeChanged = scheduleStatuses.statuses[String(s.id)] && scheduleStatuses.statuses[String(s.id)].event_group_id !== null
+              const deleteReason = scopeChanged ? '開催回との所属関係が変更されています。最新情報を再取得してください。' : scheduleDeletionBlockReason({ loading: scheduleStatuses.loading, error: scheduleStatuses.error, status: scheduleStatuses.statuses[String(s.id)] })
               return (
               <div key={s.id} className="list-card">
                 <div style={{ flex: 1 }}>
@@ -393,7 +402,7 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
                   <div className="list-sub">{s.date} · {s.start_time || '--:--'}〜{s.end_time || '--:--'} · {s.location}</div>
                   <ScheduleRegistrationStatus status={scheduleStatuses.statuses[String(s.id)]} loading={scheduleStatuses.loading} />
                 </div>
-                <button className="edit-btn" disabled={creatingSchedule || updatingSchedule} onClick={() => startEditSchedule(s)}>編集</button>
+                <button className="edit-btn" disabled={creatingSchedule || updatingSchedule || !!scopeChanged} onClick={() => startEditSchedule(s)}>編集</button>
                 <div>
                   <button className="del-btn" disabled={deletingSchedule || updatingSchedule || deleteReason !== null} aria-describedby={deleteReason ? `schedule-delete-reason-${s.id}` : undefined}
                     style={deletingSchedule || updatingSchedule || deleteReason !== null ? { opacity: .5, cursor: 'not-allowed' } : undefined}

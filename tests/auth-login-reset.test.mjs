@@ -45,7 +45,7 @@ for (const role of ['member', 'admin']) for (const status of [200, 401, 429]) {
       } }
     } })
     await ui.form.props.onSubmit({ preventDefault() {} })
-    assert.deepEqual(calls, status === 200 ? ['login', role === 'admin' ? '/admin/event-groups' : '/videos'] : ['login'])
+    assert.deepEqual(calls, status === 200 ? ['login', role === 'admin' ? '/admin' : '/videos'] : ['login'])
     assert.equal(ui.state[1], 'synthetic-password')
     assert.equal(ui.state[3], false)
     if (status !== 200) assert.ok(ui.state[2])

@@ -53,11 +53,11 @@ for (const role of ['anonymous', 'member', 'admin', 'profile-error', 'auth-error
       '@/lib/supabase/client': { createClient: () => client },
     })
     function render() { index = 0; return nodes(Layout({ children: 'existing content' })) }
-    assert.equal(render().some(n => n.props?.href === '/admin/event-groups'), false)
+    assert.equal(render().some(n => n.props?.href === '/admin'), false)
     const cleanup = effect()
     await new Promise(resolve => setImmediate(resolve))
     const result = render()
-    assert.equal(result.some(n => n.props?.href === '/admin/event-groups'), role === 'admin')
+    assert.equal(result.some(n => n.props?.href === '/admin'), role === 'admin')
     assert.equal(result.some(n => n.props?.href === '/videos'), !['anonymous', 'auth-error'].includes(role))
     assert.ok(result.some(n => n.props?.href === '/schedule'))
     assert.ok(result.some(n => n.props?.href === '/'))

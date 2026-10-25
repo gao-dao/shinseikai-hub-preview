@@ -16,3 +16,7 @@
 .page p { margin: 12px 0; line-height: 1.8; }
 .page a:focus-visible, .filters :focus-visible { outline: 2px solid #6b1f2b; outline-offset: 4px; }
 @media(min-width: 768px) { .page { padding: 32px; } }
+
+.homeGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; list-style: none; padding: 0; margin: 24px 0; }
+.homeCard { display: flex; align-items: center; min-height: 88px; padding: 20px; border: 1px solid #ded8ce; border-radius: 10px; background: #fff; color: #6b1f2b; font-size: 18px; font-weight: 700; text-decoration: none; overflow-wrap: anywhere; }
+.homeCard:hover { border-color: #6b1f2b; }
