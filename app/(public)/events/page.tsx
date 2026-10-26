@@ -29,7 +29,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
   let error = ''
   try { result = await loadGuidePage(guidePage(params.page)) } catch { error = '開催案内を取得できませんでした。時間をおいて再度お試しください。' }
   return <main className={styles.page}><div className={styles.inner}>
-    <nav className={styles.nav} aria-label="公開メニュー"><Link href="/">ホーム</Link><Link href="/schedule">従来のスケジュール →</Link><Link href="/login">ログイン →</Link></nav>
+    <nav className={styles.nav} aria-label="公開メニュー"><Link href="/">ホーム</Link><Link href="/schedule">スケジュール →</Link><Link href="/login">ログイン →</Link></nav>
     <h1>開催案内</h1>
     {error && <p role="alert">{error}</p>}
     {result && <>
@@ -43,6 +43,5 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
         {result.hasNext && <Link href={`/events?page=${result.page + 1}`}>次へ →</Link>}
       </nav>
     </>}
-    <p><Link href="/events?view=registration">既存のWeb申込ページ →</Link></p>
   </div></main>
 }

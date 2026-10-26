@@ -108,6 +108,7 @@ test('public list renders only parent metadata, links, and server pagination',as
  const html=renderToStaticMarkup(await page.default({searchParams:Promise.resolve({page:'2'})}))
  assert.equal(calls,1);assert.ok(html.includes('/events/1'));assert.ok(html.includes('/events?page=1'));assert.ok(html.includes('/events?page=3'));assert.ok(html.includes('3クラス'))
  assert.ok(!html.includes('残席'));assert.ok(!html.includes('13:40'));assert.ok(!html.includes('テスト会場'))
+ assert.ok(!html.includes('既存のWeb申込'));assert.ok(!html.includes('view=registration'));assert.ok(!html.includes('従来のスケジュール'));assert.ok(html.includes('スケジュール →'))
 })
 test('failed list and invalid input cannot display partial or invented data',async()=>{
  let calls=0

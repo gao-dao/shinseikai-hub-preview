@@ -72,6 +72,7 @@ export default function EventsList({ initialGroup = null }: { initialGroup?: Gro
   const registrationStart = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    if (initialGroup) return
     const controller = new AbortController()
     async function load() {
       setLoading(true)
@@ -90,7 +91,7 @@ export default function EventsList({ initialGroup = null }: { initialGroup?: Gro
     }
     void load()
     return () => controller.abort()
-  }, [page, reload])
+  }, [page, reload, initialGroup])
 
   useEffect(() => {
     if (!registrationGroup || !registrationStart.current) return
@@ -105,7 +106,7 @@ export default function EventsList({ initialGroup = null }: { initialGroup?: Gro
       .events-page h1 { font-size: 26px; color: #6B1F2B; margin: 20px 0 12px; }
       .events-page h2 { font-size: 21px; margin-bottom: 12px; overflow-wrap: anywhere; }
       .events-page h3 { font-size: 17px; margin-bottom: 8px; overflow-wrap: anywhere; }
-      .events-page p { margin: 10px 0; line-height: 1.7; }
+      .events-page p { margin: 10px 0; line-height: 1.7; overflow-wrap: anywhere; }
       .events-page a { color: #6B1F2B; }
       .events-group { margin: 24px 0; padding: 22px; background: #fff; border: 1px solid #EDE8DF; border-radius: 14px; box-shadow: 0 4px 16px rgba(0,0,0,.04); }
       .events-registration input:not([type="checkbox"]), .events-registration textarea { display: block; width: 100%; padding: 10px; margin: 6px 0 16px; border: 1px solid #CBD5E1; border-radius: 6px; background: #fff; }
@@ -117,22 +118,33 @@ export default function EventsList({ initialGroup = null }: { initialGroup?: Gro
       .events-class { padding: 18px 0; border-top: 1px solid #EDE8DF; }
       .events-available { color: #166534; }
       .events-unavailable { color: #64748B; }
-      .events-page button { padding: 8px 14px; border: 1px solid #6B1F2B; border-radius: 8px; color: #6B1F2B; background: #F7EEF0; cursor: pointer; font: inherit; }
+      .events-page button { min-height: 44px; padding: 10px 16px; border: 1px solid #6B1F2B; border-radius: 8px; color: #6B1F2B; background: #F7EEF0; cursor: pointer; font: inherit; white-space: normal; overflow-wrap: anywhere; }
+      .events-page button.events-primary { background: #6B1F2B; color: #fff; font-weight: 700; }
+      .events-page button.events-secondary { background: #fff; color: #475569; border-color: #CBD5E1; }
+      .events-page :is(button, a, input, textarea):focus-visible { outline: 3px solid #6B1F2B; outline-offset: 3px; }
+      .events-page a { display: inline-flex; align-items: center; min-height: 44px; text-underline-offset: 4px; }
+      .events-navigation { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; }
+      .events-form-actions { align-items: center; }
+      .events-form-actions > .events-primary { min-width: 200px; }
+      .events-form-close { margin-top: 16px; }
       .events-page button:disabled { opacity: .5; cursor: default; }
       .events-registration-start { scroll-margin-top: 24px; }
       .events-registration-start:focus-visible { outline: 2px solid #6B1F2B; outline-offset: 4px; }
       .events-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 14px 0; }
-      @media(max-width:640px) { .events-page { padding: 16px 12px 40px; } .events-group { padding: 16px; } }
+      @media(max-width:640px) { .events-page { padding: 16px 12px 40px; } .events-group { padding: 16px; } .events-form-actions > button { width: 100%; } .events-form-actions > .events-primary { min-width: 0; } }
     `}</style>
     <div className="events-inner">
-      <Link href="/events">開催案内へ</Link>
-      {' ／ '}<Link href="/schedule">スケジュールへ</Link>
-      <h1>公開講習会</h1>
-      <p>Web申込を受付中の講習会です。クラスの申込状況をご確認ください。</p>
+      <nav className="events-navigation" aria-label="公開メニュー"><Link href="/events">開催案内へ</Link><Link href="/schedule">スケジュールへ</Link></nav>
+      <h1>{initialGroup ? 'Web申込' : '公開講習会'}</h1>
+      {!initialGroup && <p>Web申込を受付中の講習会です。クラスの申込状況をご確認ください。</p>}
       {registrationGroup && <div className="events-registration-start" ref={registrationStart} tabIndex={-1} aria-label={`${registrationGroup.title}の参加申込`}>
         <RegistrationForm key={registrationGroup.id} group={registrationGroup} onClose={() => setRegistrationGroup(null)} />
       </div>}
-      <button disabled={loading} onClick={() => { setPage(1); setReload(value => value + 1) }}>講習会一覧を更新</button>
+      {initialGroup ? <>
+        {!registrationGroup && <><p>{initialGroup.title}の申込フォームを閉じました。</p><button type="button" className="events-secondary" onClick={() => setRegistrationGroup(initialGroup)}>申込フォームを開く</button></>}
+        <nav className="events-navigation" aria-label="Web申込一覧へ"><Link href="/events?view=registration">別の講習会を探す</Link></nav>
+      </> : <>
+      <button type="button" className="events-secondary" disabled={loading} onClick={() => { setPage(1); setReload(value => value + 1) }}>講習会一覧を更新</button>
       {loading && <p role="status">講習会を読み込み中...</p>}
       {error && <p role="alert">{error}</p>}
       {result && result.eventGroups.length === 0 && <p>現在、公開受付中の講習会はありません。</p>}
@@ -148,6 +160,7 @@ export default function EventsList({ initialGroup = null }: { initialGroup?: Gro
           <button disabled={loading || page <= 1} onClick={() => setPage(value => value - 1)}>前の講習会</button>
           <button disabled={loading || page * result.pageSize >= result.total} onClick={() => setPage(value => value + 1)}>次の講習会</button>
         </nav>
+      </>}
       </>}
     </div>
   </main>

@@ -347,3 +347,30 @@ test('server-validated target opens immediately, scrolls/focuses once and cancel
  assert.equal(JSON.stringify(movement),JSON.stringify([['focus',{preventScroll:true}],['scroll',{behavior:'instant',block:'start'}]]))
  form.props.onClose();tree=render();assert.equal(tree.some(n=>n.props?.group),false);c.effects[1]();assert.equal(movement.length,2)
 })
+
+test('targeted registration omits unrelated groups, list refresh and pagination, without fetching the list',async()=>{
+ const c=ui(),initialGroup={id:501,title:'対象開催回',description:null},props={initialGroup}
+ c.render(c.exports.default,props)
+ c.state[2]={eventGroups:[{id:999,title:'無関係な開催回',description:null}],page:1,pageSize:50,total:100}
+ c.effects[0]();await new Promise(resolve=>setImmediate(resolve))
+ let tree=c.render(c.exports.default,props)
+ assert.equal(c.calls.length,0)
+ assert.ok(tree.some(n=>n.props?.group?.id===501))
+ assert.equal(tree.some(n=>n.type==='article'),false)
+ assert.equal(tree.some(n=>n.props?.children==='講習会一覧を更新'),false)
+ assert.equal(tree.some(n=>n.props?.['aria-label']==='講習会のページ切替'),false)
+ const links=tree.filter(n=>n.props?.href==='/events?view=registration');assert.equal(links.length,1);assert.equal(links[0].props.children,'別の講習会を探す')
+ tree.find(n=>n.props?.group?.id===501).props.onClose()
+ tree=c.render(c.exports.default,props);assert.equal(tree.some(n=>n.props?.group),false)
+ tree.find(n=>n.type==='button'&&n.props.children==='申込フォームを開く').props.onClick()
+ tree=c.render(c.exports.default,props);assert.ok(tree.some(n=>n.props?.group?.id===501));assert.equal(c.calls.length,0)
+})
+test('ordinary registration keeps list retrieval, pagination and the auxiliary refresh operation',async()=>{
+ const c=ui();c.setResponse({ok:true,json:async()=>({eventGroups:[{id:5,title:'通常開催回',description:null}],page:1,pageSize:50,total:51})})
+ c.render();c.effects[0]();await new Promise(resolve=>setImmediate(resolve))
+ let tree=c.render();assert.equal(c.calls.length,1);assert.equal(c.calls[0][0],'/api/event-groups?page=1');assert.equal(tree.filter(n=>n.type==='article').length,1)
+ const refresh=tree.find(n=>n.props?.children==='講習会一覧を更新');assert.equal(refresh.props.className,'events-secondary');assert.equal(refresh.props.type,'button')
+ assert.ok(tree.some(n=>n.props?.['aria-label']==='講習会のページ切替'))
+ refresh.props.onClick();tree=c.render();c.effects[0]();await new Promise(resolve=>setImmediate(resolve));assert.equal(c.calls.length,2)
+ assert.equal(tree.some(n=>n.props?.children==='別の講習会を探す'),false)
+})

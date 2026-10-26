@@ -113,8 +113,10 @@ export default function RegistrationForm({ group, onClose }: { group: { id: numb
         </label>)}
       </fieldset>
       <p>送信時に申込可否を再確認します。</p>
-      <button type="button" disabled={loading} onClick={() => setReload(value => value + 1)}>申込状況を再取得</button>{' '}
-      <button type="submit" disabled={loading || !!classesError}>入力内容を確認する</button>
+      <div className="events-actions events-form-actions">
+        <button type="submit" className="events-primary" disabled={loading || !!classesError}>入力内容を確認する</button>
+        <button type="button" className="events-secondary" disabled={loading} onClick={() => setReload(value => value + 1)}>申込状況を再取得</button>
+      </div>
     </form>}
     {(stage === 'confirming' || stage === 'pending') && review && <>
       <h3>申込内容の確認</h3>
@@ -122,13 +124,13 @@ export default function RegistrationForm({ group, onClose }: { group: { id: numb
       <ul>{review.schedule_ids.map(id => { const item = classes.find(row => row.id === id); return <li key={id}>{item?.title} ／ {item?.date} {item?.start_time ?? ''}〜{item?.end_time ?? ''}</li> })}</ul>
       {stage === 'pending' && <p>送信済みの内容を固定しています。結果が不明な場合も、操作確認をやり直して同じ申込を再確認できます。再読み込み後は送信内容を復元できません。</p>}
       {!saving && <TurnstileWidget onToken={onToken} generation={generation} />}
-      <div className="events-actions">
-        <button type="button" disabled={saving || !token} onClick={() => { void submit() }}>{saving ? '送信中...' : stage === 'pending' ? '同じ申込の結果を再確認する' : 'この内容で申し込む'}</button>
-        <button type="button" disabled={saving} onClick={() => { setToken(''); setGeneration(value => value + 1) }}>操作確認をやり直す</button>
-        {stage === 'confirming' && <button type="button" onClick={() => { setReview(null); setToken(''); setStage('editing') }}>入力を修正する</button>}
+      <div className="events-actions events-form-actions">
+        <button type="button" className="events-primary" disabled={saving || !token} onClick={() => { void submit() }}>{saving ? '送信中...' : stage === 'pending' ? '同じ申込の結果を再確認する' : 'この内容で申し込む'}</button>
+        <button type="button" className="events-secondary" disabled={saving} onClick={() => { setToken(''); setGeneration(value => value + 1) }}>操作確認をやり直す</button>
+        {stage === 'confirming' && <button type="button" className="events-secondary" onClick={() => { setReview(null); setToken(''); setStage('editing') }}>入力を修正する</button>}
       </div>
     </>}
     {error && <p role="alert">{error}</p>}
-    {stage !== 'pending' && !saving && <button type="button" onClick={onClose}>閉じる</button>}
+    {stage !== 'pending' && !saving && <div className="events-form-close"><button type="button" className="events-secondary" onClick={onClose}>閉じる</button></div>}
   </section>
 }

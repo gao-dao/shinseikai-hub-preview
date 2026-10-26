@@ -421,3 +421,24 @@ test('unavailable group/classes never become full labels and prevent confirmatio
  assert.equal(context.render().find(item=>item.type==='button'&&item.props.children==='入力内容を確認する').props.disabled,true)
  assert.equal(context.calls.some(call=>call[1]?.method==='POST'),false)
 })
+
+test('editing exposes a single primary review action before auxiliary refresh and close; auxiliary actions never submit',async()=>{
+ const c=form();await c.mount();let tree=c.render()
+ const controls=tree.filter(n=>n.type==='button'),primary=controls.filter(n=>n.props.className==='events-primary')
+ assert.equal(primary.length,1);assert.equal(primary[0].props.children,'入力内容を確認する');assert.equal(primary[0].props.type,'submit')
+ const refresh=controls.find(n=>n.props.children==='申込状況を再取得'),close=controls.find(n=>n.props.children==='閉じる')
+ assert.equal(refresh.props.className,'events-secondary');assert.equal(close.props.className,'events-secondary');assert.equal(refresh.props.type,'button');assert.equal(close.props.type,'button')
+ assert.ok(controls.indexOf(primary[0])<controls.indexOf(refresh))
+ const gets=c.calls.filter(([url,init])=>!init?.method&&url.startsWith('/api/')).length
+ refresh.props.onClick();await c.mount();assert.ok(c.calls.filter(([url,init])=>!init?.method&&url.startsWith('/api/')).length>gets)
+ close.props.onClick();assert.equal(c.calls.filter(([url])=>url==='closed').length,1);assert.equal(c.calls.filter(([,init])=>init?.method==='POST').length,0)
+})
+test('review retains the protected submit action and editing path; pending still prevents close and input changes',async()=>{
+ const c=form({postError:true});await c.completeInput();c.confirm()
+ let tree=c.render();assert.equal(tree.filter(n=>n.type==='button'&&n.props.className==='events-primary').length,1)
+ assert.equal(tree.find(n=>n.type==='button'&&n.props.children==='この内容で申し込む').props.disabled,true)
+ assert.equal(tree.find(n=>n.type==='button'&&n.props.children==='入力を修正する').props.className,'events-secondary')
+ c.token();c.submit();await new Promise(resolve=>setImmediate(resolve));tree=c.render()
+ assert.ok(tree.some(n=>n.type==='button'&&n.props.children==='同じ申込の結果を再確認する'))
+ assert.equal(tree.some(n=>n.type==='button'&&['閉じる','入力を修正する'].includes(n.props.children)),false)
+})
