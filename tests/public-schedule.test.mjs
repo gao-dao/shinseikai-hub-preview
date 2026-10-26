@@ -24,9 +24,9 @@ function db(groups = [group()], schedules = [row()], options = {}) {
     const q = {
       select(columns, settings) { call.columns = columns; assert.equal(settings.count, 'exact'); return q },
       eq(k, v) { call.filters.push(r => r[k] === v); return q },
-      is(k, v) { call.independent = true; call.filters.push(r => r[k] === v); return q },
+      is() { assert.fail('Independent schedules must not be queried') },
       not(k, op, v) { assert.equal(op, 'is'); assert.equal(v, null); call.filters.push(r => r[k] != null); return q },
-      in(k, ids) { call.ids = ids; call.filters.push(r => ids.includes(r[k])); return q },
+      in(k, ids) { assert.equal(k, 'event_group_id'); assert.ok(ids.every(id => Number.isSafeInteger(id) && id > 0)); call.ids = ids; call.filters.push(r => ids.includes(r[k])); return q },
       order(k) { assert.equal(k, 'id'); return q },
       range(a, b) { call.range = [a, b]; return q },
       then(resolve, reject) { try {
@@ -54,15 +54,15 @@ for (const [types, expected] of [[['稽古会','稽古会'],'稽古会'],[['一�
   const c = db([group()], types.map((type, i) => row(i+1, { type })))
   const items = await load(c); assert.equal(items.length, 1); assert.equal(items[0].type, expected)
 })
-test('multiple days aggregate into one period; independent dates, venue, type and time stay distinct', async () => {
+test('multiple days aggregate into one occurrence; independent schedules are excluded', async () => {
   const c = db([group(1,{start_date:'2029-12-31'})], [row(1,{date:'2029-12-31'}), row(2), row(3,{event_group_id:null,title:'独立予定',date:'2029-01-01',type:'一般参加'})])
-  const items = await load(c); assert.equal(items.length,2)
-  assert.equal(items[0].title,'独立予定'); assert.equal(items[0].period,'2029-01-01 13:40〜15:40'); assert.equal(items[0].place,'会場'); assert.equal(items[0].type,'一般参加')
-  assert.equal(items[1].period,'2029-12-31〜2030-01-01')
+  const items = await load(c); assert.equal(items.length,1)
+  assert.equal(items[0].title,'開催1');assert.equal(items[0].period,'2029-12-31〜2030-01-01');assert.equal(items[0].place,'東京');assert.equal(items[0].type,'稽古会')
+  assert.ok(c.calls.filter(call=>call.table==='schedules').every(call=>call.ids?.includes(1)))
 })
 for (const change of [{is_cancelled:true},{is_hidden:true},{is_hidden:true,is_cancelled:true},{start_date:null},{end_date:null},{start_date:'2030-02-30'},{end_date:'2029-01-01'}]) test(`exclude unsafe occurrence ${JSON.stringify(change)}`, async () => {
   const c=db([group(1,change)],[row(),row(2,{event_group_id:null})]);const items=await load(c)
-  assert.equal(items.length,1);assert.equal(items[0].key,'schedule-2')
+  assert.equal(items.length,0)
 })
 for (const dates of [['2030-01-02'],[null],['2029-12-31']]) test(`exclude inconsistent class dates ${dates}`,async()=>{
   assert.equal((await load(db([group()],dates.map((date,i)=>row(i+1,{date}))))).length,0)
@@ -71,11 +71,11 @@ test('stale final day and empty group are not guessed publishable',async()=>{
   assert.equal((await load(db([group(1,{end_date:'2030-01-02'})],[row()]))).length,0)
   assert.equal((await load(db([group()],[]))).length,0)
 })
-test('history remains visible; link ends only after final Tokyo day, independent history retained',async()=>{
+test('history remains visible without a link after final Tokyo day; independent history excluded',async()=>{
   const c=()=>db([group()],[row(),row(2,{event_group_id:null,date:'2020-01-01'})])
   const last=await load(c(),presentation.tokyoDay(new Date('2030-01-01T14:59:59Z')))
   const ended=await load(c(),presentation.tokyoDay(new Date('2030-01-01T15:00:00Z')))
-  assert.equal(last.length,2); assert.equal(last[1].href,'/events/1'); assert.equal(ended.length,2);assert.equal(ended[1].href,null)
+  assert.equal(last.length,1); assert.equal(last[0].href,'/events/1'); assert.equal(ended.length,1);assert.equal(ended[0].href,null)
 })
 test('group batches avoid N+1 and metadata ranges read all class types',async()=>{
   const groups=Array.from({length:51},(_,i)=>group(i+1))
@@ -85,9 +85,9 @@ test('group batches avoid N+1 and metadata ranges read all class types',async()=
   const many=db([group()],Array.from({length:501},(_,i)=>row(i+1,{type:i===500?'一般参加':'稽古会'})))
   assert.equal((await load(many))[0].type,'稽古会・一般参加');assert.equal(many.calls.filter(c=>c.ids).length,2)
 })
-test('independent rows beyond default DB response cap are retained',async()=>{
+test('independent rows beyond DB response caps are excluded without any schedule query',async()=>{
   const c=db([],Array.from({length:501},(_,i)=>row(i+1,{event_group_id:null})))
-  assert.equal((await load(c)).length,501);assert.equal(c.calls.filter(c=>c.independent).length,2)
+  assert.equal((await load(c)).length,0);assert.equal(c.calls.filter(c=>c.table==='schedules').length,0)
 })
 for (const options of [{truncate:true},{duplicate:true},{noCount:true},{fail:true}]) test(`incomplete or failed reads are explicit errors ${JSON.stringify(options)}`, async()=>{
   await assert.rejects(()=>load(db([group()],[row(),row(2)],options)))
@@ -95,7 +95,7 @@ for (const options of [{truncate:true},{duplicate:true},{noCount:true},{fail:tru
 test('changing counts during batching never present an incomplete list',async()=>{
   await assert.rejects(()=>load(db([group()],Array.from({length:501},(_,i)=>row(i+1)),{inconsistentCount:true})))
 })
-test('direct server page renders group links and independent rows without class duplication',async()=>{
+test('direct server page renders occurrence links without class duplication',async()=>{
   const c=db();const items=await load(c)
   const page=compile('app/(app)/schedule/page.tsx',{'react/jsx-runtime':jsxRuntime,'next/link':{default:({children,...props})=>jsxRuntime.jsx('a',{...props,children})},'@/lib/schedule/public-schedule':{loadScheduleIndex:async()=>items},'./schedule.module.css':{default:{}}})
   assert.equal(page.dynamic,'force-dynamic');assert.equal(page.revalidate,0)
@@ -108,7 +108,16 @@ test('empty and error page states are distinct and do not expose database errors
   }
 })
 
-test('independent schedules retain missing-date and end-only-time information',async()=>{
- const items=await load(db([], [row(1,{event_group_id:null,date:null,start_time:null,end_time:'15:40:00'}),row(2,{event_group_id:null,start_time:'09:00:00',end_time:null})]))
- assert.equal(items.length,2);assert.equal(items[0].period,'2030-01-01 09:00');assert.equal(items[1].period,'日付未設定 終了 15:40')
+test('independent schedules with missing or malformed dates never enter the public list',async()=>{
+ const items=await load(db([], [row(1,{event_group_id:null,date:null,start_time:null,end_time:'15:40:00'}),row(2,{event_group_id:null,date:'bad'})]))
+ assert.equal(items.length,0)
+})
+test('occurrences sort by start date regardless of database ID order, retaining ended entries without links',async()=>{
+ const groups=[group(1,{start_date:'2031-01-01',end_date:'2031-01-01'}),group(2,{start_date:'2029-01-01',end_date:'2029-01-01'}),group(3)]
+ const items=await load(db(groups,groups.map(g=>row(g.id,{event_group_id:g.id,date:g.start_date}))))
+ assert.deepEqual(Array.from(items,item=>item.key),['group-2','group-3','group-1']);assert.equal(items[0].href,null);assert.equal(items[1].href,'/events/3')
+})
+test('excluding independent schedules never mutates the source data or other occurrence metadata',async()=>{
+ const groups=[group()],schedules=[row(),row(2,{event_group_id:null,title:'旧データ'})],before=JSON.stringify({groups,schedules})
+ assert.equal((await load(db(groups,schedules))).length,1);assert.equal(JSON.stringify({groups,schedules}),before)
 })

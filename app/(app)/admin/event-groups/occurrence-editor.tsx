@@ -39,7 +39,7 @@ export default function OccurrenceEditor({ groupId, returnTo = '/admin/event-gro
         const response = await fetch(`/api/admin/occurrences/${groupId}`, { cache: 'no-store', signal: controller.signal })
         if (!response.ok) throw new Error('開催回を取得できませんでした。再取得してください。')
         const data = await response.json()
-        if (!validSnapshot(data.snapshot) || data.snapshot.classes.length > 100) throw new Error('開催回の全クラスを確認できません。予定管理で確認してください。')
+        if (!validSnapshot(data.snapshot) || data.snapshot.classes.length > 100) throw new Error('開催回の全クラスを確認できません。開催回管理の詳細画面で確認してください。')
         if (controller.signal.aborted) return
         const snapshot: OccurrenceSnapshot = data.snapshot
         setExpected(snapshot); setTitle(snapshot.group.title); setDescription(snapshot.group.description ?? ''); setCity(snapshot.group.city ?? '')

@@ -1,11 +1,10 @@
 import 'server-only'
 import { createAnonymousClient } from '@/lib/supabase/anonymous'
 import { occurrencePhase, tokyoDay } from '@/lib/event-groups/presentation'
-import { validGroup, minuteTime, type GuideGroup } from '@/lib/event-groups/public-guide'
+import { validGroup, type GuideGroup } from '@/lib/event-groups/public-guide'
 
 type Client = ReturnType<typeof createAnonymousClient>
 type ClassMetadata = { id: number; event_group_id: number; date: string; type: string }
-type Independent = { id: number; event_group_id: null; title: string; date: string; start_time: string | null; end_time: string | null; location: string; type: string }
 export type ScheduleItem = { key: string; title: string; date: string; period: string; place: string; type: string; href: string | null }
 const groupBatch = 50
 const rowBatch = 500
@@ -72,22 +71,5 @@ export async function loadScheduleIndex(client = createAnonymousClient(), today 
     }
   }
   if (!groupsComplete) throw new Error('occurrence read limit')
-  expected = undefined; seen.clear()
-  for (let offset = 0; offset < readLimit; offset += rowBatch) {
-    const { data, error, count } = await client.from('schedules')
-      .select('id,event_group_id,title,date,start_time,end_time,location,type', { count: 'exact' })
-      .is('event_group_id', null).order('id').range(offset, offset + rowBatch - 1)
-    if (completePage(data, error, count, offset, rowBatch, expected, seen)) {
-      expected = count!
-      for (const row of data as Independent[]) {
-        if (row.event_group_id !== null) throw new Error('unexpected linked class')
-        const start = minuteTime(row.start_time), end = minuteTime(row.end_time)
-        const time = start ? `${start}${end ? `〜${end}` : ''}` : end ? `終了 ${end}` : ''
-        items.push({ key: `schedule-${row.id}`, title: row.title, date: row.date ?? '',
-          period: [row.date || '日付未設定', time].filter(Boolean).join(' '), place: row.location ?? '', type: row.type, href: null })
-      }
-      if (seen.size === count) return items.sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || a.period.localeCompare(b.period) || a.key.localeCompare(b.key))
-    }
-  }
-  throw new Error('independent schedule read limit')
+  return items.sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999') || a.period.localeCompare(b.period) || a.key.localeCompare(b.key))
 }

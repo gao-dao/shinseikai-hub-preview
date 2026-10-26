@@ -38,8 +38,8 @@ test('409 does not auto retry or claim success',async()=>{const c=screen({patchS
 test('schedule delegates public visibility to the anonymous server loader', async()=>{
  const jsx=(type,props)=>({type,props})
  let loaded=0
- const Component=compile('app/(app)/schedule/page.tsx',{'react/jsx-runtime':{jsx,jsxs:jsx},'next/link':{default:()=>null},'./schedule.module.css':{default:{}},'@/lib/schedule/public-schedule':{loadScheduleIndex:async()=>{loaded++;return[{key:'schedule-3',title:'Unassigned',period:'2030-01-02',place:'Other venue',type:'稽古会',href:null}]}}}).default
+ const Component=compile('app/(app)/schedule/page.tsx',{'react/jsx-runtime':{jsx,jsxs:jsx},'next/link':{default:()=>null},'./schedule.module.css':{default:{}},'@/lib/schedule/public-schedule':{loadScheduleIndex:async()=>{loaded++;return[{key:'group-3',title:'Ended occurrence',period:'2020-01-02',place:'Other venue',type:'稽古会',href:null}]}}}).default
  const text=n=>Array.isArray(n)?n.map(text).join(''):n&&typeof n==='object'?text(n.props?.children):typeof n==='string'?n:''
  const output=text(await Component())
- assert.equal(loaded,1);assert.match(output,/Unassigned/);assert.match(output,/Other venue/)
+ assert.equal(loaded,1);assert.match(output,/Ended occurrence/);assert.match(output,/Other venue/)
 })

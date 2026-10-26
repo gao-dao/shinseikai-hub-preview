@@ -241,3 +241,8 @@ test('history context survives edit cancellation and save without entering the w
  assert.equal(c.render().find(v=>v.type==='Link').props.href,'/admin/event-groups/9'+suffix)
  const input=c.calls.find(v=>v[0]==='save')[1];assert.equal('returnTo' in input,false);assert.equal(input.expected.group.registration_open,false)
 })
+
+test('incomplete occurrence data points to occurrence management, never the retired schedule manager',async()=>{
+ const data=snapshot();data.classes=Array.from({length:101},(_,i)=>({...data.classes[0],id:i+1}))
+ const c=setup({groupId:1,data});await c.mount();assert.equal(c.render().some(n=>n.type==='form'),false);assert.match(c.text(),/開催回管理の詳細画面/);assert.doesNotMatch(c.text(),/予定管理/);assert.equal(c.calls.filter(call=>call[0]==='save').length,0)
+})
