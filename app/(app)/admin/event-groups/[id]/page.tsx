@@ -1,12 +1,14 @@
 import { redirect, notFound } from 'next/navigation'
 import { requireAdmin } from '@/lib/supabase/require-admin'
+import { adminReturnHref } from '@/lib/event-groups/admin-index'
 import EventGroups from '../event-groups'
 
 export const dynamic = 'force-dynamic'
-export default async function Page({ params }: { params: Promise<{ id: string }> }) {
+export default async function Page({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const auth = await requireAdmin()
   if (!auth.ok) redirect(auth.status === 401 ? '/login' : '/videos')
   const { id } = await params
   if (!/^[1-9][0-9]*$/.test(id) || !Number.isSafeInteger(Number(id))) notFound()
-  return <EventGroups groupId={Number(id)} />
+  const returnTo = adminReturnHref((await searchParams)?.returnTo)
+  return <EventGroups groupId={Number(id)} returnTo={returnTo} />
 }

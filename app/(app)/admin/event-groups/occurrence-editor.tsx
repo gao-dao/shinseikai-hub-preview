@@ -11,7 +11,7 @@ const ordered = (items: Row[], commonDate: string) => chronologicalRows(items, r
 function draftFingerprint(title: string, description: string, city: string, date: string, venue: string, rows: Row[]) {
   return JSON.stringify({ title, description, city, classes: rows.map(row => ({ id: row.id, title: rows.length === 1 && row.id === null ? title : row.title, date: row.ownDate ? row.date : date, location: row.ownLocation ? row.location : venue, start: row.start, end: row.end, capacity: row.capacity, enabled: row.enabled, type: row.type })) })
 }
-export default function OccurrenceEditor({ groupId }: { groupId?: number }) {
+export default function OccurrenceEditor({ groupId, returnTo = '/admin/event-groups' }: { groupId?: number; returnTo?: string }) {
   const [title, setTitle] = useState(''), [description, setDescription] = useState(''), [city, setCity] = useState('')
   const [date, setDate] = useState(''), [venue, setVenue] = useState(''), [rows, setRows] = useState<Row[]>([blankRow(0)])
   const [displayKeys, setDisplayKeys] = useState<number[]>([0])
@@ -89,7 +89,8 @@ export default function OccurrenceEditor({ groupId }: { groupId?: number }) {
     if (hasChanges && !window.confirm('未保存の入力を破棄し、最新情報を読み込みますか？')) return
     setReview(null); setReload(v => v + 1)
   }
-  const cancelHref = groupId ? `/admin/event-groups/${groupId}` : '/admin/event-groups'
+  const detailQuery = returnTo !== '/admin/event-groups' ? `?returnTo=${encodeURIComponent(returnTo)}` : ''
+  const cancelHref = groupId ? `/admin/event-groups/${groupId}${detailQuery}` : '/admin/event-groups'
   function leave(event: React.MouseEvent<HTMLAnchorElement>) {
     if (busyRef.current || unknown || (hasChanges && !window.confirm('未保存の変更を破棄して移動しますか？'))) event.preventDefault()
   }
@@ -110,7 +111,7 @@ export default function OccurrenceEditor({ groupId }: { groupId?: number }) {
     <p>{unknown ? '前回の保存結果を同じキー・内容で確認します。' : groupId ? '新しいクラスは初期設定で受付有効です。既存の受付状態は、明示的に変更しない限り保持します。' : '保存すると開催回のグループ受付を開始します。新しいクラスは初期設定で受付有効です。'}</p>
     {loading && <p role="status">全クラスを読み込み中...</p>}
     {error && <p role="alert">{error}</p>}
-    {saved !== null ? <section><h2>開催回とクラスを保存しました</h2>{!groupId ? <p role="status">{savedFromRecovery ? '保存結果を確認しました。以前の保存結果の再確認では受付状態を変更しません。現在の状態は詳細画面で確認してください。' : '新規開催回のグループ受付を開始しました。クラス受付をOFFにしたクラスは申込を受け付けません。'}</p> : <><p role="status">グループ全体の受付状態は変更していません。</p>{expected?.group.registration_open ? <p>編集開始時は受付中でした。中止・非表示などによる最新の受付状態は詳細画面で確認できます。</p> : <p>グループ受付は停止中のままです。追加クラスが受付有効でも一般Web申込は受け付けません。</p>}</>}<Link href={`/admin/event-groups/${saved}`}>開催回の詳細・受付操作へ</Link></section> : <>
+    {saved !== null ? <section><h2>開催回とクラスを保存しました</h2>{!groupId ? <p role="status">{savedFromRecovery ? '保存結果を確認しました。以前の保存結果の再確認では受付状態を変更しません。現在の状態は詳細画面で確認してください。' : '新規開催回のグループ受付を開始しました。クラス受付をOFFにしたクラスは申込を受け付けません。'}</p> : <><p role="status">グループ全体の受付状態は変更していません。</p>{expected?.group.registration_open ? <p>編集開始時は受付中でした。中止・非表示などによる最新の受付状態は詳細画面で確認できます。</p> : <p>グループ受付は停止中のままです。追加クラスが受付有効でも一般Web申込は受け付けません。</p>}</>}<Link href={`/admin/event-groups/${saved}${detailQuery}`}>開催回の詳細・受付操作へ</Link></section> : <>
       {groupId && !unknown && <button type="button" disabled={busy || loading} onClick={fresh}>最新情報を再取得</button>}
       {!review && !loading && !fatal && <form onSubmit={confirm}>
         <section><h2>基本情報</h2><label>開催名<input value={title} maxLength={200} required onChange={e => setTitle(e.target.value)} /></label>

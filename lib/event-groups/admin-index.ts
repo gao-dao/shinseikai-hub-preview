@@ -35,3 +35,20 @@ export function indexHref(options: IndexOptions, page: number) {
   if (page > 1) query.set('page',String(page))
   return `/admin/event-groups${options.history ? '/history' : ''}${query.size ? `?${query}` : ''}`
 }
+
+// Only canonical history filters may cross detail/edit routes. Never redirect to arbitrary URLs.
+export function adminReturnHref(value: unknown): string {
+  const fallback = '/admin/event-groups', history = '/admin/event-groups/history'
+  if (value === fallback || value === undefined) return fallback
+  if (typeof value !== 'string' || value.length > 2048 || /[\\#\u0000-\u001f\u007f]/.test(value)) return fallback
+  const [path, query = '', ...extra] = value.split('?')
+  if (path !== history || extra.length) return fallback
+  const params = new URLSearchParams(query)
+  for (const key of params.keys()) {
+    if (!['q','state','page'].includes(key) || params.getAll(key).length !== 1 || /[\u0000-\u001f\u007f]/.test(params.get(key) ?? '')) return fallback
+  }
+  try {
+    const options = indexOptions(true, Object.fromEntries(params))
+    return indexHref(options, options.page)
+  } catch { return fallback }
+}

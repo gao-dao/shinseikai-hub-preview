@@ -105,7 +105,7 @@ const View=compile('app/(app)/admin/event-groups/admin-index-view.tsx',{'react/j
 for(const isHistory of [false,true])test(`minimal ${isHistory?'history':'normal'} view, no duplicate edit controls`,()=>{
  const options=index.indexOptions(isHistory),item=index.classifyIndex(group(1,{is_hidden:isHistory}),['2030-01-01'],'2030-01-01')
  const html=renderToStaticMarkup(jsxRuntime.jsx(View,{options,result:{items:[item],total:1,upcoming:1,review:0,page:1,pageSize:20},error:''}))
- assert.ok(html.includes(isHistory?'開催記録・履歴':'開催回管理'));assert.equal((html.match(/href="\/admin\/event-groups\/1"/g)||[]).length,1)
+ assert.ok(html.includes(isHistory?'開催記録・履歴':'開催回管理'));assert.equal((html.match(/href="\/admin\/event-groups\/1(?:\?returnTo=[^"]*)?"/g)||[]).length,1)
  assert.ok(!html.includes('/1/edit'));assert.ok(!html.includes('申込数'));assert.ok(!html.includes('クラス数'))
  if(isHistory){assert.ok(html.includes('method="get"'));assert.ok(!html.includes('name="page"'));assert.ok(html.includes('非表示'))}else assert.ok(html.includes('/admin/event-groups/new'))
 })

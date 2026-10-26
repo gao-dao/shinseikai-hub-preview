@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { indexHref, indexLabels, type IndexOptions, type IndexResult } from '@/lib/event-groups/admin-index'
 import styles from './admin-index.module.css'
 export default function AdminIndexView({ options, result, error }: { options: IndexOptions; result: IndexResult | null; error: string }) {
-  const list = (items: IndexResult['items']) => <ul className={styles.list}>{items.map(item => <li key={item.id}><Link className={styles.item} href={`/admin/event-groups/${item.id}`}>
+  const list = (items: IndexResult['items']) => <ul className={styles.list}>{items.map(item => <li key={item.id}><Link className={styles.item} href={`/admin/event-groups/${item.id}${options.history ? `?returnTo=${encodeURIComponent(indexHref(options, options.page))}` : ''}`}>
     <strong>{item.title} →</strong>
     <span>開催期間：{item.start_date || '未設定'}{item.end_date !== item.start_date ? `〜${item.end_date || '未設定'}` : ''}</span>
     <span>地域：{item.city || '未設定'}</span>

@@ -337,3 +337,13 @@ for (const [name, enabled, registered, missing, label, selectable] of [
  if(label!=='満席')assert.doesNotMatch(html,/満席/)
  assert.equal(item.canRegister,selectable);assert.equal(JSON.stringify(item),before);assert.equal(source.registration_enabled,enabled)
 })
+
+test('server-validated target opens immediately, scrolls/focuses once and cancellation does not reopen it',()=>{
+ const c=ui(),initialGroup={id:501,title:'対象開催回',description:null},props={initialGroup}
+ const render=()=>c.render(c.exports.default,props)
+ let tree=render(),form=tree.find(n=>n.props?.group?.id===501);assert.ok(form)
+ const start=tree.find(n=>n.props?.['aria-label']==='対象開催回の参加申込'),movement=[]
+ start.props.ref.current={focus:o=>movement.push(['focus',o]),scrollIntoView:o=>movement.push(['scroll',o])};c.effects[1]()
+ assert.equal(JSON.stringify(movement),JSON.stringify([['focus',{preventScroll:true}],['scroll',{behavior:'instant',block:'start'}]]))
+ form.props.onClose();tree=render();assert.equal(tree.some(n=>n.props?.group),false);c.effects[1]();assert.equal(movement.length,2)
+})

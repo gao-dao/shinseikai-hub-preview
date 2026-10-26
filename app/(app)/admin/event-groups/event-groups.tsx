@@ -13,7 +13,7 @@ import { validateEventGroupOccurrence, type EventGroupOccurrence } from '@/lib/e
 type Group = { id: number; title: string; description: string | null; registration_open: boolean; is_cancelled?: boolean; is_hidden?: boolean; state_version?: number } & EventGroupOccurrence
 type List = { eventGroups: Group[]; page: number; pageSize: number; total: number }
 
-export default function EventGroups({ groupId, createOnly = false }: { groupId?: number; createOnly?: boolean } = {}) {
+export default function EventGroups({ groupId, createOnly = false, returnTo = '/admin/event-groups' }: { groupId?: number; createOnly?: boolean; returnTo?: string } = {}) {
   const [page, setPage] = useState(1)
   const [reload, setReload] = useState(0)
   const [result, setResult] = useState<List | null>(null)
@@ -233,7 +233,7 @@ export default function EventGroups({ groupId, createOnly = false }: { groupId?:
         .eg-page button { font-size:14px; padding:8px 12px; }
         .eg-description { white-space: pre-wrap; overflow-wrap: anywhere; margin: 12px 0; }
       `}</style>
-      <Link href="/admin/event-groups">← 開催回一覧へ</Link>
+      <Link href={returnTo}>{returnTo.startsWith('/admin/event-groups/history') ? '← 開催履歴へ戻る' : '← 開催回一覧へ'}</Link>
       <h1 id="event-groups-title">{groupId ? result?.eventGroups[0]?.title ?? '開催回の詳細' : '開催回を作成'}</h1>
       {!groupId && <nav className="occurrence-nav" aria-label="管理メニュー"><Link href="/admin/videos">動画管理</Link><Link href="/admin/passwords">パスワード管理</Link><Link href="/admin/registrations">全開催回の申込一覧 →</Link></nav>}
       {!groupId && <form onSubmit={create} className="eg-card">
@@ -273,7 +273,7 @@ export default function EventGroups({ groupId, createOnly = false }: { groupId?:
         </>}
         <section className="occurrence-management" aria-label="管理操作">
         {groupId && <h2>管理操作</h2>}
-        <div className="occurrence-navigation"><Link href={`/admin/event-groups/${group.id}/edit`} onClick={event => { if (classBusy.current || editBusy.current || (classDirty.current && !window.confirm('未保存の予定入力を破棄して編集画面へ移動しますか？'))) event.preventDefault() }}>{groupId ? '編集 →' : '開催回と全クラスをまとめて編集 →'}</Link></div>
+        <div className="occurrence-navigation"><Link href={`/admin/event-groups/${group.id}/edit${returnTo !== '/admin/event-groups' ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} onClick={event => { if (classBusy.current || editBusy.current || (classDirty.current && !window.confirm('未保存の予定入力を破棄して編集画面へ移動しますか？'))) event.preventDefault() }}>{groupId ? '編集 →' : '開催回と全クラスをまとめて編集 →'}</Link></div>
         {!groupId && <>
         <button type="button" disabled={editing !== null || addingGroup !== null} onClick={() => beginEdit(group)}>開催情報を編集</button>
         {!groupId && <h3 id={`classes-${group.id}`}>クラス・受付</h3>}

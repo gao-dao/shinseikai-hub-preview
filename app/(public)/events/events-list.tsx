@@ -62,13 +62,13 @@ export function EventClasses({ groupId }: { groupId: number }) {
   </div>
 }
 
-export default function EventsList() {
+export default function EventsList({ initialGroup = null }: { initialGroup?: Group | null } = {}) {
   const [page, setPage] = useState(1)
   const [reload, setReload] = useState(0)
   const [result, setResult] = useState<GroupList | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [registrationGroup, setRegistrationGroup] = useState<Group | null>(null)
+  const [registrationGroup, setRegistrationGroup] = useState<Group | null>(initialGroup)
   const registrationStart = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -119,6 +119,8 @@ export default function EventsList() {
       .events-unavailable { color: #64748B; }
       .events-page button { padding: 8px 14px; border: 1px solid #6B1F2B; border-radius: 8px; color: #6B1F2B; background: #F7EEF0; cursor: pointer; font: inherit; }
       .events-page button:disabled { opacity: .5; cursor: default; }
+      .events-registration-start { scroll-margin-top: 24px; }
+      .events-registration-start:focus-visible { outline: 2px solid #6B1F2B; outline-offset: 4px; }
       .events-actions { display: flex; flex-wrap: wrap; gap: 12px; margin: 14px 0; }
       @media(max-width:640px) { .events-page { padding: 16px 12px 40px; } .events-group { padding: 16px; } }
     `}</style>
@@ -127,7 +129,7 @@ export default function EventsList() {
       {' ／ '}<Link href="/schedule">スケジュールへ</Link>
       <h1>公開講習会</h1>
       <p>Web申込を受付中の講習会です。クラスの申込状況をご確認ください。</p>
-      {registrationGroup && <div ref={registrationStart} tabIndex={-1} aria-label={`${registrationGroup.title}の参加申込`}>
+      {registrationGroup && <div className="events-registration-start" ref={registrationStart} tabIndex={-1} aria-label={`${registrationGroup.title}の参加申込`}>
         <RegistrationForm key={registrationGroup.id} group={registrationGroup} onClose={() => setRegistrationGroup(null)} />
       </div>}
       <button disabled={loading} onClick={() => { setPage(1); setReload(value => value + 1) }}>講習会一覧を更新</button>

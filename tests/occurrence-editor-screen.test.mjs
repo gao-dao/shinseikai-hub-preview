@@ -15,7 +15,7 @@ const plain = v => JSON.parse(JSON.stringify(v))
 function all(tree) { if (Array.isArray(tree)) return tree.flatMap(all); return tree && typeof tree === 'object' ? [tree, ...all(tree.props?.children)] : [] }
 function text(tree) { if (Array.isArray(tree)) return tree.map(text).join(''); if (tree && typeof tree === 'object') return text(tree.props?.children); return typeof tree === 'string' || typeof tree === 'number' ? String(tree) : '' }
 const snapshot = () => ({ group: { title: '既存開催回', description: null, city: null, start_date: null, end_date: null, registration_open: false }, classes: [{ id: 7, title: '既存クラス', date: '2030-10-23', start_time: '12:00:30', end_time: '17:00', location: '既存会場', type: '稽古会', capacity: 25, registration_enabled: false }] })
-function setup({ groupId, data = snapshot(), status = 200, result = { state: 'saved', groupId: 9 }, pending = null, deferred = false } = {}) {
+function setup({ groupId, returnTo, data = snapshot(), status = 200, result = { state: 'saved', groupId: 9 }, pending = null, deferred = false } = {}) {
   const slots = [], effects = [], calls = []; let cursor = 0, release, confirmResult = true, confirmations = 0
   const react = {
     useState(initial) { const i = cursor++; if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial; return [slots[i], v => slots[i] = typeof v === 'function' ? v(slots[i]) : v] },
@@ -27,7 +27,7 @@ function setup({ groupId, data = snapshot(), status = 200, result = { state: 'sa
     react, 'react/jsx-runtime': { jsx, jsxs: jsx, Fragment: 'fragment' }, 'next/link': { default: 'Link' }, '@/lib/event-groups/occurrence-editor': validation, '@/lib/event-groups/presentation': presentation,
     '@/lib/event-groups/occurrence-save': { createOccurrenceSaver: () => ({ restore: () => pending, save: async input => { calls.push(['save', plain(input)]); if (deferred) return new Promise(r => release = r); return result } }) },
   }, { AbortController, fetch: async (url, options) => { calls.push(['fetch', url, options]); return { ok: status === 200, json: async () => ({ snapshot: data }) } }, window: { addEventListener() {}, removeEventListener() {}, confirm: () => { confirmations++; return confirmResult } }, sessionStorage: {}, crypto: {} })
-  const render = () => { cursor = 0; return all(Component({ groupId })) }
+  const render = () => { cursor = 0; return all(Component({ groupId, returnTo })) }
   const button = label => render().find(v => v.type === 'button' && text(v) === label)
   const fields = label => render().filter(v => v.type === 'label' && typeof v.props.children?.[0] === 'string' && v.props.children[0] === label).map(v => all(v).find(n => ['input', 'select', 'textarea'].includes(n.type)))
   return { calls, render, button, fields, confirmations: () => confirmations, cancel: () => render().find(v => v.type === 'Link' && text(v) === 'キャンセル'), text: () => render().map(v => typeof v.type === 'string' && ['p','h1','h2'].includes(v.type) ? text(v) : '').join(' '), change: (label, value, i = 0) => fields(label)[i].props.onChange({ target: { value } }),
@@ -85,6 +85,7 @@ for (const file of ['app/(app)/admin/event-groups/new/page.tsx','app/(app)/admin
     const Component = compile(file, {
       'next/navigation': { redirect: path => { assert.equal(path,status===401?'/login':'/videos');throw Error('REDIRECT') }, notFound: () => { throw Error('NOT_FOUND') } },
       '@/lib/supabase/require-admin': { requireAdmin: async()=>({ok:false,status}) },
+      '@/lib/event-groups/admin-index': { adminReturnHref:()=>'/admin/event-groups' },
       '../occurrence-editor': { default:()=>null }, '../../occurrence-editor': { default:()=>null },
       'react/jsx-runtime': { jsx:()=>null },
     }).default
@@ -231,4 +232,12 @@ test('recovered old creation never falsely claims reception was opened by replay
  await new Promise(resolve=>setImmediate(resolve))
  assert.match(replay.text(),/以前の保存結果の再確認では受付状態を変更しません/)
  assert.doesNotMatch(replay.text(),/グループ受付を開始しました/)
+})
+
+test('history context survives edit cancellation and save without entering the write payload',async()=>{
+ const returnTo='/admin/event-groups/history?q=東京&state=ended&page=3', suffix='?returnTo='+encodeURIComponent(returnTo)
+ const c=setup({groupId:1,returnTo});await c.mount();assert.equal(c.cancel().props.href,'/admin/event-groups/1'+suffix)
+ c.change('開催名','編集後');await c.submit();await c.save()
+ assert.equal(c.render().find(v=>v.type==='Link').props.href,'/admin/event-groups/9'+suffix)
+ const input=c.calls.find(v=>v[0]==='save')[1];assert.equal('returnTo' in input,false);assert.equal(input.expected.group.registration_open,false)
 })
