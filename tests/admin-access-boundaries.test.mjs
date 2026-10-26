@@ -54,16 +54,19 @@ for (const [folder, component] of [['event-groups', './admin-index-view'], ['reg
         'next/navigation': { redirect(path) { assert.equal(path, destination); throw new Error('TEST_REDIRECT') } },
         '@/lib/supabase/require-admin': { requireAdmin: async () => status === 200 ? { ok: true } : { ok: false, status } },
         [component]: { default: () => null },
+        './registration-browser': { default: () => null },
+        './registrations.module.css': { default: {} },
+        'next/link': { default: () => null },
         '@/lib/event-groups/admin-index': { indexOptions: () => ({}) },
         '@/lib/event-groups/admin-index-server': { loadAdminIndex: async () => { assert.equal(status, 200); return {} } },
-        'react/jsx-runtime': { jsx() { rendered++; return 'TEST_PAGE' } },
+        'react/jsx-runtime': { jsx() { rendered++; return 'TEST_PAGE' }, jsxs() { rendered++; return 'TEST_PAGE' } },
       })
       if (destination) {
         await assert.rejects(page.default(), /TEST_REDIRECT/)
         assert.equal(rendered, 0)
       } else {
         assert.equal(await page.default(), 'TEST_PAGE')
-        assert.equal(rendered, 1)
+        assert.equal(rendered, folder === 'registrations' ? 5 : 1)
       }
     })
   }
