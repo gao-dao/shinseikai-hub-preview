@@ -18,15 +18,29 @@ function hooks() {
   return {react,state,render(Component,props={}){s=0;r=0;e=0;return nodes(Component(props))},flush(i){return effects[i].fn()}}
 }
 const Link='Link'
-const managementLinks=[['/admin/event-groups','開催回管理'],['/admin/registrations','申込者管理'],['/admin/schedules','予定管理'],['/admin/videos','動画管理'],['/admin/event-groups/history','開催記録・履歴'],['/admin/passwords','パスワード管理']]
-for(const status of [401,403,200])test(`admin home boundary and six exact links: ${status}`,async()=>{
+const managementLinks=[['/admin/event-groups','開催回管理'],['/admin/registrations','申込者管理'],['/admin/videos','動画管理'],['/admin/event-groups/history','開催履歴'],['/admin/passwords','パスワード管理']]
+for(const status of [401,403,200])test(`admin home boundary and five exact links: ${status}`,async()=>{
  let authorized=0
  const Page=compile('app/(app)/admin/page.tsx',{'next/link':{default:Link},'next/navigation':{redirect(path){throw Error(`REDIRECT:${path}`)}},'@/lib/supabase/require-admin':{requireAdmin:async()=>{authorized++;return status===200?{ok:true}:{ok:false,status}}},'./event-groups/admin-index.module.css':{default:{}},'react/jsx-runtime':jsxRuntime})
  assert.equal(Page.dynamic,'force-dynamic');assert.equal(Page.revalidate,0)
  if(status!==200)await assert.rejects(Page.default(),new RegExp(`REDIRECT:${status===401?'/login':'/videos'}`))
  else{
   const tree=nodes(await Page.default())
-  assert.deepEqual(tree.filter(n=>n.type===Link).map(n=>[n.props.href,n.props.children]),managementLinks)
+  const management=tree.find(n=>n.type==='nav'&&n.props['aria-label']==='管理メニュー')
+  const cards=nodes(management).filter(n=>n.type===Link)
+  assert.deepEqual(cards.map(n=>[n.props.href,nodes(n).find(child=>child.type==='strong').props.children]),managementLinks)
+  const publicNav=tree.find(n=>n.type==='nav'&&n.props['aria-label']==='公開ページ')
+  assert.deepEqual(nodes(publicNav).filter(n=>n.type===Link).map(n=>[n.props.href,n.props.children]),[['/events','開催案内'],['/schedule','スケジュール'],['/videos','動画ライブラリ']])
+  assert.equal(tree.filter(n=>n.type===Link).length,8)
+  for(const card of cards){
+   assert.equal(nodes(card).filter(n=>n.type==='svg'&&n.props['aria-hidden']==='true').length,1)
+   assert.ok(nodes(card).some(n=>n.type==='span'&&n.props.children==='→'&&n.props['aria-hidden']==='true'))
+   assert.equal(nodes(card).filter(n=>n.type==='span'&&typeof n.props.children==='string'&&n.props.children!=='→').length,1)
+   assert.equal(card.props.tabIndex,undefined)
+  }
+  assert.ok(tree.some(n=>n.type==='h1'&&n.props.children==='管理ホーム'))
+  assert.ok(tree.some(n=>n.type==='p'&&n.props.children==='心勢会HUB'))
+  assert.ok(tree.some(n=>n.type==='span'&&n.props.children==='管理者'))
   assert.ok(tree.filter(n=>n.type===Link).every(n=>n.props.prefetch===false))
  }
  assert.equal(authorized,1)

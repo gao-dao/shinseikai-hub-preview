@@ -117,10 +117,11 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
   useEffect(() => {
     if (!isAdmin) return
     const loadData = async () => {
-      await Promise.all([fetchVideos(), fetchSchedules()])
+      if (tab === 'videos') await fetchVideos()
+      if (tab === 'schedules') await fetchSchedules()
     }
     void loadData()
-  }, [isAdmin, fetchVideos, fetchSchedules])
+  }, [isAdmin, tab, fetchVideos, fetchSchedules])
 
   const addVideo = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -314,7 +315,6 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
         </div>
         <div className="tabs">
           <Link className={`tab${tab === 'videos' ? ' act' : ''}`} aria-current={tab === 'videos' ? 'page' : undefined} href="/admin/videos">▶ 動画管理</Link>
-          <Link className={`tab${tab === 'schedules' ? ' act' : ''}`} aria-current={tab === 'schedules' ? 'page' : undefined} href="/admin/schedules">📅 予定管理</Link>
           <Link className={`tab${tab === 'passwords' ? ' act' : ''}`} aria-current={tab === 'passwords' ? 'page' : undefined} href="/admin/passwords">🔑 パスワード管理</Link>
         </div>
 

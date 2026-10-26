@@ -55,7 +55,7 @@ function tools(tab) {
   h.render(Tools, { initialTab: tab }); h.state[1] = true; h.state[2] = false
   return { h, render: () => h.render(Tools, { initialTab: tab }) }
 }
-for (const tab of ['videos', 'schedules', 'passwords']) test(`management navigation identifies current page: ${tab}`, () => {
+for (const tab of ['videos', 'passwords']) test(`management navigation identifies current page: ${tab}`, () => {
   const { render } = tools(tab); const tree = render()
   const current = tree.filter(n => n.props?.['aria-current'] === 'page')
   assert.equal(current.length, 1); assert.equal(current[0].props.href, `/admin/${tab}`); assert.match(current[0].props.className, /\bact\b/)

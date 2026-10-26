@@ -17,6 +17,22 @@
 .page a:focus-visible, .filters :focus-visible { outline: 2px solid #6b1f2b; outline-offset: 4px; }
 @media(min-width: 768px) { .page { padding: 32px; } }
 
-.homeGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 16px; list-style: none; padding: 0; margin: 24px 0; }
-.homeCard { display: flex; align-items: center; min-height: 88px; padding: 20px; border: 1px solid #ded8ce; border-radius: 10px; background: #fff; color: #6b1f2b; font-size: 18px; font-weight: 700; text-decoration: none; overflow-wrap: anywhere; }
+.homeHeader { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 24px; border-bottom: 1px solid #ded8ce; }
+.page .homeBrand { margin: 0 0 8px; color: #6b1f2b; font-size: 18px; font-weight: 700; }
+.page .homeTitle { margin: 0; font-size: 26px; line-height: 1.4; }
+.homeRole { flex-shrink: 0; padding: 5px 12px; border: 1px solid #ded8ce; border-radius: 6px; color: #52616e; background: #fff; font-size: 13px; }
+.homeGrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; list-style: none; padding: 0; margin: 24px 0 32px; }
+.homeGrid > li { min-width: 0; }
+.homeCard { display: grid; grid-template-columns: 28px minmax(0, 1fr) 20px; align-items: center; gap: 16px; height: 100%; min-height: 120px; padding: 22px 20px; border: 1px solid #ded8ce; border-radius: 10px; background: #fff; color: #6b1f2b; text-decoration: none; overflow-wrap: anywhere; }
 .homeCard:hover { border-color: #6b1f2b; }
+.homeIcon { width: 28px; height: 28px; }
+.homeCardText { min-width: 0; }
+.homeCardText strong { display: block; font-size: 18px; font-weight: 700; line-height: 1.5; }
+.homeCardText > span { display: block; margin-top: 6px; color: #52616e; font-size: 13px; line-height: 1.7; }
+.homeArrow { font-size: 20px; text-align: right; }
+.homePublic { border-top: 1px solid #ded8ce; padding-top: 20px; }
+.page .homePublicTitle { margin: 0 0 8px; font-size: 15px; color: #52616e; }
+.homePublicLinks { display: flex; flex-wrap: wrap; gap: 4px 24px; }
+.homePublicLinks a { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 0; font-size: 14px; }
+@media(min-width: 640px) { .homeGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media(max-width: 639px) { .homeCard { min-height: 112px; gap: 12px; padding: 20px 16px; } }

@@ -12,7 +12,7 @@ export default function AdminIndexView({ options, result, error }: { options: In
     <header className={styles.header}><h1>{options.history ? '開催記録・履歴' : '開催回管理'}</h1>{!options.history && <Link className={styles.primary} href="/admin/event-groups/new">新規作成</Link>}</header>
     <nav className={styles.nav} aria-label="管理メニュー">
       <Link href={options.history ? '/admin/event-groups' : '/admin/event-groups/history'}>{options.history ? '開催回管理へ' : '開催記録・履歴 →'}</Link>
-      <Link href="/admin/schedules">予定管理</Link><Link href="/admin/videos">動画管理</Link><Link href="/admin/passwords">パスワード管理</Link><Link href="/admin/registrations">申込一覧</Link>
+      <Link href="/admin/videos">動画管理</Link><Link href="/admin/passwords">パスワード管理</Link><Link href="/admin/registrations">申込一覧</Link>
     </nav>
     {options.history && <form className={styles.filters} action="/admin/event-groups/history" method="get">
       <label>開催名<input type="search" name="q" defaultValue={options.q} maxLength={100} /></label>

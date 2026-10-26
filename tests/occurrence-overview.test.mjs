@@ -66,7 +66,7 @@ for (const summary of [undefined, 'error', { classCount: 3, activeClassBookings:
   assert.equal(dd[2], summary === 'error' ? '取得できません' : summary ? '3クラス' : '確認中')
   assert.equal(dd[3], summary === 'error' ? '取得できません' : summary ? '有効クラス申込 6件（延べ）' : '確認中')
 })
-for (const tab of ['schedules', 'videos', 'passwords']) for (const status of [401, 403, 200]) test(`separate ${tab} menu retains server authorization: ${status}`, async () => {
+for (const tab of ['videos', 'passwords']) for (const status of [401, 403, 200]) test(`separate ${tab} menu retains server authorization: ${status}`, async () => {
   const Page = compile(`app/(app)/admin/${tab}/page.tsx`, {
     'next/navigation': { redirect: path => { assert.equal(path, status === 401 ? '/login' : '/videos'); throw new Error('REDIRECT') } },
     '@/lib/supabase/require-admin': { requireAdmin: async () => status === 200 ? { ok: true } : { ok: false, status } },

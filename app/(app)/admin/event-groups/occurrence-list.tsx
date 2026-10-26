@@ -45,7 +45,7 @@ export default function OccurrenceList() {
   return <main className="occurrence-page">
     <header><div><p className="eyebrow">開催・募集・参加者をまとめて管理</p><h1>開催回一覧</h1></div>
       <Link className="primary" href="/admin/event-groups/new">＋ 開催回を作成</Link></header>
-    <nav aria-label="管理メニュー"><strong>開催回</strong><Link href="/admin/schedules">予定管理</Link><Link href="/admin/videos">動画管理</Link><Link href="/admin/passwords">パスワード管理</Link><Link href="/admin/registrations">全開催回の申込一覧</Link></nav>
+    <nav aria-label="管理メニュー"><strong>開催回</strong><Link href="/admin/videos">動画管理</Link><Link href="/admin/passwords">パスワード管理</Link><Link href="/admin/registrations">全開催回の申込一覧</Link></nav>
     <nav aria-label="表示する開催回"><button aria-pressed={visibility === 'visible'} onClick={() => { setPage(1); setVisibility('visible') }}>通常の開催回</button><button aria-pressed={visibility === 'hidden'} onClick={() => { setPage(1); setVisibility('hidden') }}>非表示の開催回</button></nav>
     <div className="toolbar"><p>開催回を選ぶと、基本情報・クラス・受付操作を確認できます。</p><button disabled={loading} onClick={() => setReload(v => v + 1)}>一覧を再取得</button></div>
     <p className="note">申込状況は取得時点の有効クラス申込の延べ件数です。同じ人の複数クラス申込を含み、申込者数ではありません。</p>

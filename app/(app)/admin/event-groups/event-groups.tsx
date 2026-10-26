@@ -235,7 +235,7 @@ export default function EventGroups({ groupId, createOnly = false }: { groupId?:
       `}</style>
       <Link href="/admin/event-groups">← 開催回一覧へ</Link>
       <h1 id="event-groups-title">{groupId ? result?.eventGroups[0]?.title ?? '開催回の詳細' : '開催回を作成'}</h1>
-      {!groupId && <nav className="occurrence-nav" aria-label="管理メニュー"><Link href="/admin/schedules">予定管理</Link><Link href="/admin/videos">動画管理</Link><Link href="/admin/passwords">パスワード管理</Link><Link href="/admin/registrations">全開催回の申込一覧 →</Link></nav>}
+      {!groupId && <nav className="occurrence-nav" aria-label="管理メニュー"><Link href="/admin/videos">動画管理</Link><Link href="/admin/passwords">パスワード管理</Link><Link href="/admin/registrations">全開催回の申込一覧 →</Link></nav>}
       {!groupId && <form onSubmit={create} className="eg-card">
         <h2>開催回の基本情報</h2>
         <p>新規作成時の申込受付は停止中になります。</p>
