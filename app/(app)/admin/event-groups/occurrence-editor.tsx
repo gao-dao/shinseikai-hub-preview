@@ -121,21 +121,27 @@ export default function OccurrenceEditor({ groupId, returnTo = '/admin/event-gro
             <label>{rows.length === 1 ? '会場' : '会場（共通）'}<input required maxLength={500} value={rows.length === 1 && rows[0].ownLocation ? rows[0].location : venue} onChange={e => { setVenue(e.target.value); if (rows.length === 1) changeRow(rows[0].key, { ownLocation: false }) }} /></label></div>
           <details><summary>開催回の詳細設定</summary><label>開催地（都市・任意）<input value={city} onChange={e => setCity(e.target.value)} /></label><label>説明（任意）<textarea value={description} onChange={e => setDescription(e.target.value)} /></label></details>
         </section>
-        {displayRows.map((row, i) => <section key={row.key} data-class-key={row.key}><h2>{rows.length > 1 ? `クラス ${i + 1}` : '受付・詳細設定'}</h2>
+        {displayRows.map((row, i) => <section key={row.key} data-class-key={row.key}><h2>{rows.length > 1 ? `クラス ${i + 1}` : '定員・種別・受付'}</h2>
           {(rows.length > 1) && <label>クラス名<input required value={row.title} maxLength={200} onChange={e => changeRow(row.key, { title: e.target.value })} /></label>}
           {rows.length > 1 && (row.ownDate || row.ownLocation) && <p className="individual-setting">個別設定：{row.ownDate ? `開催日 ${row.date || '未設定'}` : ''}{row.ownDate && row.ownLocation ? ' ／ ' : ''}{row.ownLocation ? `会場 ${row.location || '未設定'}` : ''}</p>}
-          <p>クラス受付：{row.enabled ? '有効' : '無効（詳細設定で変更できます）'}</p>
           {rows.length > 1 && <label>開始時刻<input type="time" step="60" required value={row.start} onChange={e => changeRow(row.key, { start: e.target.value })} /></label>}
           {rows.length > 1 && <label>終了時刻（任意）<input type="time" step="60" value={row.end} onChange={e => changeRow(row.key, { end: e.target.value })} /></label>}
-          <details><summary>クラスの詳細設定（定員・個別日程・受付）</summary>
-            {rows.length > 1 && <>
-            <label><input type="checkbox" checked={row.ownDate} onChange={e => changeRow(row.key, { ownDate: e.target.checked, date: row.date || date })} />このクラスだけ日付を変更</label>{row.ownDate && <label>個別の開催日<input type="date" required value={row.date} onChange={e => changeRow(row.key, { date: e.target.value })} /></label>}
-            <label><input type="checkbox" checked={row.ownLocation} onChange={e => changeRow(row.key, { ownLocation: e.target.checked, location: row.location || venue })} />このクラスだけ会場を変更</label>{row.ownLocation && <label>個別の会場<input required value={row.location} onChange={e => changeRow(row.key, { location: e.target.value })} /></label>}
-            </>}
+          <div className="grid">
             <label>定員<input type="number" min="1" max="2147483647" step="1" value={row.capacity} onChange={e => changeRow(row.key, { capacity: e.target.value })} /></label>
             <label>種別<select value={row.type} onChange={e => changeRow(row.key, { type: e.target.value as Row['type'] })}><option>一般参加</option><option>稽古会</option></select></label>
-            <label><input type="checkbox" checked={row.enabled} onChange={e => changeRow(row.key, { enabled: e.target.checked })} />クラスの受付を有効にする</label><p>一般Web申込にはグループ全体の受付も有効である必要があります。</p>
-          </details>
+            <label className="reception-toggle"><input type="checkbox" checked={row.enabled} onChange={e => changeRow(row.key, { enabled: e.target.checked })} />クラスの受付を有効にする</label>
+          </div>
+          {rows.length > 1 && <details><summary>個別の日付・会場</summary>
+            <label><input type="checkbox" checked={row.ownDate} onChange={e => changeRow(row.key, { ownDate: e.target.checked, date: row.date || date })} />このクラスだけ日付を変更</label>{row.ownDate && <label>個別の開催日<input type="date" required value={row.date} onChange={e => changeRow(row.key, { date: e.target.value })} /></label>}
+            <label><input type="checkbox" checked={row.ownLocation} onChange={e => changeRow(row.key, { ownLocation: e.target.checked, location: row.location || venue })} />このクラスだけ会場を変更</label>{row.ownLocation && <label>個別の会場<input required value={row.location} onChange={e => changeRow(row.key, { location: e.target.value })} /></label>}
+          </details>}
+          {rows.length === 1 && row.id !== null && <>
+            {row.title.trim() !== title.trim() && <p className="individual-setting">開催名と申込画面のクラス名が異なります。申込画面では「{row.title}」と表示されます。</p>}
+            <details><summary>申込画面のクラス名を確認・編集</summary>
+              <p>開催名を変更しても、登録済みのクラス名は自動では変わりません。変更する場合だけ入力してください。</p>
+              <label>クラス名<input required value={row.title} maxLength={200} onChange={e => changeRow(row.key, { title: e.target.value })} /></label>
+            </details>
+          </>}
           {row.id === null && rows.length > 1 ? <button type="button" onClick={() => { setRows(old => old.filter(r => r.key !== row.key)) }}>この入力行を取り除く</button> : row.id !== null && <p>登録済みクラスはこの画面から削除しません。申込・取消履歴は保持します。</p>}
         </section>)}
         {rows.length > 1 && <p>入力中の順序は固定し、確認画面で日時順に表示します。</p>}
@@ -148,6 +154,7 @@ export default function OccurrenceEditor({ groupId, returnTo = '/admin/event-gro
         {commonReviewVenue && <p>会場：{commonReviewVenue}</p>}
         {review.group.city && <p>地域：{review.group.city}</p>}
         {review.group.description && <p className="review-description">{review.group.description}</p>}
+        {reviewRows.length === 1 && reviewRows[0].title !== review.group.title && <p>申込画面のクラス名：{reviewRows[0].title}</p>}
         {reviewRows.length === 1 ? <p>種別：{reviewRows[0].type} ／ 定員：{reviewRows[0].capacity ?? '未設定'}名 ／ クラス受付：{reviewRows[0].registration_enabled ? '有効' : '無効'}</p> : <ul>{reviewRows.map((row, i) => <li key={row.id ?? `new-${i}`}><strong>{row.title}</strong>
           <p>{!commonReviewDate ? `${row.date} ` : ''}{reviewTime(row)}</p>
           {!commonReviewVenue && <p>会場：{row.location}</p>}
@@ -160,6 +167,6 @@ export default function OccurrenceEditor({ groupId, returnTo = '/admin/event-gro
       </section>}
       <nav aria-label="編集を中止"><Link className="cancel" href={cancelHref} aria-disabled={busy || unknown} onClick={leave}>キャンセル</Link>{unknown && <p>保存結果の確認が完了するまでキャンセルできません。</p>}</nav>
     </>}
-    <style jsx>{`.editor{width:100%;max-width:1000px;margin:auto;padding:32px;overflow:auto;color:#29353b}h1{font-size:28px}section{background:white;border:1px solid #e7e1d8;border-radius:14px;padding:24px;margin:20px 0}label{display:block;margin:14px 0}input:not([type=checkbox]),textarea,select{display:block;width:100%;padding:12px;border:1px solid #c9c9c9;border-radius:8px;margin-top:8px;font:inherit}input[type=checkbox]{margin-right:8px}button{min-height:44px;padding:10px 16px;margin:8px 8px 8px 0;border:1px solid #d9d2c8;border-radius:8px;cursor:pointer;background:white;font:inherit}button:disabled{opacity:.5;cursor:default}.primary{background:#6b1f2b;color:white}summary{cursor:pointer;padding:12px 0}li{margin-bottom:16px}.individual-setting{overflow-wrap:anywhere;border-left:3px solid #6b1f2b;padding-left:10px}.review-description{white-space:pre-wrap;overflow-wrap:anywhere}p[role=alert]{color:#b91c1c;white-space:pre-wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:16px}.cancel{display:inline-flex;align-items:center;min-height:44px;padding:10px 16px;text-decoration:underline;text-underline-offset:4px}a[aria-disabled=true]{opacity:.5;cursor:default}a{color:#6b1f2b}@media(max-width:640px){.editor{padding:20px 16px}.grid{grid-template-columns:1fr;gap:0}section{padding:16px}button{width:100%;margin-right:0}}`}</style>
+    <style jsx>{`.editor{width:100%;max-width:1000px;margin:auto;padding:32px;overflow:auto;color:#29353b}h1{font-size:28px}section{background:white;border:1px solid #e7e1d8;border-radius:14px;padding:24px;margin:20px 0}label{display:block;margin:14px 0}input:not([type=checkbox]),textarea,select{display:block;width:100%;padding:12px;border:1px solid #c9c9c9;border-radius:8px;margin-top:8px;font:inherit}input[type=checkbox]{margin-right:8px}button{min-height:44px;padding:10px 16px;margin:8px 8px 8px 0;border:1px solid #d9d2c8;border-radius:8px;cursor:pointer;background:white;font:inherit}button:disabled{opacity:.5;cursor:default}.primary{background:#6b1f2b;color:white}summary{cursor:pointer;padding:12px 0;min-height:44px;box-sizing:border-box}.reception-toggle{min-height:44px;display:flex;align-items:center}.reception-toggle input{min-width:20px;min-height:20px}input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible,summary:focus-visible,a:focus-visible{outline:3px solid #8a5d3b;outline-offset:3px}li{margin-bottom:16px}.individual-setting{overflow-wrap:anywhere;border-left:3px solid #6b1f2b;padding-left:10px}.review-description{white-space:pre-wrap;overflow-wrap:anywhere}p[role=alert]{color:#b91c1c;white-space:pre-wrap}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:16px}.cancel{display:inline-flex;align-items:center;min-height:44px;padding:10px 16px;text-decoration:underline;text-underline-offset:4px}a[aria-disabled=true]{opacity:.5;cursor:default}a{color:#6b1f2b}@media(max-width:640px){.editor{padding:20px 16px}.grid{grid-template-columns:1fr;gap:0}section{padding:16px}button{width:100%;margin-right:0}}`}</style>
   </main>
 }

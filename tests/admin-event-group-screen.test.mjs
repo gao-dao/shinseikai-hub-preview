@@ -251,15 +251,15 @@ test('saved message remains in parent independently of class reload and subseque
 
 test('detail mode shows only its exact occurrence, existing reception, and honest application navigation', async () => {
   const c = setup({ groupId: original.id }); await c.mount()
-  assert.equal(c.render().filter(item => item.type === c.Control).length, 1)
-  assert.equal(c.render().find(item => item.type === c.Control).props.id, original.id)
+  assert.equal(c.render().filter(item => item.type === c.Control).length, 0)
   const detail = c.render().find(item => item.type === c.Detail)
   assert.equal(detail.props.group.id, original.id)
+  assert.equal(typeof detail.props.onUpdated, 'function')
   assert.equal(c.render().some(item => item.type === c.Classes), false)
   const nodes = c.render()
   assert.ok(nodes.indexOf(detail) < nodes.indexOf(nodes.find(item => item.props?.['aria-label'] === '管理操作')))
   assert.equal(nodes.find(item => item.type === 'h1').props.children, original.title)
-  assert.match(c.text(), /開催回別のサーバー絞り込みは未対応/)
+  assert.doesNotMatch(c.text(), /未対応/); assert.match(c.text(), /申込者管理/)
   assert.equal(c.render().some(item => item.type === 'form' && !item.props['aria-label']), false)
   assert.equal(c.button('＋ クラスを追加'), undefined)
   assert.equal(c.button('開催情報を編集'), undefined)

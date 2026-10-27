@@ -2,16 +2,16 @@
 
 import { useRef, useState } from 'react'
 
-type Props = { id: number; title: string; registrationOpen: boolean; stateVersion?: number; onUpdated: () => void }
+type Props = { id: number; title: string; registrationOpen: boolean; stateVersion?: number; disabled?: boolean; compact?: boolean; onUpdated: () => void }
 
-export default function RegistrationControl({ id, title, registrationOpen, stateVersion, onUpdated }: Props) {
+export default function RegistrationControl({ id, title, registrationOpen, stateVersion, disabled = false, compact = false, onUpdated }: Props) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const inFlight = useRef(false)
   const url = `/api/admin/event-groups/${id}/registration`
 
   async function change() {
-    if (inFlight.current) return
+    if (disabled || inFlight.current) return
     inFlight.current = true
     setBusy(true)
     setError('')
@@ -64,8 +64,8 @@ export default function RegistrationControl({ id, title, registrationOpen, state
   }
 
   return <div style={{ marginTop: 12 }}>
-    <button type="button" disabled={busy} onClick={change} aria-label={`${title}：グループ全体の受付を${registrationOpen ? '停止' : '開始'}`}>
-      {busy ? '確認・更新中...' : registrationOpen ? 'グループ全体の受付を停止' : 'グループ全体の受付を開始'}
+    <button type="button" disabled={busy || disabled} onClick={change} aria-label={`${title}：${compact ? '受付を' : 'グループ全体の受付を'}${registrationOpen ? '停止' : '開始'}`}>
+      {busy ? '確認・更新中...' : `${compact ? '受付を' : 'グループ全体の受付を'}${registrationOpen ? '停止' : '開始'}`}
     </button>
     {error && <p role="alert" style={{ color: '#B91C1C', marginTop: 8 }}>{error}</p>}
   </div>

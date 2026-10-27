@@ -263,7 +263,7 @@ export default function EventGroups({ groupId, createOnly = false, returnTo = '/
       {listError && <p role="alert">{listError} <Link href="/login">ログイン画面へ</Link></p>}
       {result?.eventGroups.length === 0 && <p>表示する講習会グループはありません。</p>}
       {result?.eventGroups.map(group => <article className="eg-card" key={group.id}>
-        {groupId ? <OccurrenceDetail group={group} refreshToken={classRefresh[group.id] ?? 0} /> : <>
+        {groupId ? <OccurrenceDetail group={group} refreshToken={classRefresh[group.id] ?? 0} onUpdated={() => setReload(value => value + 1)} /> : <>
         <h2 style={{ overflowWrap: 'anywhere' }}>{group.title}</h2>
         <nav className="occurrence-nav" aria-label="開催回の項目"><a href={`#basic-${group.id}`}>基本情報</a><a href={`#classes-${group.id}`}>クラス・受付</a><a href={`#applications-${group.id}`}>申込管理</a></nav>
         <h3 id={`basic-${group.id}`}>基本情報</h3>
@@ -295,12 +295,12 @@ export default function EventGroups({ groupId, createOnly = false, returnTo = '/
         </>}
         {!groupId && <GroupClasses key={`${group.id}-${classRefresh[group.id] ?? 0}`} groupId={group.id}
           hideEndTime={!!groupId} initiallyExpanded={!!groupId || (classRefresh[group.id] ?? 0) > 0} />}
-        <div className="occurrence-state-change"><p>受付状態を変更する操作</p><RegistrationControl id={group.id} title={group.title} registrationOpen={group.registration_open} stateVersion={group.state_version} onUpdated={() => setReload(value => value + 1)} /></div>
+        {!groupId && <div className="occurrence-state-change"><p>受付状態を変更する操作</p><RegistrationControl id={group.id} title={group.title} registrationOpen={group.registration_open} stateVersion={group.state_version} onUpdated={() => setReload(value => value + 1)} /></div>}
         <section id={`applications-${group.id}`} className="occurrence-applications"><h3>申込管理</h3>
-          <p>開催回別のサーバー絞り込みは未対応です。ここでは一部の申込を全件として表示しません。</p>
-          <Link href="/admin/registrations">全開催回の申込一覧を開く →</Link><p>一覧の「対象講習会」で「{group.title}」を確認してください。情報編集・クラス追加・取消は申込一覧で行えます。</p>
+          <p>申込者の情報編集・クラス追加・取消は、申込者管理で行えます。</p>
+          <Link href="/admin/registrations">申込者管理を開く →</Link><p>「開催回別」で「{group.title}」と対象クラスを選択してください。</p>
         </section>
-        {groupId && <button type="button" disabled={loading || addingGroup !== null || editSaving} onClick={() => setReload(value => value + 1)}>一覧を再取得</button>}
+        {groupId && <button type="button" disabled={loading || addingGroup !== null || editSaving} onClick={() => setReload(value => value + 1)}>最新情報を再取得</button>}
         {groupId && <OccurrenceState group={group} disabled={editing !== null || addingGroup !== null || saving || editSaving} onUpdated={() => setReload(value => value + 1)} />}
         </section>
       </article>)}

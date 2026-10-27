@@ -186,7 +186,7 @@ function elements(tree) {
   if (!tree || typeof tree !== 'object') return []
   return [tree, ...elements(tree.props?.children)]
 }
-function control({ registrationOpen = false, canOpen = true, checkOk = true, patchOk = true, confirmed = true, wrongResult = false } = {}) {
+function control({ disabled = false, compact = false, registrationOpen = false, canOpen = true, checkOk = true, patchOk = true, confirmed = true, wrongResult = false } = {}) {
   const state = [], refs = [], calls = []
   let index = 0, refIndex = 0
   const react = {
@@ -203,7 +203,7 @@ function control({ registrationOpen = false, canOpen = true, checkOk = true, pat
           : { id: 5, registration_open: registrationOpen, state_version: 0, canOpen, reason: canOpen ? null : '受付対象のクラスがありません。' } }
     },
   })
-  const render = () => { index = 0; refIndex = 0; return elements(Component({ id: 5, title: '講習会', registrationOpen, stateVersion: 0, onUpdated: () => calls.push(['updated']) })) }
+  const render = () => { index = 0; refIndex = 0; return elements(Component({ id: 5, title: '講習会', registrationOpen, disabled, compact, stateVersion: 0, onUpdated: () => calls.push(['updated']) })) }
   return { calls, render, change: () => render().find(item => item.type === 'button').props.onClick() }
 }
 
@@ -266,3 +266,11 @@ test('reception PATCH refuses stale lifecycle versions and checks version in ato
  const fresh=setup();assert.equal((await fresh.patch()).status,200);assert.ok(fresh.calls.some(v=>v[0]==='eq'&&v[1]==='state_version'&&v[2]===0))
 })
 for(const flags of [{hidden:true},{cancelled:true}])test(`blocked lifecycle prevents reopening ${JSON.stringify(flags)}`,async()=>{const c=setup(flags);assert.equal((await c.get()).body.canOpen,false);assert.equal((await c.patch()).status,409);noUpdate(c)})
+
+test('UI-disabled start never calls either existing reception API', async () => {
+  const c = control({ disabled: true, compact: true }); assert.equal(c.render().find(n => n.type === 'button').props.disabled, true); await c.change(); assert.deepEqual(c.calls, [])
+})
+for (const registrationOpen of [true,false]) test(`single reception uses a concise label and the unchanged parent-only API: ${registrationOpen}`, async () => {
+  const c = control({ compact: true, registrationOpen }); const b = c.render().find(n => n.type === 'button'); assert.equal(b.props.children, registrationOpen ? '受付を停止' : '受付を開始')
+  await c.change(); const patch = c.calls.find(x => x[0] === 'patch'); assert.match(patch[1], /event-groups\/5\/registration$/); assert.deepEqual(Object.keys(JSON.parse(patch[2].body)).sort(), ['expected_registration_open','expected_state_version','registration_open'])
+})

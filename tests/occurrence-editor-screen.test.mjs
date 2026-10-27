@@ -38,7 +38,7 @@ function setup({ groupId, returnTo, data = snapshot(), status = 200, result = { 
   }
 }
 function fill(c) { c.change('開催名', '東京講座'); c.change('開催日', '2030-10-23'); c.change('会場', '合成会場'); c.change('開始時刻', '12:00') }
-test('new editor starts with one class, 10 seats in details, optional minute-only end-time input', async () => {
+test('new editor starts with one class, 10 visible seats, optional minute-only end-time input', async () => {
   const c = setup(); await c.mount(); assert.equal(c.fields('開始時刻').length, 1); assert.equal(c.fields('定員')[0].props.value, '10'); assert.equal(c.fields('終了時刻（任意）').length, 1); assert.equal(c.fields('終了時刻（任意）')[0].props.value, ''); assert.equal(c.fields('開始時刻')[0].props.step, '60')
   assert.equal(c.calls.length, 0)
 })
@@ -107,7 +107,7 @@ test('cancel confirms only actual unsaved changes; restoring the initial input r
   c.change('開催名', ''); assert.equal(leaveByCancel(c), false); assert.equal(c.confirmations(), 2)
 })
 test('existing single class has no name input, preserves its internal name, and cancelled changes do not save', async () => {
-  const c = setup({ groupId: 1 }); await c.mount(); assert.equal(c.fields('クラス名').length, 0); assert.equal(c.fields('開始時刻').length, 1); assert.equal(c.fields('会場')[0].props.value, '既存会場')
+  const c = setup({ groupId: 1 }); await c.mount(); assert.equal(c.fields('クラス名').length, 1); assert.equal(c.fields('開始時刻').length, 1); assert.equal(c.fields('会場')[0].props.value, '既存会場')
   c.change('開催名', '変更'); c.change('開催名', '既存開催回'); assert.equal(leaveByCancel(c), false); assert.equal(c.confirmations(), 0)
   await c.submit(); await c.save(); assert.equal(c.calls.find(v => v[0] === 'save')[1].classes[0].title, '既存クラス')
 })
@@ -158,10 +158,10 @@ test('single review shows event name, date and venue once without the internal c
  for(const value of ['東京講座','2030-10-23','合成会場'])assert.equal(content.split(value).length-1,1)
  assert.match(content,/12:00/);assert.match(content,/定員：10名/);assert.match(content,/クラス受付：有効/)
 })
-test('renaming a single existing event retains its hidden saved class name and ID',async()=>{
+test('renaming a single existing event retains and displays its saved class name and ID',async()=>{
  const c=setup({groupId:1});await c.mount();c.change('開催名','変更後の開催名');await c.submit()
  const content=text(c.render().find(v=>v.props?.['aria-label']==='保存前の確認'))
- assert.match(content,/変更後の開催名/);assert.equal(content.includes('既存クラス'),false)
+ assert.match(content,/変更後の開催名/);assert.equal(content.includes('既存クラス'),true)
  await c.save();const sent=c.calls.find(v=>v[0]==='save')[1]
  assert.equal(sent.group.title,'変更後の開催名');assert.equal(sent.classes[0].title,'既存クラス');assert.equal(sent.classes[0].id,7);assert.equal(sent.expected.classes[0].title,'既存クラス')
 })
@@ -245,4 +245,21 @@ test('history context survives edit cancellation and save without entering the w
 test('incomplete occurrence data points to occurrence management, never the retired schedule manager',async()=>{
  const data=snapshot();data.classes=Array.from({length:101},(_,i)=>({...data.classes[0],id:i+1}))
  const c=setup({groupId:1,data});await c.mount();assert.equal(c.render().some(n=>n.type==='form'),false);assert.match(c.text(),/開催回管理の詳細画面/);assert.doesNotMatch(c.text(),/予定管理/);assert.equal(c.calls.filter(call=>call[0]==='save').length,0)
+})
+
+test('capacity, type and class reception are visible without opening details', async () => {
+  for (const multiple of [false,true]) {
+    const c = setup(); await c.mount(); if (multiple) c.button('＋クラスを追加').props.onClick()
+    const nodes = c.render(), folded = new Set(nodes.filter(n => n.type === 'details').flatMap(all))
+    const labels = nodes.filter(n => n.type === 'label' && (['定員','種別'].includes(n.props.children?.[0]) || text(n) === 'クラスの受付を有効にする'))
+    assert.equal(labels.length, multiple ? 6 : 3)
+    for (const label of labels) { assert.equal(folded.has(label), false); const input = all(label).find(n => ['input','select'].includes(n.type)); assert.ok(input); if (input.props.type === 'checkbox') assert.equal(input.props.checked, true) }
+    assert.equal(c.calls.length, 0)
+  }
+})
+test('explicit single-class name edit uses the existing payload and preserves IDs and settings', async () => {
+  const c = setup({ groupId: 1 }); await c.mount(); assert.match(c.text(), /開催名と申込画面のクラス名が異なります/)
+  c.change('クラス名','申込画面用の名称'); await c.submit(); await c.save()
+  const sent = c.calls.find(x => x[0] === 'save')[1]
+  assert.equal(sent.group.title,'既存開催回'); assert.equal(sent.classes[0].id,7); assert.equal(sent.classes[0].title,'申込画面用の名称'); assert.equal(sent.classes[0].registration_enabled,false); assert.equal(sent.classes[0].capacity,25); assert.equal(sent.expected.classes[0].title,'既存クラス')
 })

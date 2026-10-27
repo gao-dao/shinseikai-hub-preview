@@ -44,8 +44,8 @@ function text(tree) {
   return typeof tree === 'string' || typeof tree === 'number' ? String(tree) : ''
 }
 const group = { id: 7, title: 'Occurrence title', description: null, city: 'City is not venue', start_date: '2030-10-23', end_date: '2030-10-24', registration_open: false }
-function screen({ rows = [row()], fail = false, parentOpen = false, cancelled = false, hidden = false } = {}) {
-  let cursor = 0, refreshToken = 0, current = { ...group, registration_open: parentOpen, is_cancelled: cancelled, is_hidden: hidden }; const slots = [], effects = [], calls = []
+function screen({ rows = [row()], fail = false, parentOpen = false, cancelled = false, hidden = false, groupData = {} } = {}) {
+  let cursor = 0, refreshToken = 0, current = { ...group, ...groupData, registration_open: parentOpen, is_cancelled: cancelled, is_hidden: hidden }; const slots = [], effects = [], calls = []
   const react = {
     useState(value) { const i = cursor++; if (!(i in slots)) slots[i] = value; return [slots[i], value => slots[i] = typeof value === 'function' ? value(slots[i]) : value] },
     useRef(value) { const i = cursor++; if (!(i in slots)) slots[i] = { current: value }; return slots[i] },
@@ -53,7 +53,7 @@ function screen({ rows = [row()], fail = false, parentOpen = false, cancelled = 
   }
   const jsx = (type, props) => ({ type, props })
   const Control = compile('app/(app)/admin/event-groups/class-registration-control.tsx', { react, 'react/jsx-runtime': { jsx, jsxs: jsx }, '@/lib/event-groups/detail': { loadDetailClasses: async () => rows } }, { AbortController }).default
-  const Component = compile('app/(app)/admin/event-groups/occurrence-detail.tsx', { react, 'next/link': { default: props => jsx('a', props) }, './class-registration-control': { default: Control }, 'react/jsx-runtime': { jsx, jsxs: jsx }, '@/lib/event-groups/detail': { loadDetailClasses: async (id, signal) => { calls.push([id, signal]); if (fail) throw Error('PRIVATE_ERROR'); return rows } } }, { AbortController }).default
+  const Component = compile('app/(app)/admin/event-groups/occurrence-detail.tsx', { react, './registration-control': { default: props => jsx('button', { disabled: props.disabled, children: `${props.compact ? '受付を' : 'グループ全体の受付を'}${props.registrationOpen ? '停止' : '開始'}` }) }, 'next/link': { default: props => jsx('a', props) }, './class-registration-control': { default: Control }, 'react/jsx-runtime': { jsx, jsxs: jsx }, '@/lib/event-groups/detail': { loadDetailClasses: async (id, signal) => { calls.push([id, signal]); if (fail) throw Error('PRIVATE_ERROR'); return rows } } }, { AbortController }).default
   const render = () => { cursor = 0; return Component({ group: current, refreshToken }) }
   return { calls, render, text: () => text(render()), nodes: () => elements(render()), async flush() { render(); for (const fn of effects.splice(0)) fn(); await new Promise(r => setImmediate(r)); render() }, refresh: () => refreshToken++, changeGroup: () => current = { ...group, id: 8 } }
 }
@@ -94,15 +94,16 @@ test('shared venue appears once above all classes, distinct venues remain per cl
 
 for (const parentOpen of [true, false]) for (const enabled of [true, false]) test(`single reception combines parent=${parentOpen} and class=${enabled} without individual controls`, async () => {
   const c = screen({ parentOpen, rows: [row(1, { registration_enabled: enabled })] }); await c.flush()
-  assert.equal(c.nodes().filter(n => n.type === 'button').length, 0)
+  assert.equal(c.nodes().filter(n => n.type === 'button').length, 1)
+  assert.equal(c.nodes().find(n => n.type === 'button').props.disabled, !parentOpen && !enabled)
   assert.match(c.text(), /有効申込数3件/); assert.match(c.text(), /定員10名/); assert.match(c.text(), /残席7名/)
-  assert.match(c.text(), /グループ全体の受付を開始／停止/)
+  assert.match(c.text(), parentOpen ? /受付を停止/ : /受付を開始/)
   assert.match(c.text(), parentOpen && enabled ? /現在の公開申込：受付可能/ : /現在の公開申込：受付停止/)
   const edit = c.nodes().filter(n => n.type === 'a')
   assert.equal(edit.length, enabled ? 0 : 1)
   if (!enabled) {
     assert.equal(edit[0].props.href, '/admin/event-groups/7/edit')
-    assert.match(c.text(), /グループ全体の受付だけを開始しても申し込めません/)
+    assert.match(c.text(), /開催回全体だけを開始しても申し込めません/)
     assert.match(c.text(), /クラスの受付を有効にする/)
   }
 })
@@ -117,13 +118,13 @@ test('zero classes provides neither individual control nor a guessed single clas
 })
 test('multiple classes retain one reception control per class', async () => {
   const c = screen({ rows: [row(1), row(2, { registration_enabled: false })] }); await c.flush()
-  assert.equal(c.nodes().filter(n => n.type === 'button').length, 2)
+  assert.equal(c.nodes().filter(n => n.type === 'button').length, 3)
   assert.match(c.text(), /受付を開始/); assert.match(c.text(), /受付を停止/)
   assert.doesNotMatch(c.text(), /現在の公開申込：/)
 })
 test('page containing one row does not make a two-class occurrence single', async () => {
   const rows = await loader([page([row(1)], 1, 2, 1), page([row(2)], 2, 2, 1)]).read()
-  const c = screen({ rows }); await c.flush(); assert.equal(c.nodes().filter(n => n.type === 'button').length, 2)
+  const c = screen({ rows }); await c.flush(); assert.equal(c.nodes().filter(n => n.type === 'button').length, 3)
 })
 test('later page failure never produces a partial single-class control', async () => {
   await assert.rejects(loader([page([row(1)], 1, 2, 1), new Error('unavailable')]).read())
@@ -132,8 +133,22 @@ test('later page failure never produces a partial single-class control', async (
 test('single class guidance matches the existing editor and does not add a write path', () => {
   const source = fs.readFileSync('app/(app)/admin/event-groups/occurrence-detail.tsx', 'utf8')
   const editor = fs.readFileSync('app/(app)/admin/event-groups/occurrence-editor.tsx', 'utf8')
-  assert.match(editor, /クラスの受付を有効にする/); assert.match(editor, /クラスの詳細設定（定員・個別日程・受付）/)
+  assert.match(editor, /クラスの受付を有効にする/); assert.match(editor, /定員・種別・受付/)
   assert.doesNotMatch(source, /method:\s*['"]PATCH/)
   const host = fs.readFileSync('app/(app)/admin/event-groups/event-groups.tsx', 'utf8')
   assert.equal((host.match(/<RegistrationControl /g) ?? []).length, 1)
+  assert.match(host, /!groupId && <div className="occurrence-state-change"/)
+})
+
+test('zero-class guidance links to the existing editor without offering reception start', async () => {
+  const c = screen({ rows: [] }); await c.flush(); assert.match(c.text(), /受付するにはクラスの登録が必要です/); assert.equal(c.nodes().find(n => n.type === 'a').props.href,'/admin/event-groups/7/edit'); assert.equal(c.nodes().filter(n => n.type === 'button').length,0)
+})
+test('parent stop notice appears once above multiple classes', async () => {
+  const c = screen({ rows: [row(1),row(2),row(3)] }); await c.flush(); assert.equal(c.text().split('開催回全体が受付停止中です。').length-1,1)
+  assert.ok(c.text().indexOf('開催回全体が受付停止中です。') < c.text().indexOf('Class 1'))
+})
+
+test('closed Tokyo occurrence remains stopped after display-only loading', async () => {
+  const c = screen({ parentOpen: false, groupData: { id: 6, title: '東京稽古会', start_date: '2026-10-23', end_date: '2026-10-26' }, rows: [row(61, { date: '2026-10-26', registration_enabled: true })] })
+  await c.flush(); assert.match(c.text(), /現在の公開申込：受付停止/); assert.match(c.text(), /グループ全体の申込受付：停止中/); assert.equal(c.calls.length, 1); assert.equal(c.calls[0][0], 6)
 })

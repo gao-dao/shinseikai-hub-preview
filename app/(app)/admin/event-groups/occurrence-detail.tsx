@@ -3,10 +3,11 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { loadDetailClasses, type DetailClass } from '@/lib/event-groups/detail'
 import ClassRegistrationControl from './class-registration-control'
+import RegistrationControl from './registration-control'
 import type { Occurrence } from '@/lib/event-groups/admin-overview'
 
 const timeRange = (row: DetailClass) => `${row.start_time?.slice(0, 5) ?? '開始時刻未設定'}${row.end_time ? `〜${row.end_time.slice(0, 5)}` : ''}`
-export default function OccurrenceDetail({ group, refreshToken = 0 }: { group: Occurrence; refreshToken?: number }) {
+export default function OccurrenceDetail({ group, refreshToken = 0, onUpdated }: { group: Occurrence; refreshToken?: number; onUpdated?: () => void }) {
   const [result, setResult] = useState<{ id: number; rows: DetailClass[] } | null>(null)
   const [error, setError] = useState('')
   useEffect(() => {
@@ -38,17 +39,17 @@ export default function OccurrenceDetail({ group, refreshToken = 0 }: { group: O
     {group.description && <p className="detail-description">{group.description}</p>}
     {error && <p role="alert">{error}</p>}
     {!rows && !error && <p role="status">クラス・申込状況を読み込み中...</p>}
-    {rows?.length === 0 && <p>クラス未登録</p>}
-    {rows && rows.length > 1 && <section aria-label="クラス情報"><h2>クラス情報</h2><ol className="detail-classes">{rows.map(row => <li key={row.id}><h3>{row.title}</h3><p>{row.date} {timeRange(row)}</p>{venues.length > 1 && <p>会場：{row.location || '未設定'}</p>}<ClassRegistrationControl key={`${group.id}-${row.id}`} groupId={group.id} row={row} parentOpen={group.registration_open} onRefreshed={refreshed} /></li>)}</ol></section>}
+    {rows?.length === 0 && <p className="single-reception-help">クラス未登録。受付するにはクラスの登録が必要です。<Link href={`/admin/event-groups/${group.id}/edit`}>クラスを登録・編集</Link></p>}
+    {rows && rows.length > 1 && <section aria-label="クラス情報"><h2>クラス情報</h2>{!group.registration_open && <p className="detail-note">開催回全体が受付停止中です。クラス受付がONでも公開申込は受け付けません。</p>}<ol className="detail-classes">{rows.map(row => <li key={row.id}><h3>{row.title}</h3><p>{row.date} {timeRange(row)}</p>{venues.length > 1 && <p>会場：{row.location || '未設定'}</p>}<ClassRegistrationControl key={`${group.id}-${row.id}`} groupId={group.id} row={row} parentOpen={group.registration_open} onRefreshed={refreshed} showParentNotice={false} /></li>)}</ol></section>}
     <section aria-label="申込状況" className="detail-applications"><h2>申込状況</h2><p>グループ全体の申込受付：<strong>{group.registration_open ? '受付中' : '停止中'}</strong></p>
-      {single && <><h3>{single.title}</h3><ClassRegistrationControl key={`${group.id}-${single.id}`} groupId={group.id} row={single} parentOpen={group.registration_open} onRefreshed={refreshed} showControls={false} />
+      {single && <><h3>{single.title}</h3><ClassRegistrationControl key={`${group.id}-${single.id}`} groupId={group.id} row={single} parentOpen={group.registration_open} onRefreshed={refreshed} showControls={false} showParentNotice={false} />
         <p>現在の公開申込：<strong>{singleStatus}</strong></p>
-        <p className="detail-note">受付の開始・停止は「グループ全体の受付を開始／停止」で操作してください。</p>
-        {!single.registration_enabled && <p className="single-reception-help">クラス受付が停止中です。グループ全体の受付だけを開始しても申し込めません。<Link href={`/admin/event-groups/${group.id}/edit`}>編集画面でクラス受付を変更</Link>し、「クラスの詳細設定（定員・個別日程・受付）」の「クラスの受付を有効にする」をONにして確認・保存してください。</p>}
+        {!single.registration_enabled && <p className="single-reception-help">クラス受付が停止中のため、開催回全体だけを開始しても申し込めません。<Link href={`/admin/event-groups/${group.id}/edit`}>受付設定を編集</Link>し、「クラスの受付を有効にする」をONにして保存してください。</p>}
       </>}
       {rows && rows.length > 1 && <p>有効クラス申込：{Number.isSafeInteger(bookings) ? `${bookings}件（延べ）` : '集計できません'}。同じ人の複数クラス申込を含みます。</p>}
       {!rows && <p>定員・申込数・クラス受付状態は確認できません。</p>}
-      <p className="detail-note">グループ全体が停止中の場合、クラス受付が有効でも公開申込は受け付けません。</p>
+      {rows && rows.length > 0 && <div className="class-reception-actions"><RegistrationControl id={group.id} title={group.title} registrationOpen={group.registration_open} stateVersion={group.state_version}
+        compact={!!single} disabled={!group.registration_open && !!(group.is_cancelled || group.is_hidden || (single && (!single.registration_enabled || single.capacity === null)))} onUpdated={() => onUpdated?.()} /></div>}
     </section>
     <style>{`
       .detail-reading{font-size:16px;line-height:1.7}.detail-basics{display:grid;gap:18px;margin:0 0 24px}.detail-basics dt{color:#657078;font-size:13px}.detail-basics dd{margin:4px 0 0;font-size:20px;font-weight:600;overflow-wrap:anywhere}.detail-description{white-space:pre-wrap;overflow-wrap:anywhere}.detail-classes{padding:0;list-style:none;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:16px}.detail-classes li{border:1px solid #e7e1d8;border-radius:12px;padding:18px}.detail-classes h3{margin:0 0 10px!important}.detail-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:16px}.detail-stats dt,.detail-note{font-size:13px;color:#657078}.detail-stats dd{margin:2px 0 0}.detail-applications{border-top:1px solid #e7e1d8;margin-top:24px;padding-top:20px}.class-reception-count dd{font-size:24px;font-weight:700}.class-reception-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}.class-reception-actions button{min-height:44px;padding:10px 16px;cursor:pointer}.class-reception-actions button:focus-visible{outline:3px solid #8a5d3b;outline-offset:3px}.class-reception-actions button:disabled{opacity:.55;cursor:default}.class-reception [role=status],.class-reception [role=alert]{overflow-wrap:anywhere}.single-reception-help a{display:inline-block;padding:8px 0;min-height:44px;box-sizing:border-box}.single-reception-help a:focus-visible{outline:3px solid #8a5d3b;outline-offset:3px}.detail-reading [role=alert]{color:#b91c1c}@media(min-width:800px){.detail-basics{grid-template-columns:1fr 1fr}}`
