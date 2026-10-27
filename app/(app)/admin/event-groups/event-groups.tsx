@@ -231,7 +231,7 @@ export default function EventGroups({ groupId, createOnly = false, returnTo = '/
         .occurrence-state-change p { font-size:13px; color:#657078; }
         .eg-card { max-width:1080px; margin-left:auto; margin-right:auto; }
         .eg-page button { font-size:14px; padding:8px 12px; }
-        .eg-description { white-space: pre-wrap; overflow-wrap: anywhere; margin: 12px 0; }
+        .eg-page h1{font-size:28px;font-weight:700;line-height:1.4}.eg-page h2{font-size:21px;font-weight:700;line-height:1.5;margin:24px 0 12px}.eg-page h3{font-size:18px;font-weight:600;line-height:1.5;margin:18px 0 10px}.eg-page .reception-primary{background:#6b1f2b;border-color:#6b1f2b;color:#fff}.eg-page .reception-secondary{background:#fff;border-color:#c9c2b8;color:#52616e}.eg-page .reception-caution{background:#fff;border-color:#b91c1c;color:#b91c1c}.eg-page :is(button,a,summary):focus-visible{outline:3px solid #6b1f2b;outline-offset:3px}.eg-page summary{min-height:44px;padding:12px 0;cursor:pointer}.eg-description { white-space: pre-wrap; overflow-wrap: anywhere; margin: 12px 0; }
       `}</style>
       <Link href={returnTo}>{returnTo.startsWith('/admin/event-groups/history') ? '← 開催履歴へ戻る' : '← 開催回一覧へ'}</Link>
       <h1 id="event-groups-title">{groupId ? result?.eventGroups[0]?.title ?? '開催回の詳細' : '開催回を作成'}</h1>
@@ -273,7 +273,7 @@ export default function EventGroups({ groupId, createOnly = false, returnTo = '/
         </>}
         <section className="occurrence-management" aria-label="管理操作">
         {groupId && <h2>管理操作</h2>}
-        <div className="occurrence-navigation"><Link href={`/admin/event-groups/${group.id}/edit${returnTo !== '/admin/event-groups' ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} onClick={event => { if (classBusy.current || editBusy.current || (classDirty.current && !window.confirm('未保存の予定入力を破棄して編集画面へ移動しますか？'))) event.preventDefault() }}>{groupId ? '編集 →' : '開催回と全クラスをまとめて編集 →'}</Link></div>
+        <div className="occurrence-navigation"><Link href={`/admin/event-groups/${group.id}/edit${returnTo !== '/admin/event-groups' ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} onClick={event => { if (classBusy.current || editBusy.current || (classDirty.current && !window.confirm('未保存の予定入力を破棄して編集画面へ移動しますか？'))) event.preventDefault() }}>{groupId ? '開催回を編集' : '開催回と全クラスをまとめて編集 →'}</Link></div>
         {!groupId && <>
         <button type="button" disabled={editing !== null || addingGroup !== null} onClick={() => beginEdit(group)}>開催情報を編集</button>
         {!groupId && <h3 id={`classes-${group.id}`}>クラス・受付</h3>}
@@ -300,7 +300,7 @@ export default function EventGroups({ groupId, createOnly = false, returnTo = '/
           <p>申込者の情報編集・クラス追加・取消は、申込者管理で行えます。</p>
           <Link href={`/admin/registrations?groupId=${group.id}`}>申込者管理を開く →</Link><p>申込者管理で対象クラスを選択してください。</p>
         </section>
-        {groupId && <button type="button" disabled={loading || addingGroup !== null || editSaving} onClick={() => setReload(value => value + 1)}>最新情報を再取得</button>}
+        {groupId && <button className="reception-secondary" type="button" disabled={loading || addingGroup !== null || editSaving} onClick={() => setReload(value => value + 1)}>最新情報を再取得</button>}
         {groupId && <OccurrenceState group={group} disabled={editing !== null || addingGroup !== null || saving || editSaving} onUpdated={() => setReload(value => value + 1)} />}
         </section>
       </article>)}

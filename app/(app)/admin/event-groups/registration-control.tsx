@@ -64,7 +64,7 @@ export default function RegistrationControl({ id, title, registrationOpen, state
   }
 
   return <div style={{ marginTop: 12 }}>
-    <button type="button" disabled={busy || disabled} onClick={change} aria-label={`${title}：${compact ? '受付を' : 'グループ全体の受付を'}${registrationOpen ? '停止' : '開始'}`}>
+    <button className="reception-primary" type="button" disabled={busy || disabled} onClick={change} aria-label={`${title}：${compact ? '受付を' : 'グループ全体の受付を'}${registrationOpen ? '停止' : '開始'}`}>
       {busy ? '確認・更新中...' : `${compact ? '受付を' : 'グループ全体の受付を'}${registrationOpen ? '停止' : '開始'}`}
     </button>
     {error && <p role="alert" style={{ color: '#B91C1C', marginTop: 8 }}>{error}</p>}

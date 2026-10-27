@@ -43,10 +43,11 @@ export default function ClassRegistrationControl({ groupId, row, parentOpen, onR
   }
 
   return <div className="class-reception">
-    <dl className="detail-stats"><div><dt>クラス受付</dt><dd>{row.registration_enabled ? '受付中' : '受付停止'}</dd></div><div><dt>定員</dt><dd>{row.capacity === null ? '未設定' : `${row.capacity}名`}</dd></div><div className="class-reception-count"><dt>有効申込数</dt><dd>{row.registeredCount}件</dd></div><div><dt>残席</dt><dd>{row.capacity === null ? '確認できません' : `${Math.max(row.capacity - row.registeredCount, 0)}名`}</dd></div></dl>
+    <dl className="detail-stats"><div className="class-reception-count"><dt>有効申込数</dt><dd>{row.registeredCount}件</dd></div><div><dt>定員</dt><dd>{row.capacity === null ? '未設定' : `${row.capacity}名`}</dd></div><div><dt>残席</dt><dd>{row.capacity === null ? '確認できません' : `${Math.max(row.capacity - row.registeredCount, 0)}名`}</dd></div></dl>
+    <p className="class-reception-state">クラス受付：<strong>{row.registration_enabled ? '受付中' : '受付停止'}</strong></p>
     {!parentOpen && showParentNotice && <p className="detail-note">開催回全体が受付停止中です。クラス受付がONでも公開申込は受け付けません。</p>}
-    {showControls && <div className="class-reception-actions"><button type="button" disabled={busy || needsCheck} aria-label={`${row.title}：受付を${row.registration_enabled ? '停止' : '開始'}`} onClick={() => void run(true)}>{busy ? '確認・更新中…' : row.registration_enabled ? '受付を停止' : '受付を開始'}</button>
-      {needsCheck && <button type="button" disabled={busy} onClick={() => void run(false)}>最新状態を再取得</button>}</div>}
+    {showControls && <div className="class-reception-actions"><button className="reception-primary" type="button" disabled={busy || needsCheck} aria-label={`${row.title}：受付を${row.registration_enabled ? '停止' : '開始'}`} onClick={() => void run(true)}>{busy ? '確認・更新中…' : row.registration_enabled ? '受付を停止' : '受付を開始'}</button>
+      {needsCheck && <button className="reception-secondary" type="button" disabled={busy} onClick={() => void run(false)}>最新状態を再取得</button>}</div>}
     {message && <p role={needsCheck ? 'alert' : 'status'}>{message}</p>}
   </div>
 }

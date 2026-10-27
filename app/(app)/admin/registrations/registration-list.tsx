@@ -74,7 +74,7 @@ export default function RegistrationList() {
   return (
     <section aria-labelledby="registrations-title" style={{ flex: 1, overflowY: 'auto', padding: '24px 20px' }}>
       <Link href="/admin/event-groups" style={{ display: 'inline-flex', alignItems: 'center', minHeight: 44, color: '#6B1F2B', textUnderlineOffset: 4 }}>← 開催回管理へ</Link>
-      <h1 id="registrations-title" style={{ fontSize: 22, margin: '20px 0' }}>参加申込一覧</h1>
+      <h1 id="registrations-title" style={{ fontSize: 22, margin: '20px 0' }}>申込者管理｜申込順・全履歴</h1>
       <p style={{ marginBottom: 16 }}>取消済みのクラスも含めて表示します。日時は日本時間です。</p>
       <button type="button" disabled={proxyOpen || editing !== null || adding !== null} onClick={() => { setMessage(''); setProxyOpen(true) }}
         style={{ padding: '8px 16px', border: '1px solid #6B1F2B', borderRadius: 8, color: '#6B1F2B', background: '#F7EEF0' }}>代理申込を登録</button>

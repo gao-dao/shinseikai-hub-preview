@@ -108,3 +108,12 @@ test('existing API counts active items only and existing layout supports small s
 test('single class display-only mode retains all statistics without mutation controls', () => {
   const c = screen({ showControls: false }); assert.equal(c.buttons().length, 0); assert.match(c.text(), /5件/); assert.match(c.text(), /定員5名/); assert.match(c.text(), /残席0名/); assert.match(c.text(), /受付中/); assert.equal(c.calls.length, 0)
 })
+
+test('counts stay grouped with labels while reception state is separate', () => {
+  const c = screen({ registeredCount: 3, capacity: 5 }); const tree = nodes(c.render());
+  const stats = tree.find(n => n.type === 'dl');
+  assert.deepEqual(nodes(stats).filter(n => n.type === 'dt').map(n => text(n)), ['有効申込数', '定員', '残席']);
+  assert.deepEqual(nodes(stats).filter(n => n.type === 'dd').map(n => text(n)), ['3件', '5名', '2名']);
+  assert.ok(!text(stats).includes('受付中')); assert.match(text(tree.find(n => n.props?.className === 'class-reception-state')), /クラス受付：受付中/);
+  assert.equal(c.buttons().length, 1); assert.equal(c.buttons()[0].props.className, 'reception-primary'); assert.equal(c.buttons()[0].props.disabled, false);
+})

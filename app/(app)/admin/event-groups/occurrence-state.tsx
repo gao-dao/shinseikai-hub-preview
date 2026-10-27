@@ -30,9 +30,9 @@ ${action === 'cancel' ? '開催中止は解除できません。' : ''}
   }
   return <details><summary>その他の操作</summary>
     <p>申込・取消履歴は保持します。中止・非表示にしても既存申込は自動取消されず、申込者への連絡は別途必要です。</p>
-    <button type="button" disabled={disabled || busy || group.is_cancelled === true} onClick={() => void change('cancel')}>開催中止にする</button>
-    <button type="button" disabled={disabled || busy} onClick={() => void change(group.is_hidden ? 'show' : 'hide')}>{group.is_hidden ? '一覧に再表示する' : '一覧から非表示にする'}</button>
-    <button type="button" disabled={disabled || busy} onClick={onUpdated}>最新情報を再取得</button>
+    <button className="reception-caution" type="button" disabled={disabled || busy || group.is_cancelled === true} onClick={() => void change('cancel')}>開催中止にする</button>
+    <button className="reception-secondary" type="button" disabled={disabled || busy} onClick={() => void change(group.is_hidden ? 'show' : 'hide')}>{group.is_hidden ? '一覧に再表示する' : '一覧から非表示にする'}</button>
+    <button className="reception-secondary" type="button" disabled={disabled || busy} onClick={onUpdated}>最新情報を再取得</button>
     {message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}
   </details>
 }
