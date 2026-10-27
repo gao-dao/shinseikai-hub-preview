@@ -62,7 +62,7 @@ for (const options of [{ id: '0' }, { classId: '1e3' }, { id: '9007199254740992'
 })
 function nodes(tree) { return Array.isArray(tree) ? tree.flatMap(nodes) : tree && typeof tree === 'object' ? [tree, ...nodes(tree.props?.children)] : [] }
 function text(tree) { return Array.isArray(tree) ? tree.map(text).join('') : tree && typeof tree === 'object' ? text(tree.props?.children) : tree == null ? '' : String(tree) }
-function screen({ parentOpen = true, enabled = true, mutate = 'ok', readFails = false, capacity = 5, registeredCount = 5 } = {}) {
+function screen({ showControls = true, parentOpen = true, enabled = true, mutate = 'ok', readFails = false, capacity = 5, registeredCount = 5 } = {}) {
   let slot = 0, current = { id: 2, title: 'クラスA', date: '2030-01-01', capacity, registeredCount, registration_enabled: enabled }, readsFail = readFails, pending, deferred
   const slots = [], calls = [], effects = []
   const react = { useState(v) { const i = slot++; if (!(i in slots)) slots[i] = v; return [slots[i], v => { slots[i] = typeof v === 'function' ? v(slots[i]) : v }] }, useRef(v) { const i = slot++; if (!(i in slots)) slots[i] = { current: v }; return slots[i] }, useEffect(fn) { slot++; if (!effects.length) effects.push(fn) } }
@@ -74,7 +74,7 @@ function screen({ parentOpen = true, enabled = true, mutate = 'ok', readFails = 
     if (mutate === 'throw') throw Error('lost response')
     return { ok: mutate !== 'conflict', json: async () => mutate === 'conflict' ? { error: '競合' } : { schedule: { id: 2, event_group_id: 7, registration_enabled: !enabled } } }
   } }).default
-  const render = () => { slot = 0; return Component({ groupId: 7, row: current, parentOpen, onRefreshed: row => { current = row } }) }
+  const render = () => { slot = 0; return Component({ groupId: 7, row: current, parentOpen, showControls, onRefreshed: row => { current = row } }) }
   const buttons = () => nodes(render()).filter(n => n.type === 'button')
   return { calls, render, buttons, text: () => text(render()), click(i = 0) { buttons()[i].props.onClick(); pending = new Promise(r => setImmediate(r)); return pending }, unblock() { deferred?.() }, allowRead() { readsFail = false } }
 }
@@ -103,4 +103,8 @@ test('existing API counts active items only and existing layout supports small s
   assert.match(route, /eq\('active_items.status', 'active'\)/)
   const css = fs.readFileSync('app/(app)/admin/event-groups/occurrence-detail.tsx', 'utf8')
   assert.match(css, /minmax\(min\(100%,280px\)/); assert.match(css, /min-height:44px/); assert.match(css, /:focus-visible/)
+})
+
+test('single class display-only mode retains all statistics without mutation controls', () => {
+  const c = screen({ showControls: false }); assert.equal(c.buttons().length, 0); assert.match(c.text(), /5件/); assert.match(c.text(), /定員5名/); assert.match(c.text(), /残席0名/); assert.match(c.text(), /受付中/); assert.equal(c.calls.length, 0)
 })
