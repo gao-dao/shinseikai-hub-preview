@@ -263,3 +263,20 @@ test('explicit single-class name edit uses the existing payload and preserves ID
   const sent = c.calls.find(x => x[0] === 'save')[1]
   assert.equal(sent.group.title,'既存開催回'); assert.equal(sent.classes[0].id,7); assert.equal(sent.classes[0].title,'申込画面用の名称'); assert.equal(sent.classes[0].registration_enabled,false); assert.equal(sent.classes[0].capacity,25); assert.equal(sent.expected.classes[0].title,'既存クラス')
 })
+
+for (const open of [false, true]) test(`saved edit copy preserves reception caveat and detail ID: ${open}`, async () => {
+ const data = snapshot(); data.group.registration_open = open;
+ const c = setup({ groupId: 1, data, result: { state: 'saved', groupId: 9 } }); await c.mount(); c.change('開催名', '編集後'); await c.submit(); await c.save();
+ assert.ok(c.render().some(n => n.type === 'h2' && text(n) === '保存しました'));
+ assert.match(c.text(), /開催回とクラスの情報を保存しました/);
+ assert.match(c.text(), /今回の保存では、開催回全体の受付状態は変更していません/);
+ assert.match(c.text(), open ? /中止・非表示などで受付状態が変わる場合があります/ : /開催回全体が受付停止中の場合、クラス受付が有効でも申し込めません/);
+ assert.match(c.text(), /最新の受付状態の確認・変更は、詳細画面で行えます/);
+ assert.equal(c.render().find(n => n.type === 'Link' && text(n) === '開催回の詳細を見る').props.href, '/admin/event-groups/9');
+ assert.equal(c.calls.filter(v => v[0] === 'save').length, 1);
+})
+test('failed edit keeps error and review, without claiming save success', async () => {
+ const c = setup({ groupId: 1, result: { state: 'conflict', error: '他の操作で状態が変更されました。再取得してください。' } }); await c.mount(); c.change('開催名', '編集後'); await c.submit(); await c.save();
+ assert.match(c.text(), /他の操作で状態が変更されました/); assert.ok(c.button('まとめて保存')); assert.equal(c.render().some(n => n.type === 'h2' && text(n) === '保存しました'), false);
+ assert.equal(c.render().some(n => n.type === 'Link' && text(n) === '開催回の詳細を見る'), false);
+})

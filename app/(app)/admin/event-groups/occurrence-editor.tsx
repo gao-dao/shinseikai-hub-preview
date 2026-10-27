@@ -111,7 +111,7 @@ export default function OccurrenceEditor({ groupId, returnTo = '/admin/event-gro
     <p>{unknown ? '前回の保存結果を同じキー・内容で確認します。' : groupId ? '新しいクラスは初期設定で受付有効です。既存の受付状態は、明示的に変更しない限り保持します。' : '保存すると開催回のグループ受付を開始します。新しいクラスは初期設定で受付有効です。'}</p>
     {loading && <p role="status">全クラスを読み込み中...</p>}
     {error && <p role="alert">{error}</p>}
-    {saved !== null ? <section><h2>開催回とクラスを保存しました</h2>{!groupId ? <p role="status">{savedFromRecovery ? '保存結果を確認しました。以前の保存結果の再確認では受付状態を変更しません。現在の状態は詳細画面で確認してください。' : '新規開催回のグループ受付を開始しました。クラス受付をOFFにしたクラスは申込を受け付けません。'}</p> : <><p role="status">グループ全体の受付状態は変更していません。</p>{expected?.group.registration_open ? <p>編集開始時は受付中でした。中止・非表示などによる最新の受付状態は詳細画面で確認できます。</p> : <p>グループ受付は停止中のままです。追加クラスが受付有効でも一般Web申込は受け付けません。</p>}</>}<Link href={`/admin/event-groups/${saved}${detailQuery}`}>開催回の詳細・受付操作へ</Link></section> : <>
+    {saved !== null ? <section><h2>保存しました</h2><p>開催回とクラスの情報を保存しました。</p>{!groupId ? <p role="status">{savedFromRecovery ? '保存結果を確認しました。以前の保存結果の再確認では受付状態を変更しません。現在の状態は詳細画面で確認してください。' : '新規開催回のグループ受付を開始しました。クラス受付をOFFにしたクラスは申込を受け付けません。'}</p> : <><p role="status">今回の保存では、開催回全体の受付状態は変更していません。</p>{expected?.group.registration_open ? <p>中止・非表示などで受付状態が変わる場合があります。</p> : <p>開催回全体が受付停止中の場合、クラス受付が有効でも申し込めません。</p>}</>}<p>最新の受付状態の確認・変更は、詳細画面で行えます。</p><Link href={`/admin/event-groups/${saved}${detailQuery}`}>開催回の詳細を見る</Link></section> : <>
       {groupId && !unknown && <button type="button" disabled={busy || loading} onClick={fresh}>最新情報を再取得</button>}
       {!review && !loading && !fatal && <form onSubmit={confirm}>
         <section><h2>基本情報</h2><label>開催名<input value={title} maxLength={200} required onChange={e => setTitle(e.target.value)} /></label>
