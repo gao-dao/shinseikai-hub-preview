@@ -121,9 +121,9 @@ function nodes(tree){if(Array.isArray(tree))return tree.flatMap(nodes);if(!tree|
 function hooks(){const state=[],effects=[];let s=0,e=0
  return {state,react:{useState(value){const i=s++;if(!(i in state))state[i]=typeof value==='function'?value():value;return [state[i],value=>{state[i]=typeof value==='function'?value(state[i]):value}]},useEffect(fn,deps){const i=e++,old=effects[i];if(!old||deps.some((v,j)=>v!==old.deps[j]))effects[i]={fn,deps,pending:true,cleanup:old?.cleanup}}},render(Component,props={}){s=0;e=0;return nodes(Component(props))},flush(){for(const effect of effects)if(effect.pending){effect.cleanup?.();effect.cleanup=effect.fn();effect.pending=false}},unmount(){for(const effect of effects)effect.cleanup?.()}}
 }
-function browser(fetcher){const h=hooks(),Details=()=>null,Add=()=>null,Cancel=()=>null
- const Browser=compile('app/(app)/admin/registrations/registration-browser.tsx',{'next/link':{default:'Link'},react:h.react,'react/jsx-runtime':jsx,'@/lib/event-groups/admin-index':index,'./registration-details-form':{default:Details},'./add-registration-items':{default:Add},'./cancel-registration-item':{default:Cancel},'./registrations.module.css':{default:{}}},{fetch:fetcher,AbortController}).default
- return {h,Details,Add,Cancel,render:()=>h.render(Browser)}
+function browser(fetcher,props={}){const h=hooks(),Details=()=>null,Add=()=>null,Cancel=()=>null
+ const navigations=[];const Browser=compile('app/(app)/admin/registrations/registration-browser.tsx',{'next/link':{default:'Link'},'next/navigation':{useRouter:()=>({push:(...args)=>navigations.push(args)})},react:h.react,'react/jsx-runtime':jsx,'@/lib/event-groups/admin-index':index,'./registration-details-form':{default:Details},'./add-registration-items':{default:Add},'./cancel-registration-item':{default:Cancel},'./registrations.module.css':{default:{}}},{fetch:fetcher,AbortController}).default
+ return {h,Details,Add,Cancel,navigations,render:()=>h.render(Browser,props)}
 }
 const tick=()=>new Promise(resolve=>setImmediate(resolve))
 function groupedFetch(calls,fail=false){return async(url,init)=>{
@@ -171,4 +171,38 @@ test('default grouped view and history navigation remain admin guarded',async()=
 test('history view reads the complete read endpoint and uses returned keyset cursor for page two',async()=>{
  const h=hooks(),calls=[];const List=compile('app/(app)/admin/registrations/registration-list.tsx',{react:h.react,'react/jsx-runtime':jsx,'next/link':{default:'Link'},'./registration-details-form':{default:()=>null},'./cancel-registration-item':{default:()=>null},'./add-registration-items':{default:()=>null},'./proxy-registration-form':{default:()=>null}},{AbortController,fetch:async(url)=>{calls.push(url);return {ok:true,json:async()=>({registrations:[],total:100,page:1,pageSize:50,nextCursor:'2026-10-26T00:00:00.123456+00:00|50'})}}}).default
  h.render(List);h.flush();await tick();let tree=h.render(List);tree.find(n=>n.type==='button'&&n.props.children==='次のページ').props.onClick();h.render(List);h.flush();await tick();assert.equal(new URL(calls.at(-1),'http://synthetic.invalid').searchParams.get('cursor'),'2026-10-26T00:00:00.123456+00:00|50');assert.match(calls[0],/resource=history/);h.unmount()
+})
+
+test('URL-selected occurrence opens classes outside group page, using its ID and server title',async()=>{
+ const calls=[],context=browser(groupedFetch(calls),{initialGroupId:1,initialScope:'all'});
+ context.render();context.h.flush();await tick();let tree=context.render();
+ assert.ok(calls.some(([u])=>u.includes('resource=classes')&&u.includes('group=1')));
+ assert.ok(tree.some(n=>n.props?.id==='classes-title'&&nodes(n).some(x=>x.props?.children?.includes?.('同名開催'))));
+ tree.find(n=>n.props?.['aria-pressed']===false&&String(n.props.children?.[1]?.props?.children).includes('クラスID')).props.onClick();context.render();context.h.flush();await tick();
+ assert.ok(calls.at(-1)[0].includes('resource=items'));assert.ok(calls.at(-1)[0].includes('group=1'));
+ tree=context.render();tree.find(n=>n.props?.['aria-pressed']===false&&n.key==='2').props.onClick();
+ assert.equal(new URL(context.navigations.at(-1)[0],'http://synthetic.invalid').searchParams.get('groupId'),'2');
+ assert.equal(context.navigations.at(-1)[1].scroll,false);context.h.unmount();
+})
+test('missing URL occurrence is a read error, not a successful empty class list',async()=>{
+ const c=browser(groupedFetch([],true),{initialGroupId:999,initialScope:'all'});c.render();c.h.flush();await tick();const tree=c.render();
+ assert.ok(tree.some(n=>n.props?.error?.includes('指定された開催回を確認できません')));assert.equal(tree.some(n=>n.props?.children==='クラスはありません。'),false);c.h.unmount();
+})
+test('page validates IDs, handles duplicate params and preserves history admin boundary',async()=>{
+ const Grouped=()=>null,History=()=>null;
+ const page=compile('app/(app)/admin/registrations/page.tsx',{'next/navigation':{redirect(){assert.fail()}},'@/lib/supabase/require-admin':{requireAdmin:async()=>({ok:true})},'./registration-list':{default:History},'./registration-browser':{default:Grouped},'next/link':{default:'Link'},'./registrations.module.css':{default:{}},'react/jsx-runtime':jsx});
+ for(const id of ['6','999']){const tree=nodes(await page.default({searchParams:Promise.resolve({groupId:id})}));const props=tree.find(n=>n.type===Grouped).props;assert.equal(props.initialGroupId,Number(id));assert.equal(props.initialScope,'all');assert.equal(props.invalidGroup,false)}
+ for(const groupId of ['0','-1','1.2','9007199254740992','https://example.invalid',['1','2'],'']){const tree=nodes(await page.default({searchParams:Promise.resolve({groupId})}));const props=tree.find(n=>n.type===Grouped).props;assert.equal(props.initialGroupId,null);assert.equal(props.invalidGroup,true)}
+ const history=nodes(await page.default({searchParams:Promise.resolve({groupId:'6',view:'history'})}));assert.ok(history.some(n=>n.type===History));
+})
+test('selection beyond group pagination resolves through existing class endpoint, and URL scope survives remount',async()=>{
+ const calls=[];const base=groupedFetch(calls);const fetcher=async(u,i)=>{const r=await base(u,i);if(u.includes('resource=classes'))return {ok:true,json:async()=>({group:{id:99,title:'終了済み・別ページの開催'},items:[],total:0,page:1,pageSize:20})};return r};
+ const props={initialGroupId:99,initialScope:'all'};const c=browser(fetcher,props);c.render();c.h.flush();await tick();let tree=c.render();
+ assert.ok(tree.some(n=>n.props?.id==='classes-title'&&n.props.children[0]==='終了済み・別ページの開催'));assert.ok(calls.some(([u])=>u.includes('group=99')));
+ tree.find(n=>n.props?.id==='occurrence-scope').props.onChange({target:{value:'ended'}});const url=new URL(c.navigations.at(-1)[0],'http://synthetic.invalid');assert.equal(url.searchParams.get('scope'),'ended');assert.equal(url.searchParams.has('groupId'),false);c.h.unmount();
+ // Next page key remount initializes the selection on reload/back, without waiting for group pagination.
+ const restored=browser(fetcher,props);restored.render();restored.h.flush();await tick();assert.ok(restored.render().some(n=>n.props?.id==='classes-title'&&n.props.children[0]==='終了済み・別ページの開催'));restored.h.unmount();
+})
+test('detail link hands off the numeric occurrence ID without changing applicant writers',()=>{
+ const source=fs.readFileSync('app/(app)/admin/event-groups/event-groups.tsx','utf8');assert.ok(source.includes('href={`/admin/registrations?groupId=${group.id}`}'));
 })

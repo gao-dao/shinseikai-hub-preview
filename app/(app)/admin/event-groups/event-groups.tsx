@@ -298,7 +298,7 @@ export default function EventGroups({ groupId, createOnly = false, returnTo = '/
         {!groupId && <div className="occurrence-state-change"><p>受付状態を変更する操作</p><RegistrationControl id={group.id} title={group.title} registrationOpen={group.registration_open} stateVersion={group.state_version} onUpdated={() => setReload(value => value + 1)} /></div>}
         <section id={`applications-${group.id}`} className="occurrence-applications"><h3>申込管理</h3>
           <p>申込者の情報編集・クラス追加・取消は、申込者管理で行えます。</p>
-          <Link href="/admin/registrations">申込者管理を開く →</Link><p>「開催回別」で「{group.title}」と対象クラスを選択してください。</p>
+          <Link href={`/admin/registrations?groupId=${group.id}`}>申込者管理を開く →</Link><p>申込者管理で対象クラスを選択してください。</p>
         </section>
         {groupId && <button type="button" disabled={loading || addingGroup !== null || editSaving} onClick={() => setReload(value => value + 1)}>最新情報を再取得</button>}
         {groupId && <OccurrenceState group={group} disabled={editing !== null || addingGroup !== null || saving || editSaving} onUpdated={() => setReload(value => value + 1)} />}
