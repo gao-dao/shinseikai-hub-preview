@@ -302,8 +302,41 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
         .management-tools .list-card { flex-wrap: wrap; }
         .management-tools .list-title { overflow-wrap: anywhere; }
         @media(max-width:640px) { .management-tools .form-card { padding: 16px; } .management-tools .edit-btn, .management-tools .del-btn { font-size: 13px; } }
+        .management-tools.video-management{width:100%;max-width:1000px;margin:0 auto;padding:32px;color:#29353b}
+        .video-management h1{font-size:28px;font-weight:700;line-height:1.4;margin:20px 0}
+        .video-management h2.list-hd{font-size:21px;font-weight:700;line-height:1.5;color:#29353b;letter-spacing:normal;text-transform:none;margin:0 0 16px}
+        .video-management h3.list-title{font-size:18px;line-height:1.5;margin:0;font-weight:600}
+        .video-management .video-back,.video-management .video-nav a{display:inline-flex;align-items:center;min-height:44px;color:#6b1f2b;text-underline-offset:4px}
+        .video-management .video-nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;margin:0 0 24px}
+        .video-management .video-nav .tab{flex:initial;min-width:0;padding:8px 12px;border-radius:6px;box-shadow:none;background:#f7eef0;color:#6b1f2b;border-color:#ded8ce;font-size:14px}
+        .video-management .form-card,.video-management .list-card{box-shadow:none}
+        .video-management .video-label{display:block;font-size:14px;font-weight:600;line-height:1.6;margin:16px 0 6px}
+        .video-management .video-input{display:block;width:100%;min-height:44px;padding:12px;border:1px solid #c9c2b8;border-radius:8px;background:#fff;color:inherit;font:inherit;line-height:1.5;box-sizing:border-box}
+        .video-management .video-primary{min-height:44px;padding:10px 18px;margin-top:20px;border:1px solid #6b1f2b;border-radius:8px;background:#6b1f2b;color:#fff;font:inherit;font-weight:600;cursor:pointer}
+        .video-management .cancel-btn{width:auto;min-height:44px;padding:10px 18px;margin:12px 0 0 12px;background:#fff;border-color:#c9c2b8;font:inherit;box-shadow:none}
+        .video-management .video-info{flex:1;min-width:0;overflow-wrap:anywhere}
+        .video-management .list-sub{font-size:14px;line-height:1.6;margin-top:6px}
+        .video-management .video-actions{display:flex;flex-wrap:wrap;gap:10px;flex-shrink:0}
+        .video-management .edit-btn,.video-management .del-btn{min-height:44px;padding:10px 16px;font-size:14px;box-shadow:none}
+        .video-management .edit-btn{background:#fff;border-color:#c9c2b8;color:#52616e}
+        .video-management .del-btn{background:#fff;border-color:#b91c1c;color:#b91c1c}
+        .video-management .edit-btn:hover{background:#f7eef0;color:#6b1f2b}
+        .video-management .del-btn:hover{background:#fef2f2;color:#b91c1c}
+        .video-management .success,.video-management .error{font-size:14px;line-height:1.6;text-align:left}
+        .video-management :focus-visible{outline:3px solid #6b1f2b;outline-offset:3px}
+        @media(max-width:640px){.management-tools.video-management{padding:20px 16px}.video-management .list-card{align-items:stretch;gap:14px;padding:16px}.video-management .video-info{flex-basis:100%}.video-management .video-actions{width:100%}.video-management .video-primary{width:100%}.video-management .cancel-btn{width:100%;margin-left:0}}
       `}</style>
-      <div className="sp management-tools">
+      <div className={`sp management-tools${tab === 'videos' ? ' video-management' : ''}`}>
+        {tab === 'videos' ? <>
+          <Link className="video-back" href="/admin">← 管理ホームへ戻る</Link>
+          <h1>動画管理</h1>
+          <nav className="video-nav" aria-label="管理メニュー">
+            <Link href="/admin/event-groups" prefetch={false}>開催回管理</Link>
+            <Link href="/admin/registrations" prefetch={false}>申込者管理</Link>
+            <Link className="tab act" aria-current="page" href="/admin/videos">動画管理</Link>
+            <Link href="/admin/passwords">パスワード管理</Link>
+          </nav>
+        </> : <>
         <div className="sec-hd">{tab === 'schedules' ? '予定管理' : tab === 'passwords' ? 'パスワード管理' : '動画管理'}</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'flex-end', marginBottom: '16px' }}>
           <Link href="/admin/event-groups" prefetch={false} className="edit-btn" style={{ textDecoration: 'none' }}>
@@ -314,41 +347,42 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
           </Link>
         </div>
         <div className="tabs">
-          <Link className={`tab${tab === 'videos' ? ' act' : ''}`} aria-current={tab === 'videos' ? 'page' : undefined} href="/admin/videos">▶ 動画管理</Link>
+          <Link className="tab" href="/admin/videos">▶ 動画管理</Link>
           <Link className={`tab${tab === 'passwords' ? ' act' : ''}`} aria-current={tab === 'passwords' ? 'page' : undefined} href="/admin/passwords">🔑 パスワード管理</Link>
         </div>
+        </> }
 
         {tab === 'videos' && (
           <>
             <div className={`form-card${editVideo ? ' editing' : ''}`}>
               <h2 className="list-hd" ref={editHeading} tabIndex={-1}>{editVideo ? '動画を編集' : '動画を追加'}</h2>
               <form onSubmit={addVideo}>
-                <label htmlFor="management-vTitle" style={labelStyle}>タイトル *</label>
-                <input id="management-vTitle" style={inputStyle} value={vTitle} onChange={e => setVTitle(e.target.value)} required placeholder="基本形 第一段" />
-                <label htmlFor="management-vDesc" style={labelStyle}>説明</label>
-                <input id="management-vDesc" style={inputStyle} value={vDesc} onChange={e => setVDesc(e.target.value)} placeholder="正拳突き・前蹴りの基礎" />
-                <label htmlFor="management-vUrl" style={labelStyle}>動画URL *</label>
-                <input id="management-vUrl" style={inputStyle} value={vUrl} onChange={e => setVUrl(e.target.value)} required placeholder="https://www.youtube.com/watch?v=xxxxx" />
-                <label htmlFor="management-vDuration" style={labelStyle}>再生時間</label>
-                <input id="management-vDuration" style={inputStyle} value={vDuration} onChange={e => setVDuration(e.target.value)} placeholder="12:34" />
-                <label htmlFor="management-vTag" style={labelStyle}>タグ</label>
-                <select id="management-vTag" style={inputStyle} value={vTag} onChange={e => setVTag(e.target.value)}>
+                <label htmlFor="management-vTitle" className="video-label">タイトル *</label>
+                <input id="management-vTitle" className="video-input" value={vTitle} onChange={e => setVTitle(e.target.value)} required placeholder="基本形 第一段" />
+                <label htmlFor="management-vDesc" className="video-label">説明</label>
+                <input id="management-vDesc" className="video-input" value={vDesc} onChange={e => setVDesc(e.target.value)} placeholder="正拳突き・前蹴りの基礎" />
+                <label htmlFor="management-vUrl" className="video-label">動画URL *</label>
+                <input id="management-vUrl" className="video-input" value={vUrl} onChange={e => setVUrl(e.target.value)} required placeholder="https://www.youtube.com/watch?v=xxxxx" />
+                <label htmlFor="management-vDuration" className="video-label">再生時間</label>
+                <input id="management-vDuration" className="video-input" value={vDuration} onChange={e => setVDuration(e.target.value)} placeholder="12:34" />
+                <label htmlFor="management-vTag" className="video-label">タグ</label>
+                <select id="management-vTag" className="video-input" value={vTag} onChange={e => setVTag(e.target.value)}>
                   <option>基本型</option><option>稽古動画</option><option>参考動画</option>
                 </select>
-                <button type="submit" style={btnStyle}>{editVideo ? '更新する' : '追加する'}</button>
+                <button type="submit" className="video-primary">{editVideo ? '更新する' : '追加する'}</button>
                 {editVideo && <button type="button" className="cancel-btn" onClick={() => { setEditVideo(null); setVTitle(''); setVDesc(''); setVUrl(''); setVDuration(''); setVTag('基本型') }}>キャンセル</button>}
                 {vMsg && <div className={vMsg.includes('エラー') ? 'error' : 'success'}>{vMsg}</div>}
               </form>
             </div>
-            <div className="list-hd">登録済み動画 ({videos.length}件)</div>
+            <h2 className="list-hd">登録済み動画 ({videos.length}件)</h2>
             {videos.map(v => (
               <div key={v.id} className="list-card">
-                <div style={{ flex: 1 }}>
-                  <div className="list-title">{v.title}</div>
+                <div className="video-info">
+                  <h3 className="list-title">{v.title}</h3>
                   <div className="list-sub">{v.tag} · {v.duration}</div>
                 </div>
-                <button className="edit-btn" onClick={() => startEditVideo(v)}>編集</button>
-                <button className="del-btn" onClick={() => deleteVideo(v.id)}>削除</button>
+                <div className="video-actions"><button className="edit-btn" onClick={() => startEditVideo(v)}>編集</button>
+                <button className="del-btn" onClick={() => deleteVideo(v.id)}>削除</button></div>
               </div>
             ))}
           </>

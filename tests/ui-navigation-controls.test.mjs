@@ -41,17 +41,17 @@ test('login uses public links and a labelled password input; login role is expos
   const roles = tree.filter(n => n.props?.className?.startsWith('role-btn'))
   assert.deepEqual(roles.map(n => n.props['aria-pressed']), [true, false])
 })
-function tools(tab) {
+function tools(tab, { client = {}, confirm = () => true } = {}) {
   const h = hooks()
   const noop = () => null
   const Tools = compile('app/(app)/admin/management-tools.tsx', {
     react: h.react, 'react/jsx-runtime': jsxRuntime, 'next/link': { default: Link },
-    'next/navigation': { useRouter: () => ({}) }, '@/lib/supabase/client': { createClient: () => ({}) },
+    'next/navigation': { useRouter: () => ({}) }, '@/lib/supabase/client': { createClient: () => client },
     './schedule-registration-status': { useScheduleRegistrationStatuses: () => ({ statuses: {}, loading: false, error: '', refresh() {} }), ScheduleRegistrationStatus: noop },
     './schedule-deletion': { scheduleDeletionBlockReason: () => 'history unknown' },
     './new-schedule-form': { default: noop }, './edit-schedule-fields': { default: noop },
     '@/lib/schedules/new-schedule': {}, '@/lib/schedules/edit-schedule': {},
-  }).default
+  }, { confirm, setTimeout() {} }).default
   h.render(Tools, { initialTab: tab }); h.state[1] = true; h.state[2] = false
   return { h, render: () => h.render(Tools, { initialTab: tab }) }
 }
@@ -141,4 +141,29 @@ test('modal does not focus a removed opener on route unmount', () => {
 test('unauthenticated video visit redirects before reading videos', async()=>{
  const {h,calls,default:Page}=library(null);h.render(Page);h.flush(0);await new Promise(resolve=>setImmediate(resolve))
  assert.deepEqual(calls,[['push','/login']])
+})
+
+test('video headings, input order and action grouping are accessible without changing data', () => {
+ const c = tools('videos'); c.h.state[3] = [{id:42,title:'長い動画名'.repeat(20),tag:'基本型',duration:'12:34'}]; const tree=c.render();
+ assert.deepEqual(tree.filter(n=>n.type==='h1').map(n=>n.props.children),['動画管理']);
+ assert.ok(tree.some(n=>n.type==='h2'&&n.props.children==='動画を追加'));
+ assert.ok(tree.some(n=>n.type==='h2'&&n.props.children[0]==='登録済み動画 ('));
+ assert.ok(tree.some(n=>n.type==='h3'&&n.props.children==='長い動画名'.repeat(20)));
+ assert.deepEqual(tree.filter(n=>n.type==='label').map(n=>n.props.htmlFor),['management-vTitle','management-vDesc','management-vUrl','management-vDuration','management-vTag']);
+ assert.equal(tree.filter(n=>n.props?.href==='/admin/registrations').length,1);assert.equal(tree.find(n=>n.props?.href==='/admin/registrations').props.children,'申込者管理');assert.ok(tree.some(n=>n.props?.href==='/admin'));
+ const actions=tree.find(n=>n.props?.className==='video-actions');assert.deepEqual(nodes(actions).filter(n=>n.type==='button').map(n=>n.props.children),['編集','削除']);
+})
+test('password mode retains original form styling and navigation, with no video-specific wrapper', () => {
+ const tree=tools('passwords').render();assert.equal(tree.some(n=>n.props?.className?.includes('video-management')),false);assert.equal(tree.some(n=>n.props?.className==='video-nav'),false);
+ assert.equal(tree.find(n=>n.props?.id==='management-adminNewPw').props.style.fontSize,'13px');assert.equal(tree.find(n=>n.props?.htmlFor==='management-adminNewPw').props.style.fontSize,'11px');assert.equal(tree.find(n=>n.props?.href==='/admin/registrations').props.children.trim(),'参加申込一覧');
+})
+test('video create, edit, cancel and confirmed delete retain their payloads and target IDs', async () => {
+ const calls=[];let accept=false;const client={from(table){assert.equal(table,'videos');const q={select(){return q},async order(key,opts){calls.push(['read',key,opts]);return {data:[]}},async insert(payload){calls.push(['insert',plain(payload)]);return {}},update(payload){calls.push(['update',plain(payload)]);return {async eq(key,id){calls.push(['update-target',key,id]);return {}}}},delete(){calls.push(['delete']);return {async eq(key,id){calls.push(['delete-target',key,id]);return {}}}}};return q}};
+ const c=tools('videos',{client,confirm:()=>accept});let tree=c.render();
+ for(const [id,value] of [['vTitle','対象'],['vDesc','説明'],['vUrl','https://example.invalid/video'],['vDuration','12:34'],['vTag','参考動画']]){c.render().find(n=>n.props?.id==='management-'+id).props.onChange({target:{value}})}
+ await c.render().find(n=>n.type==='form').props.onSubmit({preventDefault(){}});assert.deepEqual(calls[0],['insert',{title:'対象',description:'説明',url:'https://example.invalid/video',duration:'12:34',tag:'参考動画'}]);
+ c.h.state[3]=[{id:42,title:'既存',description:'説明',url:'https://example.invalid/old',duration:'1:00',tag:'基本型'}];c.render().find(n=>n.type==='button'&&n.props.children==='編集').props.onClick();assert.ok(c.render().some(n=>n.type==='h2'&&n.props.children==='動画を編集'));
+ await c.render().find(n=>n.type==='form').props.onSubmit({preventDefault(){}});assert.ok(calls.some(x=>x[0]==='update-target'&&x[2]===42));
+ c.h.state[3]=[{id:42,title:'既存',url:'https://example.invalid/old'}];tree=c.render();await tree.find(n=>n.type==='button'&&n.props.children==='削除').props.onClick();assert.equal(calls.some(x=>x[0]==='delete'),false);accept=true;await tree.find(n=>n.type==='button'&&n.props.children==='削除').props.onClick();assert.ok(calls.some(x=>x[0]==='delete-target'&&x[2]===42));
+ assert.ok(calls.filter(x=>x[0]==='read').every(x=>x[1]==='created_at'&&x[2].ascending===false));
 })
