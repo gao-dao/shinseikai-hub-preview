@@ -48,16 +48,18 @@ function screen({ rows = [row()], fail = false } = {}) {
   let cursor = 0, refreshToken = 0, current = group; const slots = [], effects = [], calls = []
   const react = {
     useState(value) { const i = cursor++; if (!(i in slots)) slots[i] = value; return [slots[i], value => slots[i] = typeof value === 'function' ? value(slots[i]) : value] },
+    useRef(value) { const i = cursor++; if (!(i in slots)) slots[i] = { current: value }; return slots[i] },
     useEffect(fn, deps) { const i = cursor++, old = slots[i]; if (!old || deps.some((v, j) => v !== old.deps[j])) { slots[i] = { deps }; effects.push(fn) } },
   }
   const jsx = (type, props) => ({ type, props })
-  const Component = compile('app/(app)/admin/event-groups/occurrence-detail.tsx', { react, 'react/jsx-runtime': { jsx, jsxs: jsx }, '@/lib/event-groups/detail': { loadDetailClasses: async (id, signal) => { calls.push([id, signal]); if (fail) throw Error('PRIVATE_ERROR'); return rows } } }, { AbortController }).default
+  const Control = compile('app/(app)/admin/event-groups/class-registration-control.tsx', { react, 'react/jsx-runtime': { jsx, jsxs: jsx }, '@/lib/event-groups/detail': { loadDetailClasses: async () => rows } }, { AbortController }).default
+  const Component = compile('app/(app)/admin/event-groups/occurrence-detail.tsx', { react, './class-registration-control': { default: Control }, 'react/jsx-runtime': { jsx, jsxs: jsx }, '@/lib/event-groups/detail': { loadDetailClasses: async (id, signal) => { calls.push([id, signal]); if (fail) throw Error('PRIVATE_ERROR'); return rows } } }, { AbortController }).default
   const render = () => { cursor = 0; return Component({ group: current, refreshToken }) }
   return { calls, render, text: () => text(render()), nodes: () => elements(render()), async flush() { render(); for (const fn of effects.splice(0)) fn(); await new Promise(r => setImmediate(r)); render() }, refresh: () => refreshToken++, changeGroup: () => current = { ...group, id: 8 } }
 }
-test('single occurrence shows datetime and venue once, no internal class title and minute-only time range', async () => {
+test('single occurrence shows datetime and venue once, class identity and minute-only time range', async () => {
   const c = screen(); await c.flush(); const t = c.text()
-  assert.doesNotMatch(t, /Class 1|City is not venue/); assert.equal(t.split('Synthetic venue').length - 1, 1); assert.equal(t.split('2030-10-23').length - 1, 1)
+  assert.match(t, /Class 1/); assert.doesNotMatch(t, /City is not venue/); assert.equal(t.split('Synthetic venue').length - 1, 1); assert.equal(t.split('2030-10-23').length - 1, 1)
   assert.match(t, /12:00〜21:00/); assert.doesNotMatch(t, /12:00:00/); assert.equal(c.nodes().filter(n => n.props?.['aria-label'] === 'クラス情報').length, 0)
   assert.match(t, /停止中/); assert.match(t, /10名/); assert.match(t, /3件/); assert.ok(t.indexOf('開催日時') < t.indexOf('会場')); assert.ok(t.indexOf('会場') < t.indexOf('申込状況'))
 })
