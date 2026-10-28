@@ -28,14 +28,14 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
   let result: Awaited<ReturnType<typeof loadGuidePage>> | null = null
   let error = ''
   try { result = await loadGuidePage(guidePage(params.page)) } catch { error = '開催案内を取得できませんでした。時間をおいて再度お試しください。' }
-  return <div className="hub-public-shell"><header className="hub-header"><Link href="/" className="hub-brand">心勢会HUB</Link><nav className="hub-nav" aria-label="公開メニュー"><Link href="/">ホーム</Link><Link href="/events" aria-current="page">開催案内</Link><Link href="/schedule">スケジュール</Link><Link href="/admin" prefetch={false}>管理ホーム</Link><Link href="/login">ログイン</Link></nav></header><main className={styles.page}><div className={styles.inner}>
+  return <div className="hub-public-shell"><header className="hub-header"><Link href="/" className="hub-brand">心勢会HUB</Link><nav className="hub-nav" aria-label="公開メニュー"><Link href="/">ホーム</Link><Link href="/events" aria-current="page">開催案内</Link><Link href="/schedule">スケジュール</Link><Link href="/admin" prefetch={false}>管理ホーム</Link><Link href="/login">ログイン</Link></nav></header><main className={styles.page}><div className={`${styles.inner} ${styles.listing}`}>
     <h1>開催案内</h1>
     {error && <p role="alert">{error}</p>}
     {result && <>
       {result.items.length === 0 && <p>掲載中の開催案内はありません。</p>}
       <ul className={styles.list}>{result.items.map(group => <li key={group.id}><Link className={styles.item} href={`/events/${group.id}`}>
-        <strong>{group.title} →</strong><span>{group.start_date}{group.end_date !== group.start_date ? `〜${group.end_date}` : ''}</span>
-        <span>地域：{group.city || '未設定'}{group.classCount > 1 ? ` ／ ${group.classCount}クラス` : ''}</span>
+        <h2>{group.title} →</h2><span className={styles.date}>{group.start_date}{group.end_date !== group.start_date ? `〜${group.end_date}` : ''}</span>
+        <span className={styles.meta}>地域：{group.city || '未設定'}{group.classCount > 1 ? ` ／ ${group.classCount}クラス` : ''}</span>
       </Link></li>)}</ul>
       <nav className={styles.pagination} aria-label="開催案内のページ切替">
         {result.page > 1 && <Link href={`/events?page=${result.page - 1}`}>← 前へ</Link>}

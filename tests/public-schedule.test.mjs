@@ -99,7 +99,7 @@ test('direct server page renders occurrence links without class duplication',asy
   const c=db();const items=await load(c)
   const page=compile('app/(app)/schedule/page.tsx',{'react/jsx-runtime':jsxRuntime,'next/link':{default:({children,...props})=>jsxRuntime.jsx('a',{...props,children})},'@/lib/schedule/public-schedule':{loadScheduleIndex:async()=>items},'./schedule.module.css':{default:{}}})
   assert.equal(page.dynamic,'force-dynamic');assert.equal(page.revalidate,0)
-  const html=renderToStaticMarkup(await page.default());assert.match(html,/href="\/events\/1"/);assert.match(html,/開催1/);assert.doesNotMatch(html,/内部クラス|残席|定員/)
+  const html=renderToStaticMarkup(await page.default());assert.equal((html.match(/<h1/g)||[]).length,1);assert.equal((html.match(/<h2/g)||[]).length,items.length);assert.match(html,/href="\/events\/1"/);assert.match(html,/開催1/);assert.doesNotMatch(html,/内部クラス|残席|定員/)
 })
 test('empty and error page states are distinct and do not expose database errors',async()=>{
   for(const fail of [false,true]){

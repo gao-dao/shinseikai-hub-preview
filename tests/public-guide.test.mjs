@@ -108,6 +108,7 @@ test('public list renders only parent metadata, links, and server pagination',as
  const page=compile('app/(public)/events/page.tsx',{'react/jsx-runtime':jsxRuntime,'next/link':{default:Link},'./events-list':{default:()=>null},'@/lib/event-groups/public-guide-server':{loadGuidePage:async p=>{calls++;assert.equal(p,2);return {page:2,hasNext:true,items:[{...group(),classCount:3}]}}},'@/lib/event-groups/public-guide':guide,'./guide.module.css':{default:{}}})
  const html=renderToStaticMarkup(await page.default({searchParams:Promise.resolve({page:'2'})}))
  assert.equal((html.match(/<header/g)||[]).length,1);assert.ok(html.includes('href="/login"'));assert.ok(html.includes('aria-current="page"'));
+ assert.equal((html.match(/<h1/g)||[]).length,1);assert.equal((html.match(/<h2/g)||[]).length,1);assert.ok(html.includes('<h2>開催1 →</h2>'));
  assert.equal(calls,1);assert.ok(html.includes('/events/1'));assert.ok(html.includes('/events?page=1'));assert.ok(html.includes('/events?page=3'));assert.ok(html.includes('3クラス'))
  assert.ok(!html.includes('残席'));assert.ok(!html.includes('13:40'));assert.ok(!html.includes('テスト会場'))
  assert.ok(!html.includes('既存のWeb申込'));assert.ok(!html.includes('view=registration'));assert.ok(!html.includes('従来のスケジュール'));assert.ok(html.includes('href="/schedule"'))

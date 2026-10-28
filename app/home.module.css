@@ -1,8 +1,9 @@
-.page { min-height: 100dvh; padding: 32px 20px; background: var(--hub-background); color: var(--hub-text); }
-.inner { max-width: 640px; margin: auto; }
-.page h1 { font-size: var(--hub-h1-size); font-weight: var(--hub-h1-weight); margin-bottom: 28px; }
-.page nav { display: flex; flex-direction: column; }
-.page a { display: block; padding: 20px 0; border-bottom: 1px solid #ded8ce; color: var(--hub-muted); text-decoration: none; }
+.page { min-height: 100dvh; padding: 32px var(--hub-gutter-pc) 40px; background: var(--hub-background); color: var(--hub-text); font-size: 16px; line-height: 1.7; overflow-wrap: anywhere; }
+.inner { width: 100%; max-width: var(--hub-width); min-width: 0; margin: auto; }
+.page h1 { font-size: var(--hub-h1-size); font-weight: var(--hub-h1-weight); line-height: 1.4; margin: 0 0 24px; }
+.page nav { display: flex; flex-direction: column; min-width: 0; }
+.page a { display: block; min-height: 44px; padding: 24px 0; border-bottom: 1px solid #ded8ce; color: var(--hub-primary); text-decoration: none; }
 .page a:focus-visible { outline: 2px solid var(--hub-primary); outline-offset: 4px; }
-.page .primary { color: var(--hub-primary); font-size: 21px; font-weight: 700; }
-.page span { display: block; margin-top: 8px; font-size: 13px; }
+.page .primary { font-size: var(--hub-h2-size); font-weight: var(--hub-h2-weight); line-height: 1.5; }
+.page span { display: block; margin-top: 8px; font-size: 14px; color: var(--hub-muted); }
+@media (max-width: 640px) { .page { padding: 24px var(--hub-gutter-mobile) 32px; } }

@@ -16,7 +16,7 @@ export default async function SchedulePage() {
       {items.map(item => <li key={item.key} className={styles.item}>
         <h2>{item.href ? <Link href={item.href} prefetch={false}>{item.title}</Link> : item.title}</h2>
         <p>{item.period}</p>
-        {item.place && <p>{item.place}</p>}
+        {item.place && <p className={styles.meta}>{item.place}</p>}
         <p className={styles.type}>{item.type}</p>
       </li>)}
     </ul>}
