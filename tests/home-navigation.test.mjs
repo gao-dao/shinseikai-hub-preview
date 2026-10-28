@@ -24,7 +24,11 @@ function nodes(tree) {
 const Link = 'Link'
 test('public homepage needs no session or DB and prioritizes event announcements', () => {
   const Home = load('app/page.tsx', { 'next/link': { default: Link }, './home.module.css': { default: {} } })
-  const links = nodes(Home()).filter(n => n.type === Link)
+  const tree = nodes(Home())
+  assert.equal(tree.filter(n => n.type === 'header').length, 1)
+  assert.equal(tree.find(n => n.props?.['aria-current'] === 'page').props.href, '/')
+  const main = tree.find(n => n.type === 'main')
+  const links = nodes(main).filter(n => n.type === Link)
   assert.equal(links.length, 3)
   assert.ok(links.some(n => n.props.href === '/events'))
   assert.ok(links.some(n => n.props.href === '/videos'))
@@ -57,6 +61,8 @@ for (const role of ['anonymous', 'member', 'admin', 'profile-error', 'auth-error
     const cleanup = effect()
     await new Promise(resolve => setImmediate(resolve))
     const result = render()
+    assert.equal(result.filter(n => n.type === 'header').length, 1)
+    assert.equal(result.find(n => n.props?.['aria-current'] === 'page').props.href, '/schedule')
     assert.equal(result.some(n => n.props?.href === '/admin'), role === 'admin')
     assert.equal(result.some(n => n.props?.href === '/videos'), !['anonymous', 'auth-error'].includes(role))
     assert.ok(result.some(n => n.props?.href === '/schedule'))

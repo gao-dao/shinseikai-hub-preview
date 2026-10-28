@@ -1,8 +1,8 @@
-.page { min-height: 100dvh; padding: 32px 20px; background: #faf7f0; color: #1e293b; }
+.page { min-height: 100dvh; padding: 32px 20px; background: var(--hub-background); color: var(--hub-text); }
 .inner { max-width: 640px; margin: auto; }
-.page h1 { font-size: 28px; font-weight: 700; margin-bottom: 28px; }
+.page h1 { font-size: var(--hub-h1-size); font-weight: var(--hub-h1-weight); margin-bottom: 28px; }
 .page nav { display: flex; flex-direction: column; }
-.page a { display: block; padding: 20px 0; border-bottom: 1px solid #ded8ce; color: #52616e; text-decoration: none; }
-.page a:focus-visible { outline: 2px solid #6b1f2b; outline-offset: 4px; }
-.page .primary { color: #6b1f2b; font-size: 21px; font-weight: 700; }
+.page a { display: block; padding: 20px 0; border-bottom: 1px solid #ded8ce; color: var(--hub-muted); text-decoration: none; }
+.page a:focus-visible { outline: 2px solid var(--hub-primary); outline-offset: 4px; }
+.page .primary { color: var(--hub-primary); font-size: 21px; font-weight: 700; }
 .page span { display: block; margin-top: 8px; font-size: 13px; }

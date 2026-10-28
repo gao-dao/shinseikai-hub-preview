@@ -93,6 +93,7 @@ async function detail(g,classes) {
 }
 test('single detail displays time and venue once, no redundant class name or fabricated email',async()=>{
  const html=await detail(group(),[row()])
+ assert.equal((html.match(/<header/g)||[]).length,1);assert.ok(html.includes('aria-current="page"'));
  assert.equal((html.match(/13:40/g)||[]).length,1);assert.equal((html.match(/テスト会場/g)||[]).length,1)
  assert.ok(!html.includes('クラス1'));assert.ok(!html.includes('mailto:'));assert.ok(html.includes('受付は停止'))
  assert.ok(!html.includes(':00'));assert.ok(!html.includes('定員'))
@@ -106,9 +107,10 @@ test('public list renders only parent metadata, links, and server pagination',as
  let calls=0
  const page=compile('app/(public)/events/page.tsx',{'react/jsx-runtime':jsxRuntime,'next/link':{default:Link},'./events-list':{default:()=>null},'@/lib/event-groups/public-guide-server':{loadGuidePage:async p=>{calls++;assert.equal(p,2);return {page:2,hasNext:true,items:[{...group(),classCount:3}]}}},'@/lib/event-groups/public-guide':guide,'./guide.module.css':{default:{}}})
  const html=renderToStaticMarkup(await page.default({searchParams:Promise.resolve({page:'2'})}))
+ assert.equal((html.match(/<header/g)||[]).length,1);assert.ok(html.includes('href="/login"'));assert.ok(html.includes('aria-current="page"'));
  assert.equal(calls,1);assert.ok(html.includes('/events/1'));assert.ok(html.includes('/events?page=1'));assert.ok(html.includes('/events?page=3'));assert.ok(html.includes('3クラス'))
  assert.ok(!html.includes('残席'));assert.ok(!html.includes('13:40'));assert.ok(!html.includes('テスト会場'))
- assert.ok(!html.includes('既存のWeb申込'));assert.ok(!html.includes('view=registration'));assert.ok(!html.includes('従来のスケジュール'));assert.ok(html.includes('スケジュール →'))
+ assert.ok(!html.includes('既存のWeb申込'));assert.ok(!html.includes('view=registration'));assert.ok(!html.includes('従来のスケジュール'));assert.ok(html.includes('href="/schedule"'))
 })
 test('failed list and invalid input cannot display partial or invented data',async()=>{
  let calls=0

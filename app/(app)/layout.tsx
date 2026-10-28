@@ -55,16 +55,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       * { box-sizing: border-box; }
       html, body { height: 100%; background: #FAF7F0; color: #1E293B; }
       .hub-shell { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
-      .hub-header { flex-shrink: 0; background: #fff; border-bottom: 1px solid #EDE8DF; padding: 14px 24px; display: flex; align-items: center; flex-wrap: wrap; gap: 12px 24px; }
-      .hub-brand { font-size: 18px; font-weight: 700; text-decoration: none; }
-      .hub-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-left: auto; font-size: 13px; }
-      .hub-nav a { padding: 8px 0; color: #52616e; text-decoration: none; }
-      .hub-nav a[aria-current=page] { color: #6b1f2b; text-decoration: underline; text-underline-offset: 6px; }
-      .hub-nav button { border: 1px solid #EDE8DF; border-radius: 6px; padding: 8px 12px; background: white; color: #52616e; cursor: pointer; }
-      .hub-nav a:focus-visible, .hub-nav button:focus-visible, .hub-brand:focus-visible { outline: 2px solid #6b1f2b; outline-offset: 3px; }
       .hub-content { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
       .hub-error { color: #6b1f2b; padding: 8px 24px; font-size: 13px; }
-      @media(max-width:640px) { .hub-header { padding: 12px 16px; gap: 6px; } .hub-nav { width: 100%; margin-left: 0; gap: 4px 14px; } }
     `}</style>
     <div className="hub-shell">
       <header className="hub-header">

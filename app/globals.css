@@ -1,6 +1,20 @@
 @import "tailwindcss";
 
 :root {
+  --hub-background: #faf7f0;
+  --hub-text: #1e293b;
+  --hub-muted: #52616e;
+  --hub-primary: #6b1f2b;
+  --hub-width: 960px;
+  --hub-reading-width: 800px;
+  --hub-gutter-pc: 32px;
+  --hub-gutter-mobile: 16px;
+  --hub-h1-size: 28px;
+  --hub-h1-weight: 700;
+  --hub-h2-size: 21px;
+  --hub-h2-weight: 700;
+  --hub-h3-size: 18px;
+  --hub-h3-weight: 600;
   --background: #ffffff;
   --foreground: #171717;
 }
@@ -24,3 +38,20 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Shared header appearance only; authentication and scroll ownership stay in each route. */
+.hub-header { flex-shrink: 0; background: white; border-bottom: 1px solid #EDE8DF; padding: 14px var(--hub-gutter-pc); display: flex; align-items: center; flex-wrap: wrap; gap: 12px 24px; }
+.hub-brand { font-size: 18px; font-weight: 700; text-decoration: none; }
+.hub-nav { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-left: auto; font-size: 13px; }
+.hub-nav a { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 0; color: var(--hub-muted); text-decoration: none; }
+.hub-nav a[aria-current=page] { color: var(--hub-primary); text-decoration: underline; text-underline-offset: 6px; }
+.hub-nav button { min-height: 44px; border: 1px solid #EDE8DF; border-radius: 6px; padding: 8px 12px; background: white; color: var(--hub-muted); cursor: pointer; }
+.hub-nav a:focus-visible, .hub-nav button:focus-visible, .hub-brand:focus-visible { outline: 2px solid var(--hub-primary); outline-offset: 3px; }
+@media(max-width:640px) { .hub-header { padding: 12px var(--hub-gutter-mobile); gap: 6px; } .hub-nav { width: 100%; margin-left: 0; gap: 4px 14px; } }
+.hub-header, .hub-header * { box-sizing: border-box; }
+.hub-header { color: var(--hub-text); }
+.hub-brand { color: var(--hub-text); overflow-wrap: anywhere; }
+.hub-nav { min-width: 0; max-width: 100%; }
+.hub-nav a { overflow-wrap: anywhere; }
+.hub-public-shell { min-height: 100dvh; display: flex; flex-direction: column; background: var(--hub-background); }
+.hub-public-shell > main { flex: 1; min-height: 0; }
