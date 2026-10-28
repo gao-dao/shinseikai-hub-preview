@@ -26,7 +26,7 @@ export default async function EventDetail({ params }: { params: Promise<{ id: st
     {group.description && <p className={styles.description}>{group.description}</p>}
     <section className={styles.participation}><h2>参加方法</h2>
       <p>参加希望・お問い合わせの連絡先は、主催者の案内をご確認ください。お問い合わせのみで参加確定とはなりません。</p>
-      {group.registration_open ? <p><Link href={`/events?view=registration&groupId=${group.id}`}>Web申込の受付状況を確認する →</Link></p> : <p>現在、Web申込の受付は停止しています。</p>}
+      {group.registration_open ? <p><Link href={`/events?view=registration&groupId=${group.id}`} className={styles.webLink}>Web申込ページを確認</Link></p> : <p>現在、Web申込の受付は停止しています。</p>}
     </section>
   </div></main></div>
 }

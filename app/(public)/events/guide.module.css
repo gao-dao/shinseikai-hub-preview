@@ -17,3 +17,5 @@
 .pagination { display: flex; gap: 24px; padding: 24px 0; }
 .participation { border-top: 1px solid #ded8ce; margin-top: 28px; padding-top: 8px; }
 @media(min-width: 768px) { .page { padding: var(--hub-gutter-pc); } }
+
+.webLink { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 0; font-weight: 700; }

@@ -126,3 +126,8 @@ test('direct invalid or unavailable detail returns not found, not an application
  await assert.rejects(page.default({params:Promise.resolve({id:'1x'})}),/NOT_FOUND/);assert.equal(calls,0)
  await assert.rejects(page.default({params:Promise.resolve({id:'1'})}),/NOT_FOUND/);assert.equal(calls,1)
 })
+
+test('public application link keeps group ID and does not promise class availability',async()=>{
+ const open=await detail(group(7,{registration_open:true}),[row()]);assert.ok(open.includes('Web申込ページを確認'));assert.ok(open.includes('/events?view=registration&amp;groupId=7'));assert.ok(!open.includes('href="/admin'));
+ const closed=await detail(group(7,{registration_open:false}),[row()]);assert.ok(!closed.includes('Web申込ページを確認'));assert.ok(closed.includes('Web申込の受付は停止しています'));
+})

@@ -272,11 +272,18 @@ for (const open of [false, true]) test(`saved edit copy preserves reception cave
  assert.match(c.text(), /今回の保存では、開催回全体の受付状態は変更していません/);
  assert.match(c.text(), open ? /中止・非表示などで受付状態が変わる場合があります/ : /開催回全体が受付停止中の場合、クラス受付が有効でも申し込めません/);
  assert.match(c.text(), /最新の受付状態の確認・変更は、詳細画面で行えます/);
- assert.equal(c.render().find(n => n.type === 'Link' && text(n) === '開催回の詳細を見る').props.href, '/admin/event-groups/9');
+ assert.equal(c.render().find(n => n.type === 'Link' && text(n) === '開催回の詳細・受付管理へ').props.href, '/admin/event-groups/9');
  assert.equal(c.calls.filter(v => v[0] === 'save').length, 1);
 })
 test('failed edit keeps error and review, without claiming save success', async () => {
  const c = setup({ groupId: 1, result: { state: 'conflict', error: '他の操作で状態が変更されました。再取得してください。' } }); await c.mount(); c.change('開催名', '編集後'); await c.submit(); await c.save();
  assert.match(c.text(), /他の操作で状態が変更されました/); assert.ok(c.button('まとめて保存')); assert.equal(c.render().some(n => n.type === 'h2' && text(n) === '保存しました'), false);
- assert.equal(c.render().some(n => n.type === 'Link' && text(n) === '開催回の詳細を見る'), false);
+ assert.equal(c.render().some(n => n.type === 'Link' && text(n) === '開催回の詳細・受付管理へ'), false);
+})
+
+test('new creation explains class OFF and separate publication without adding a write field',async()=>{
+ const c=setup();await c.mount();fill(c);assert.match(c.text(),/受付を始めないクラスは、保存前にクラス受付をOFF/);
+ await c.submit();assert.match(c.text(),/受付を無効にしても、掲載条件を満たす開催回は開催案内に表示/);await c.save();
+ const input=c.calls.find(v=>v[0]==='save')[1];assert.equal('registration_open' in input.group,false);assert.equal(input.classes[0].registration_enabled,true);
+ const link=c.render().find(n=>n.type==='Link'&&text(n)==='開催回の詳細・受付管理へ');assert.equal(link.props.href,'/admin/event-groups/9');assert.match(link.props.className,/primary/);
 })
