@@ -128,6 +128,17 @@ test('direct invalid or unavailable detail returns not found, not an application
 })
 
 test('public application link keeps group ID and does not promise class availability',async()=>{
- const open=await detail(group(7,{registration_open:true}),[row()]);assert.ok(open.includes('Web申込ページを確認'));assert.ok(open.includes('/events?view=registration&amp;groupId=7'));assert.ok(!open.includes('href="/admin'));
+ const open=await detail(group(7,{registration_open:true}),[row()]);assert.ok(open.includes('Web申込ページを確認'));assert.ok(open.includes('/events?view=registration&amp;groupId=7'));assert.equal((open.match(/href="\/admin"/g)||[]).length,1);
  const closed=await detail(group(7,{registration_open:false}),[row()]);assert.ok(!closed.includes('Web申込ページを確認'));assert.ok(closed.includes('Web申込の受付は停止しています'));
+})
+
+test('public headers expose one non-prefetched admin entry without any authorization query',async()=>{
+ function nodes(tree){if(Array.isArray(tree))return tree.flatMap(nodes);return tree&&typeof tree==='object'?[tree,...nodes(tree.props?.children)]:[]}
+ const HeaderLink='Link';let lists=0,details=0;
+ const deps={'react/jsx-runtime':jsxRuntime,'next/link':{default:HeaderLink},'./events-list':{default:()=>null},'next/navigation':{notFound(){throw Error('NOT_FOUND')}},'@/lib/event-groups/public-guide-server':{loadGuidePage:async()=>{lists++;return {page:1,hasNext:false,items:[]}},loadGuideDetail:async()=>{details++;return {group:group(),classes:[row()]}}},'@/lib/event-groups/public-guide':guide,'./guide.module.css':{default:{}},'../guide.module.css':{default:{}}};
+ for(const [file,props] of [['app/(public)/events/page.tsx',{searchParams:Promise.resolve({})}],['app/(public)/events/[id]/page.tsx',{params:Promise.resolve({id:'1'})}]]){
+  const tree=nodes(await compile(file,deps).default(props));assert.equal(tree.filter(n=>n.type==='header').length,1);
+  const header=tree.find(n=>n.type==='header'),links=nodes(header).filter(n=>n.type===HeaderLink),admin=links.filter(n=>n.props.href==='/admin');assert.equal(admin.length,1);assert.equal(admin[0].props.prefetch,false);assert.equal(admin[0].props.children,'管理ホーム');assert.ok(links.some(n=>n.props.href==='/login'));
+ }
+ assert.equal(lists,1);assert.equal(details,1);
 })

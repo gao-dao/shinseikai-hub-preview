@@ -10,12 +10,12 @@ export default async function EventDetail({ params }: { params: Promise<{ id: st
   if (!/^[1-9][0-9]*$/.test(id) || !Number.isSafeInteger(Number(id))) notFound()
   let result: Awaited<ReturnType<typeof loadGuideDetail>>
   try { result = await loadGuideDetail(Number(id)) } catch {
-    return <div className="hub-public-shell"><header className="hub-header"><Link href="/" className="hub-brand">心勢会HUB</Link><nav className="hub-nav" aria-label="公開メニュー"><Link href="/">ホーム</Link><Link href="/events" aria-current="page">開催案内</Link><Link href="/schedule">スケジュール</Link><Link href="/login">ログイン</Link></nav></header><main className={styles.page}><div className={styles.inner}><Link href="/events">← 開催案内</Link><p role="alert">開催情報を取得できませんでした。時間をおいて再度お試しください。</p></div></main></div>
+    return <div className="hub-public-shell"><header className="hub-header"><Link href="/" className="hub-brand">心勢会HUB</Link><nav className="hub-nav" aria-label="公開メニュー"><Link href="/">ホーム</Link><Link href="/events" aria-current="page">開催案内</Link><Link href="/schedule">スケジュール</Link><Link href="/admin" prefetch={false}>管理ホーム</Link><Link href="/login">ログイン</Link></nav></header><main className={styles.page}><div className={styles.inner}><Link href="/events">← 開催案内</Link><p role="alert">開催情報を取得できませんでした。時間をおいて再度お試しください。</p></div></main></div>
   }
   if (!result) notFound()
   const { group, classes } = result
   const venue = commonVenue(classes), single = classes.length === 1 ? classes[0] : null
-  return <div className="hub-public-shell"><header className="hub-header"><Link href="/" className="hub-brand">心勢会HUB</Link><nav className="hub-nav" aria-label="公開メニュー"><Link href="/">ホーム</Link><Link href="/events" aria-current="page">開催案内</Link><Link href="/schedule">スケジュール</Link><Link href="/login">ログイン</Link></nav></header><main className={styles.page}><div className={styles.inner}>
+  return <div className="hub-public-shell"><header className="hub-header"><Link href="/" className="hub-brand">心勢会HUB</Link><nav className="hub-nav" aria-label="公開メニュー"><Link href="/">ホーム</Link><Link href="/events" aria-current="page">開催案内</Link><Link href="/schedule">スケジュール</Link><Link href="/admin" prefetch={false}>管理ホーム</Link><Link href="/login">ログイン</Link></nav></header><main className={styles.page}><div className={styles.inner}>
     <nav className={styles.nav} aria-label="開催案内へ戻る"><Link href="/events">← 開催案内</Link></nav>
     <h1>{group.title}</h1>
     <p>開催日時：{single ? `${single.date} ${timeRange(single)}` : `${group.start_date}${group.end_date !== group.start_date ? `〜${group.end_date}` : ''}`}</p>

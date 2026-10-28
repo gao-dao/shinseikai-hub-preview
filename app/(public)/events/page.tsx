@@ -28,7 +28,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
   let result: Awaited<ReturnType<typeof loadGuidePage>> | null = null
   let error = ''
   try { result = await loadGuidePage(guidePage(params.page)) } catch { error = '開催案内を取得できませんでした。時間をおいて再度お試しください。' }
-  return <div className="hub-public-shell"><header className="hub-header"><Link href="/" className="hub-brand">心勢会HUB</Link><nav className="hub-nav" aria-label="公開メニュー"><Link href="/">ホーム</Link><Link href="/events" aria-current="page">開催案内</Link><Link href="/schedule">スケジュール</Link><Link href="/login">ログイン</Link></nav></header><main className={styles.page}><div className={styles.inner}>
+  return <div className="hub-public-shell"><header className="hub-header"><Link href="/" className="hub-brand">心勢会HUB</Link><nav className="hub-nav" aria-label="公開メニュー"><Link href="/">ホーム</Link><Link href="/events" aria-current="page">開催案内</Link><Link href="/schedule">スケジュール</Link><Link href="/admin" prefetch={false}>管理ホーム</Link><Link href="/login">ログイン</Link></nav></header><main className={styles.page}><div className={styles.inner}>
     <h1>開催案内</h1>
     {error && <p role="alert">{error}</p>}
     {result && <>
