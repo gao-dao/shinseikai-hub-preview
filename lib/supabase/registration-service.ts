@@ -5,7 +5,7 @@ import { mapPublicRegistrationResult, publicRegistrationFailure, validatePublicR
 // This boundary exposes no general-purpose privileged client. The key itself
 // still has service_role privileges; callers must add HTTP/Bot/rate-limit checks.
 // No request object, cookies, or caller-supplied Authorization headers are accepted.
-export async function submitPublicRegistration(body: unknown, idempotencyKey: unknown): Promise<PublicRegistrationResponse> {
+export async function submitPublicRegistration(body: unknown, idempotencyKey: unknown): Promise<PublicRegistrationResponse & { createdNew?: boolean }> {
   const validation = validatePublicRegistration(body, idempotencyKey)
   if (!validation.data) return publicRegistrationFailure('INVALID_INPUT', 400, validation.error)
   const input = validation.data
@@ -27,6 +27,17 @@ export async function submitPublicRegistration(body: unknown, idempotencyKey: un
       p_notes: input.notes,
       p_schedule_ids: input.schedule_ids,
     })
+    // Accept only the legacy contract or the exact four-field RPC contract.
+    // Creation metadata stays server-side; it is never part of the public body.
+    if (!error && data && typeof data === 'object' && !Array.isArray(data) && Object.hasOwn(data, 'created_new')) {
+      const row = data as Record<string, unknown>
+      if (Object.keys(row).length !== 4 || !Object.keys(row).every(key => ['success', 'code', 'http_status', 'created_new'].includes(key)) ||
+          typeof row.created_new !== 'boolean' || (row.created_new && (row.success !== true || row.code !== 'REGISTERED' || row.http_status !== 201))) {
+        return mapPublicRegistrationResult(null, null)
+      }
+      const response = mapPublicRegistrationResult({ success: row.success, code: row.code, http_status: row.http_status }, null)
+      return { ...response, createdNew: response.body.success && row.created_new }
+    }
     return mapPublicRegistrationResult(data, error)
   } catch {
     // A disconnected response may follow a commit: never retry or generate a key.

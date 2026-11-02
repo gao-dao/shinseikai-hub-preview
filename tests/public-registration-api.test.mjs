@@ -23,8 +23,8 @@ const secret = 'SYNTHETIC_SECRET_NO_REAL_CREDENTIALS'
 const valid = { event_group_id: 5, name: ' Synthetic attendee ', contact: ' synthetic.contact.invalid ', notes: ' Synthetic memo ', schedule_ids: [12,11], turnstile_token: 'synthetic-token' }
 const registered = { success: true, code: 'REGISTERED', http_status: 201 }
 const plain = value => JSON.parse(JSON.stringify(value))
-function setup({ configuration = { REGISTRATION_ALLOWED_ORIGINS: origin }, turnstileResult = { ok: true }, rpcData = registered, rpcError = null, rpcThrows = false, stageThrows, realTurnstile = false } = {}) {
-  const calls = [], rpcCalls = [], clients = [], logs = [], outbound = []
+function setup({ configuration = { REGISTRATION_ALLOWED_ORIGINS: origin }, turnstileResult = { ok: true }, rpcData = registered, rpcError = null, rpcThrows = false, stageThrows, emailThrows = false, realTurnstile = false } = {}) {
+  const calls = [], rpcCalls = [], clients = [], logs = [], outbound = [], emails = []
   const globals = {
     process: { env: { ...configuration } }, URL, AbortController, setTimeout, clearTimeout,
     console: Object.fromEntries(['log','error','warn','info','debug'].map(name => [name,(...args)=>logs.push(args)])),
@@ -39,12 +39,13 @@ function setup({ configuration = { REGISTRATION_ALLOWED_ORIGINS: origin }, turns
   }, { ...globals, process: { env: { NEXT_PUBLIC_SUPABASE_URL: 'http://mock.invalid', SUPABASE_SECRET_KEY: secret } } })
   const turnstileModule = realTurnstile ? compile('lib/security/turnstile.ts', { 'server-only':{} }, globals) : null
   const route = compile('app/api/registrations/route.ts', {
+    '@/lib/registrations/confirmation-email': { sendRegistrationConfirmation: async input => { emails.push(input); if (emailThrows) throw new Error(secret) } },
     'next/server': { NextResponse: { json: (body,options) => Response.json(body,options) } },
     '@/lib/registrations/public-registration': { ...validation, validatePublicRegistration: (...args) => { calls.push('validate'); return validation.validatePublicRegistration(...args) } },
     '@/lib/security/turnstile': { verifyTurnstile: async token => { calls.push('turnstile'); assert.equal(typeof token,'string'); if(stageThrows==='turnstile') throw new Error(secret); return turnstileModule ? turnstileModule.verifyTurnstile(token) : turnstileResult } },
     '@/lib/supabase/registration-service': { submitPublicRegistration: async (...args) => { calls.push(['service',...args]); return service.submitPublicRegistration(...args) } },
   }, globals)
-  return { calls, rpcCalls, clients, logs, outbound, route,
+  return { calls, rpcCalls, clients, logs, outbound, emails, route,
     async post(body=valid,{ headers={}, raw=false, stream }={}) {
       const requestHeaders = new Headers({ Origin:origin,'Content-Type':'application/json','Idempotency-Key':key,'x-real-ip':'192.0.2.25',...headers })
       for(const [name,value] of Object.entries(headers)) if(value===null) requestHeaders.delete(name)
@@ -220,5 +221,20 @@ test('Origin and real Turnstile reject missing configuration without any externa
     const context=setup(scenario)
     assert.equal((await context.post()).status,503)
     assert.deepEqual(context.outbound,[]);noRpc(context)
+  }
+})
+
+for (const created of [true, false, undefined]) test(`email runs only for validated new success: ${created}`, async () => {
+  const rpcData = { ...registered, ...(created === undefined ? {} : { created_new: created }) }
+  const c = setup({ rpcData, emailThrows: true })
+  const r = await c.post()
+  assert.equal(r.status, 201)
+  assert.deepEqual(r.body, { success: true, code: 'REGISTERED', message: '申込を受け付けました' })
+  assert.equal(c.emails.length, created === true ? 1 : 0)
+})
+test('rejected registrations never invoke email', async () => {
+  for (const code of ['CAPACITY_EXCEEDED', 'REGISTRATION_CLOSED']) {
+    const c = setup({ rpcData: { success: false, code, http_status: 409, created_new: false } })
+    assert.equal((await c.post()).status, 409); assert.equal(c.emails.length, 0)
   }
 })

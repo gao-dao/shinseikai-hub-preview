@@ -45,7 +45,7 @@ test('registration idempotency in isolated PostgreSQL 17', { skip: !enabled, tim
     grant usage on schema auth to authenticated;
     grant execute on function auth.uid() to authenticated;
   `)
-  for (const migration of ['20260918_initial_baseline.sql', '20261015_add_registration_management.sql', '20261019_add_registration_idempotency.sql']) {
+  for (const migration of ['20260918_initial_baseline.sql', '20261015_add_registration_management.sql', '20261019_add_registration_idempotency.sql', '20261102_add_registration_created_new.sql']) {
     await sql(await readFile(`supabase/migrations/${migration}`, 'utf8'))
   }
   const definitionSummary = JSON.parse(await sql(`
@@ -275,7 +275,7 @@ test('registration idempotency in isolated PostgreSQL 17', { skip: !enabled, tim
             end if;
           end $contract$;`)
         const key = randomUUID()
-        const expected = { success: false, code: contract.code, http_status: contract.status }
+        const expected = { success: false, code: contract.code, http_status: contract.status, created_new: false }
         assert.deepEqual(await execute(key, target, { classes }), expected)
         assert.deepEqual(await execute(key, target, { classes }), expected)
         assert.equal(await requestCount(key), '1')
@@ -287,8 +287,8 @@ test('registration idempotency in isolated PostgreSQL 17', { skip: !enabled, tim
   await t.test('success, semantic replay and a fresh key create the correct number of records', async () => {
     const group = await fixture(), key = randomUUID()
     const first = await execute(key, group)
-    assert.deepEqual(first, { success: true, code: 'REGISTERED', http_status: 201 })
-    assert.deepEqual(await execute(key, group, { name: ' Synthetic attendee ', contact: ' test.invalid ', classes: [...group.classes].reverse() }), first)
+    assert.deepEqual(first, { success: true, code: 'REGISTERED', http_status: 201, created_new: true })
+    assert.deepEqual(await execute(key, group, { name: ' Synthetic attendee ', contact: ' test.invalid ', classes: [...group.classes].reverse() }), { ...first, created_new: false })
     assert.deepEqual(await stats(group), { registrations: 1, items: 2 })
     await execute(randomUUID(), group)
     assert.deepEqual(await stats(group), { registrations: 2, items: 4 })
@@ -313,7 +313,7 @@ test('registration idempotency in isolated PostgreSQL 17', { skip: !enabled, tim
     const options = { name: '😀'.repeat(100), contact: 'あ'.repeat(254), notes: null }
     const first = await execute(key, group, options)
     assert.equal(first.success, true)
-    assert.deepEqual(await execute(key, group, { ...options, notes: ' ' }), first)
+    assert.deepEqual(await execute(key, group, { ...options, notes: ' ' }), { ...first, created_new: false })
     assert.deepEqual(await stats(group), { registrations: 1, items: 2 })
     const tooLongKey = randomUUID()
     await expectState(call(tooLongKey, group, { name: '😀'.repeat(101) }), '22023')
@@ -333,8 +333,11 @@ test('registration idempotency in isolated PostgreSQL 17', { skip: !enabled, tim
       assert.ok(Date.now() - started >= 250, 'second connection must wait for the uncommitted key')
       return result
     })
-    await first
-    assert.equal((await second).success, true)
+    const firstOutput = await first
+    assert.ok(firstOutput.includes('"created_new": true'))
+    const secondResult = await second
+    assert.equal(secondResult.success, true)
+    assert.equal(secondResult.created_new, false)
     assert.deepEqual(await stats(group), { registrations: 1, items: 2 })
     assert.equal(await requestCount(key), '1')
   })
@@ -354,9 +357,9 @@ test('registration idempotency in isolated PostgreSQL 17', { skip: !enabled, tim
   await t.test('closed-group error is cached; changing the group later does not retry it', async () => {
     const group = await fixture({ open: false }), key = randomUUID()
     const result = await execute(key, group)
-    assert.deepEqual(result, { success: false, code: 'REGISTRATION_CLOSED', http_status: 409 })
+    assert.deepEqual(result, { success: false, code: 'REGISTRATION_CLOSED', http_status: 409, created_new: false })
     await sql(`update public.event_groups set registration_open=true where id=${group.id};`)
-    assert.deepEqual(await execute(key, group), result)
+    assert.deepEqual(await execute(key, group), { ...result, created_new: false })
     await expectState(call(key, group, { name: 'Changed' }), 'PT409')
     assert.deepEqual(await stats(group), { registrations: 0, items: 0 })
     assert.equal((await execute(randomUUID(), group)).success, true)
@@ -370,7 +373,7 @@ test('registration idempotency in isolated PostgreSQL 17', { skip: !enabled, tim
     assert.equal(result.code, 'CAPACITY_EXCEEDED')
     assert.deepEqual(await stats(group), { registrations: 1, items: 1 })
     await sql(`update public.schedules set capacity=2 where event_group_id=${group.id};`)
-    assert.deepEqual(await execute(key, group), result)
+    assert.deepEqual(await execute(key, group), { ...result, created_new: false })
     assert.deepEqual(await stats(group), { registrations: 1, items: 1 })
   })
 
@@ -401,7 +404,7 @@ test('registration idempotency in isolated PostgreSQL 17', { skip: !enabled, tim
     const result = await execute(key, group)
     await sql(`update public.event_groups set registration_open=false where id=${group.id};
       update public.registration_items set status='cancelled',cancelled_at=now() where event_group_id=${group.id};`)
-    assert.deepEqual(await execute(key, group), result)
+    assert.deepEqual(await execute(key, group), { ...result, created_new: false })
     assert.equal(await sql(`select count(*) from public.registration_items where event_group_id=${group.id} and status='active';`), '0')
     assert.deepEqual(await stats(group), { registrations: 1, items: 2 })
   })

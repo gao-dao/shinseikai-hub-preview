@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { validatePublicRegistration, type PublicRegistrationResponse } from '@/lib/registrations/public-registration'
 import { verifyTurnstile } from '@/lib/security/turnstile'
+import { sendRegistrationConfirmation } from '@/lib/registrations/confirmation-email'
 import { submitPublicRegistration } from '@/lib/supabase/registration-service'
 
 export const dynamic = 'force-dynamic'
@@ -89,7 +90,12 @@ export async function POST(request: Request) {
 
     // No availability reads, no per-class writes and no automatic retries.
     // Cookie/Authorization headers are not passed to the service boundary.
-    return reply(await submitPublicRegistration(registration, validation.data.idempotency_key))
+    const result = await submitPublicRegistration(registration, validation.data.idempotency_key)
+    if (result.status === 201 && result.body.success && result.createdNew === true) {
+      // Email failures must never turn a committed registration into a failure.
+      try { await sendRegistrationConfirmation(validation.data) } catch { /* Best effort only; never log applicant data. */ }
+    }
+    return reply(result)
   } catch {
     return fail('REGISTRATION_RESULT_UNKNOWN', 503, '申込結果を確認できませんでした。新しい申込キーで再送せず、同じ申込内容で結果を確認してください')
   }

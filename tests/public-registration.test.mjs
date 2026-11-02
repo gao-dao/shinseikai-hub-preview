@@ -171,3 +171,14 @@ test('server boundary never retries RPC errors, malformed results or transport f
 test('service remains server-only', () => {
   assert.match(fs.readFileSync('lib/supabase/registration-service.ts','utf8'),/^import 'server-only'/)
 })
+
+test('server accepts strict new metadata and rejects malformed metadata', async () => {
+  for (const created_new of [true, false]) {
+    const result = await setup({ data: { ...registered, created_new } }).submit()
+    assert.equal(result.status, 201); assert.equal(result.createdNew, created_new)
+    assert.deepEqual(Object.keys(result.body).sort(), ['code', 'message', 'success'])
+  }
+  for (const data of [{ ...registered, created_new: 'true' }, { ...registered, created_new: null }, { ...registered, created_new: true, extra: 1 }, { success: false, code: 'CAPACITY_EXCEEDED', http_status: 409, created_new: true }]) {
+    assert.equal((await setup({ data }).submit()).body.success, false)
+  }
+})
