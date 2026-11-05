@@ -16,7 +16,7 @@ test('history target preserves validated search, state and page while canonicali
 })
 const group=(changes={})=>({id:501,title:'対象開催回',description:'説明',city:'東京',start_date:'2030-01-01',end_date:'2030-01-01',registration_open:true,is_hidden:false,is_cancelled:false,...changes})
 function db(g,dates=['2030-01-01'],fail=false){return {from(table){let data=table==='event_groups'?[g]:dates.map((date,i)=>({id:i+1,event_group_id:501,date,title:'クラス',start_time:'10:00',end_time:null,location:'会場'})),single=false,start=0,end=Infinity;const q={select(){return q},eq(k,v){data=data.filter(r=>r[k]===v);return q},gte(k,v){data=data.filter(r=>r[k]>=v);return q},not(k){data=data.filter(r=>r[k]!==null);return q},order(){return q},range(a,b){start=a;end=b;return q},maybeSingle(){single=true;return q},then(resolve,reject){return Promise.resolve({data:single?(data[0]??null):data.slice(start,end+1),count:data.length,error:fail?{}:null}).then(resolve,reject)}};return q}}}
-function publicPage(loader){return compile('app/(public)/events/page.tsx',{'react/jsx-runtime':jsx,'next/link':{default:'Link'},'./events-list':{default:'EventsList'},'@/lib/event-groups/public-guide-server':{loadGuideDetail:loader,loadGuidePage(){assert.fail('No guide list scanning')}},'@/lib/event-groups/public-guide':guide,'./guide.module.css':{default:{}}}).default}
+function publicPage(loader){return compile('app/(public)/events/page.tsx',{'react/jsx-runtime':jsx,'next/link':{default:'Link'},'next/navigation':{redirect(path){throw Object.assign(new Error('REDIRECT'),{path})}},'./events-list':{default:'EventsList'},'@/lib/event-groups/public-guide-server':{loadGuideDetail:loader,loadGuidePage(){assert.fail('No guide list scanning')}},'@/lib/event-groups/public-guide':guide,'./guide.module.css':{default:{}}}).default}
 test('detail registration link carries the numeric occurrence ID',async()=>{
  const page=compile('app/(public)/events/[id]/page.tsx',{'react/jsx-runtime':jsx,'next/link':{default:'Link'},'next/navigation':{notFound(){assert.fail()}},'@/lib/event-groups/public-guide-server':{loadGuideDetail:async()=>({group:group(),classes:[]})},'@/lib/event-groups/public-guide':guide,'../guide.module.css':{default:{}}}).default
  const tree=nodes(await page({params:Promise.resolve({id:'501'})}));assert.ok(tree.some(n=>n.props?.href==='/events?view=registration&groupId=501'))
@@ -34,9 +34,9 @@ for(const [label,changes,dates] of [['hidden',{is_hidden:true}],['cancelled',{is
  const page=publicPage(id=>server.loadGuideDetail(id,db(group(changes),dates),'2030-01-01'))
  const tree=nodes(await page({searchParams:Promise.resolve({view:'registration',groupId:'501'})}));assert.equal(tree.some(n=>n.type==='EventsList'),false);assert.ok(tree.some(n=>n.props?.role==='alert'));assert.ok(!JSON.stringify(tree).includes('対象開催回'))
 })
-test('unknown target/read failure fail closed; ordinary registration keeps the existing list without server target reads',async()=>{
+test('unknown target/read failure fail closed; retired list redirects without server target reads',async()=>{
  for(const loader of [async()=>null,async()=>{throw new Error('PRIVATE')}]){const page=publicPage(loader),tree=nodes(await page({searchParams:Promise.resolve({view:'registration',groupId:'501'})}));assert.equal(tree.some(n=>n.type==='EventsList'),false);assert.doesNotMatch(JSON.stringify(tree),/PRIVATE/)}
- const tree=await publicPage(()=>assert.fail())({searchParams:Promise.resolve({view:'registration'})});assert.equal(tree.type,'EventsList');assert.equal(tree.props.initialGroup,undefined);assert.equal(tree.key,'list')
+ await assert.rejects(publicPage(()=>assert.fail('redirect must not read target'))({searchParams:Promise.resolve({view:'registration'})}),error=>error.message==='REDIRECT'&&error.path==='/events')
 })
 test('history detail links carry complete filters; normal list links stay unchanged',()=>{
  const View=compile('app/(app)/admin/event-groups/admin-index-view.tsx',{'react/jsx-runtime':jsx,'next/link':{default:'Link'},'@/lib/event-groups/admin-index':index,'./admin-index.module.css':{default:{}}}).default

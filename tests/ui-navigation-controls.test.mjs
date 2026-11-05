@@ -55,15 +55,13 @@ function tools(tab, { client = {}, confirm = () => true } = {}) {
   h.render(Tools, { initialTab: tab }); h.state[1] = true; h.state[2] = false
   return { h, render: () => h.render(Tools, { initialTab: tab }) }
 }
-for (const tab of ['videos', 'passwords']) test(`management navigation identifies current page: ${tab}`, () => {
-  const { render } = tools(tab); const tree = render()
-  const current = tree.filter(n => n.props?.['aria-current'] === 'page')
-  assert.equal(current.length, 1); assert.equal(current[0].props.href, `/admin/${tab}`); assert.match(current[0].props.className, /\bact\b/)
-  assert.equal(tree.find(n => n.props?.href === '/admin/event-groups').props.children.trim(), '開催回管理')
-  for (const label of tree.filter(n => n.type === 'label')) {
-    assert.ok(label.props.htmlFor); assert.ok(tree.some(n => n.props?.id === label.props.htmlFor))
-  }
+for (const tab of ['videos', 'passwords']) test(`management mode has a page heading and delegates cross-page navigation to layout: ${tab}`, () => {
+ const tree=tools(tab).render()
+ assert.deepEqual(tree.filter(n=>n.type==='h1').map(n=>n.props.children),[tab==='videos'?'動画管理':'パスワード管理'])
+ assert.equal(tree.some(n=>n.props?.['aria-current']==='page'),false)
+ assert.equal(tree.some(n=>['/admin','/admin/videos','/admin/passwords','/admin/registrations'].includes(n.props?.href)),false)
 })
+
 for (const tab of ['videos', 'schedules']) test(`${tab} editing moves to the rendered form once and keeps values on cancel`, () => {
   const { h, render } = tools(tab)
   const row = tab === 'videos' ? { id: 1, title: '対象動画', description: '説明', url: 'https://example.invalid/video', duration: '10:00', tag: '基本型' }
@@ -82,12 +80,11 @@ for (const tab of ['videos', 'schedules']) test(`${tab} editing moves to the ren
   if (tab === 'videos') assert.equal(tree.find(n => n.props?.id === 'management-vTitle').props.value, '')
   else assert.equal(tree.some(n => n.props?.id === 'management-sTitle'), false)
 })
-test('registration list returns directly to occurrence management', () => {
+test('registration history delegates cross-page navigation without removing its page heading', () => {
   const h = hooks()
   const List = compile('app/(app)/admin/registrations/registration-list.tsx', { react: h.react, 'react/jsx-runtime': jsxRuntime, 'next/link': { default: Link },
     './registration-details-form': { default: () => null }, './cancel-registration-item': { default: () => null }, './add-registration-items': { default: () => null }, './proxy-registration-form': { default: () => null } }).default
-  const link = h.render(List).find(n => n.type === Link)
-  assert.equal(link.props.href, '/admin/event-groups'); assert.match(link.props.children, /開催回管理/)
+  const tree=h.render(List);assert.equal(tree.some(n=>n.type===Link&&n.props.href==='/admin/event-groups'),false);assert.ok(tree.some(n=>n.type==='h1'&&n.props.id==='registrations-title'))
 })
 const video = { id: 9, title: 'テスト動画', description: '説明', duration: '10:00', tag: '基本型', url: 'https://example.invalid/synthetic-video' }
 function library(user = { id: 'synthetic' }) {
@@ -150,12 +147,12 @@ test('video headings, input order and action grouping are accessible without cha
  assert.ok(tree.some(n=>n.type==='h2'&&n.props.children[0]==='登録済み動画 ('));
  assert.ok(tree.some(n=>n.type==='h3'&&n.props.children==='長い動画名'.repeat(20)));
  assert.deepEqual(tree.filter(n=>n.type==='label').map(n=>n.props.htmlFor),['management-vTitle','management-vDesc','management-vUrl','management-vDuration','management-vTag']);
- assert.equal(tree.filter(n=>n.props?.href==='/admin/registrations').length,1);assert.equal(tree.find(n=>n.props?.href==='/admin/registrations').props.children,'申込者管理');assert.ok(tree.some(n=>n.props?.href==='/admin'));
+ assert.equal(tree.some(n=>n.props?.href==='/admin/registrations'||n.props?.href==='/admin'),false);
  const actions=tree.find(n=>n.props?.className==='video-actions');assert.deepEqual(nodes(actions).filter(n=>n.type==='button').map(n=>n.props.children),['編集','削除']);
 })
-test('password mode retains original form styling and navigation, with no video-specific wrapper', () => {
+test('password mode retains form styling with its h1 and no duplicate navigation', () => {
  const tree=tools('passwords').render();assert.equal(tree.some(n=>n.props?.className?.includes('video-management')),false);assert.equal(tree.some(n=>n.props?.className==='video-nav'),false);
- assert.equal(tree.find(n=>n.props?.id==='management-adminNewPw').props.style.fontSize,'13px');assert.equal(tree.find(n=>n.props?.htmlFor==='management-adminNewPw').props.style.fontSize,'11px');assert.equal(tree.find(n=>n.props?.href==='/admin/registrations').props.children.trim(),'参加申込一覧');
+ assert.equal(tree.find(n=>n.props?.id==='management-adminNewPw').props.style.fontSize,'13px');assert.equal(tree.find(n=>n.props?.htmlFor==='management-adminNewPw').props.style.fontSize,'11px');assert.equal(tree.find(n=>n.type==='h1').props.children,'パスワード管理');assert.equal(tree.some(n=>n.props?.children==='参加申込一覧'),false);
 })
 test('video create, edit, cancel and confirmed delete retain their payloads and target IDs', async () => {
  const calls=[];let accept=false;const client={from(table){assert.equal(table,'videos');const q={select(){return q},async order(key,opts){calls.push(['read',key,opts]);return {data:[]}},async insert(payload){calls.push(['insert',plain(payload)]);return {}},update(payload){calls.push(['update',plain(payload)]);return {async eq(key,id){calls.push(['update-target',key,id]);return {}}}},delete(){calls.push(['delete']);return {async eq(key,id){calls.push(['delete-target',key,id]);return {}}}}};return q}};

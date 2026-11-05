@@ -29,9 +29,8 @@ for(const status of [401,403,200])test(`admin home boundary and five exact links
   const management=tree.find(n=>n.type==='nav'&&n.props['aria-label']==='管理メニュー')
   const cards=nodes(management).filter(n=>n.type===Link)
   assert.deepEqual(cards.map(n=>[n.props.href,nodes(n).find(child=>child.type==='strong').props.children]),managementLinks)
-  const publicNav=tree.find(n=>n.type==='nav'&&n.props['aria-label']==='公開ページ')
-  assert.deepEqual(nodes(publicNav).filter(n=>n.type===Link).map(n=>[n.props.href,n.props.children]),[['/events','開催案内'],['/schedule','スケジュール'],['/videos','動画ライブラリ']])
-  assert.equal(tree.filter(n=>n.type===Link).length,8)
+  assert.equal(tree.some(n=>n.type==='nav'&&n.props['aria-label']==='公開ページ'),false)
+  assert.equal(tree.filter(n=>n.type===Link).length,5)
   for(const card of cards){
    assert.equal(nodes(card).filter(n=>n.type==='svg'&&n.props['aria-hidden']==='true').length,1)
    assert.ok(nodes(card).some(n=>n.type==='span'&&n.props.children==='→'&&n.props['aria-hidden']==='true'))
@@ -45,14 +44,15 @@ for(const status of [401,403,200])test(`admin home boundary and five exact links
  }
  assert.equal(authorized,1)
 })
-test('admin header has one home link, only current on the actual admin home',()=>{
+test('admin pages use the shared menu while non-admin pages retain the global admin-home entry',()=>{
  let pathname='/admin';const h=hooks()
- const Layout=compile('app/(app)/layout.tsx',{react:h.react,'react/jsx-runtime':jsxRuntime,'next/link':{default:Link},'next/navigation':{useRouter:()=>({}),usePathname:()=>pathname},'@/lib/supabase/client':{createClient:()=>({})}}).default
+ const Layout=compile('app/(app)/layout.tsx',{'./admin/admin-navigation':{default:'AdminNavigation'},react:h.react,'react/jsx-runtime':jsxRuntime,'next/link':{default:Link},'next/navigation':{useRouter:()=>({}),usePathname:()=>pathname},'@/lib/supabase/client':{createClient:()=>({})}}).default
  h.render(Layout);h.state[0]={checked:true,logged:true,admin:true}
  for(const path of ['/admin','/admin/schedules','/admin/event-groups']){
   pathname=path;const home=h.render(Layout).filter(n=>n.type===Link&&n.props.href==='/admin')
-  assert.equal(home.length,1);assert.equal(home[0].props.children,'管理ホーム');assert.equal(home[0].props['aria-current'],path==='/admin'?'page':undefined)
+  assert.equal(home.length,0);assert.ok(h.render(Layout).some(n=>n.type==='AdminNavigation'&&n.props.pathname===path))
  }
+ pathname='/videos';assert.equal(h.render(Layout).filter(n=>n.type===Link&&n.props.href==='/admin').length,1)
  h.state[0]={checked:true,logged:true,admin:false};assert.equal(h.render(Layout).some(n=>n.props?.href==='/admin'),false)
 })
 const independent={id:1,title:'独立予定',date:'2030-01-01',start_time:'10:00',end_time:'11:00',location:'独立会場',type:'稽古会',event_group_id:null,capacity:20,registration_enabled:false}

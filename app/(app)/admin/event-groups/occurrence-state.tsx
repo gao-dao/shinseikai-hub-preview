@@ -28,11 +28,17 @@ ${action === 'cancel' ? '開催中止は解除できません。' : ''}
     } catch { setError('状態・変更結果を確認できません。再送せず最新情報を再取得してください。') }
     finally { inFlight.current = false; setBusy(false) }
   }
-  return <details><summary>その他の操作</summary>
+  return <details className="occurrence-lifecycle"><summary>その他の操作</summary>
     <p>申込・取消履歴は保持します。中止・非表示にしても既存申込は自動取消されず、申込者への連絡は別途必要です。</p>
-    <button className="reception-caution" type="button" disabled={disabled || busy || group.is_cancelled === true} onClick={() => void change('cancel')}>開催中止にする</button>
-    <button className="reception-secondary" type="button" disabled={disabled || busy} onClick={() => void change(group.is_hidden ? 'show' : 'hide')}>{group.is_hidden ? '一覧に再表示する' : '一覧から非表示にする'}</button>
-    <button className="reception-secondary" type="button" disabled={disabled || busy} onClick={onUpdated}>最新情報を再取得</button>
+    <div className="occurrence-lifecycle-actions">
+      <button className="reception-secondary" type="button" disabled={disabled || busy} onClick={() => void change(group.is_hidden ? 'show' : 'hide')}>{group.is_hidden ? '一覧に再表示する' : '一覧から非表示にする'}</button>
+      <button className="reception-secondary" type="button" disabled={disabled || busy} onClick={onUpdated}>最新情報を再取得</button>
+    </div>
+    <div className="occurrence-cancellation">
+      <h3>開催中止</h3>
+      <p className="occurrence-cancellation-note"><strong>注意：</strong>{group.is_cancelled ? '開催中止済みです。中止は解除できません。' : '開催中止は元に戻せません。受付の一時停止は、通常の受付操作で行ってください。'}</p>
+      <button className="reception-caution" type="button" disabled={disabled || busy || group.is_cancelled === true} onClick={() => void change('cancel')}>{group.is_cancelled ? '開催中止済み' : '開催中止にする'}</button>
+    </div>
     {message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}
   </details>
 }

@@ -24,12 +24,12 @@ for(const body of [{action:'uncancel',expected_state_version:2},{action:'hide'},
 test('invalid Origin and cross-site requests cannot mutate',async()=>{const c=api();assert.equal((await c.patch(undefined,'https://other.invalid')).status,403);assert.equal((await c.patch(undefined,'https://preview.invalid',{'sec-fetch-site':'cross-site'})).status,403);assert.equal(c.calls.length,0)})
 for(const [code,status] of [['PT409',409],['40001',409],['PT404',404],['42501',403],['XX000',503]])test(`state RPC failure ${code} maps safely`,async()=>{const r=await api({rpcError:{code,message:'PRIVATE_SECRET'}}).patch();assert.equal(r.status,status);assert.doesNotMatch(JSON.stringify(r.body),/PRIVATE_SECRET/)})
 test('malformed or unsafe success cannot appear as successful',async()=>{assert.equal((await api({rpcData:group}).patch()).status,503);assert.equal((await api({rpcData:null}).patch()).status,503)})
-function screen({count=3,status=200,confirm=true,patchStatus=200}={}) {
+function screen({count=3,status=200,confirm=true,patchStatus=200,groupData=group,disabled=false}={}) {
  const slots=[],calls=[],confirmations=[];let cursor=0,updated=0
  const react={useState(initial){const i=cursor++;if(!(i in slots))slots[i]=initial;return[slots[i],v=>slots[i]=v]},useRef(initial){const i=cursor++;return slots[i]??={current:initial}}}
  const jsx=(type,props)=>({type,props});const Component=compile('app/(app)/admin/event-groups/occurrence-state.tsx',{react,'react/jsx-runtime':{jsx,jsxs:jsx},'@/lib/event-groups/lifecycle':lifecycle},{window:{confirm:text=>{confirmations.push(text);return confirm}},fetch:async(url,options={})=>{calls.push({url,options});return{ok:(options.method?patchStatus:status)===200,status:options.method?patchStatus:status,json:async()=>options.method?{eventGroup:{...group,is_hidden:true,registration_open:false,state_version:3}}:{eventGroup:group,registrationCount:count}}}}).default
  const nodes=n=>Array.isArray(n)?n.flatMap(nodes):n&&typeof n==='object'?[n,...nodes(n.props?.children)]:[]
- const render=()=>{cursor=0;return nodes(Component({group,onUpdated:()=>updated++}))}
+ const render=()=>{cursor=0;return nodes(Component({group:groupData,disabled,onUpdated:()=>updated++}))}
  return{calls,confirmations,render,updated:()=>updated,click:label=>render().find(n=>n.type==='button'&&n.props.children===label).props.onClick()}
 }
 test('confirmation includes title, all history count and cancellation warning; success reloads',async()=>{const c=screen();await c.click('一覧から非表示にする');await new Promise(r=>setImmediate(r));assert.equal(c.confirmations.length,1);assert.match(c.confirmations[0],/Synthetic occurrence/);assert.match(c.confirmations[0],/3件/);assert.match(c.confirmations[0],/自動取消されません/);assert.match(c.confirmations[0],/連絡は別途必要/);assert.equal(c.updated(),1);assert.equal(c.calls.length,2);assert.equal(JSON.parse(c.calls[1].options.body).expected_state_version,2)})
@@ -42,4 +42,53 @@ test('schedule delegates public visibility to the anonymous server loader', asyn
  const text=n=>Array.isArray(n)?n.map(text).join(''):n&&typeof n==='object'?text(n.props?.children):typeof n==='string'?n:''
  const output=text(await Component())
  assert.equal(loaded,1);assert.match(output,/Ended occurrence/);assert.match(output,/Other venue/)
+})
+
+const visibleText = n => Array.isArray(n) ? n.map(visibleText).join('') : n && typeof n === 'object' ? visibleText(n.props?.children) : typeof n === 'string' ? n : ''
+test('cancellation is separated from auxiliary actions in a closed native disclosure',()=>{
+ const nodes=screen().render(), details=nodes.find(n=>n.type==='details')
+ assert.equal(details.props.open,undefined)
+ assert.equal(nodes.find(n=>n.type==='summary').props.children,'その他の操作')
+ const auxiliary=nodes.find(n=>n.props?.className==='occurrence-lifecycle-actions')
+ const cancellation=nodes.find(n=>n.props?.className==='occurrence-cancellation')
+ assert.match(visibleText(auxiliary),/一覧から非表示にする/)
+ assert.doesNotMatch(visibleText(auxiliary),/開催中止にする/)
+ assert.match(visibleText(cancellation),/開催中止にする/)
+ assert.match(visibleText(cancellation),/元に戻せません/)
+ assert.match(visibleText(cancellation),/受付の一時停止/)
+ assert.equal(nodes.filter(n=>n.type==='button').length,3)
+ assert.ok(nodes.filter(n=>n.type==='button').every(n=>n.props.disabled===false))
+})
+test('cancelled state is explicit and offers no undo while other actions remain enabled',()=>{
+ const nodes=screen({groupData:{...group,is_cancelled:true,registration_open:false}}).render()
+ const cancel=nodes.find(n=>n.props?.className==='reception-caution')
+ assert.equal(cancel.props.children,'開催中止済み')
+ assert.equal(cancel.props.disabled,true)
+ assert.match(visibleText(nodes),/中止は解除できません/)
+ assert.ok(nodes.filter(n=>n.props?.className==='reception-secondary').every(n=>n.props.disabled===false))
+})
+test('parent disabled condition still blocks all lifecycle controls',async()=>{
+ const c=screen({disabled:true})
+ assert.ok(c.render().filter(n=>n.type==='button').every(n=>n.props.disabled===true))
+ await c.click('開催中止にする')
+ assert.equal(c.calls.length,0)
+})
+test('cancellation retains irreversible confirmation and versioned request; busy blocks controls',async()=>{
+ const c=screen()
+ await c.click('開催中止にする')
+ assert.ok(c.render().filter(n=>n.type==='button').every(n=>n.props.disabled===true))
+ await new Promise(r=>setImmediate(r))
+ assert.match(c.confirmations[0],/開催中止は解除できません/)
+ assert.match(c.confirmations[0],/申込は自動取消されません/)
+ assert.deepEqual(JSON.parse(c.calls[1].options.body),{action:'cancel',expected_state_version:2})
+ assert.equal(c.updated(),1)
+})
+test('lifecycle controls preserve focus, touch targets and distinguish disabled from hover styles',()=>{
+ const css=fs.readFileSync('app/(app)/admin/event-groups/event-groups.tsx','utf8')
+ assert.match(css,/reception-caution\{background:#fff;border-color:#c9c2b8;color:var\(--hub-text\)\}/)
+ assert.match(css,/:not\(:disabled\):hover/)
+ assert.match(css,/:disabled\s*\{\s*opacity:1;[^}]*border-style:dashed;[^}]*cursor:not-allowed/)
+ assert.match(css,/:focus-visible\{outline:3px solid #6b1f2b;outline-offset:3px\}/)
+ assert.match(css,/min-height:44px/)
+ assert.match(css,/occurrence-lifecycle-actions\s*\{\s*display:flex;\s*flex-wrap:wrap;\s*gap:8px/)
 })

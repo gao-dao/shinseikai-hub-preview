@@ -1,5 +1,4 @@
 'use client';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import type { ClassResult, GroupResult, ItemResult, Parent } from '@/lib/registrations/admin-browser';
@@ -79,7 +78,7 @@ export default function RegistrationBrowser({ initialGroupId = null, initialScop
     function refresh() { resetRows(); setRevision(n => n + 1); }
     const seenParents = new Set<number>();
     return <section className={styles.page} aria-labelledby="browser-title">
-  <Link href="/admin">← 管理ホームへ</Link><h1 id="browser-title">申込者管理</h1>
+  <h1 id="browser-title">申込者管理</h1>
   <p>開催回とクラスを選択してください。件数は申込明細数です。日時は日本時間です。</p>
   {invalidGroup && <p role="alert">開催回IDが不正です。開催回を一覧から選択してください。</p>}
   <div className={styles.controls}><label htmlFor="occurrence-scope">開催回の表示</label><select id="occurrence-scope" value={scope} disabled={busy} onChange={e => { navigateGroup(null, e.target.value); setScope(e.target.value); setGroupPage(1); setGroup(null); setSchedule(null); setClassPage(1); resetRows(); }}>

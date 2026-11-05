@@ -303,12 +303,9 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
         .management-tools .list-title { overflow-wrap: anywhere; }
         @media(max-width:640px) { .management-tools .form-card { padding: 16px; } .management-tools .edit-btn, .management-tools .del-btn { font-size: 13px; } }
         .management-tools.video-management{width:100%;max-width:1000px;margin:0 auto;padding:32px;color:#29353b}
-        .video-management h1{font-size:28px;font-weight:700;line-height:1.4;margin:20px 0}
+        .management-tools h1{font-size:28px;font-weight:700;line-height:1.4;margin:20px 0}
         .video-management h2.list-hd{font-size:21px;font-weight:700;line-height:1.5;color:#29353b;letter-spacing:normal;text-transform:none;margin:0 0 16px}
         .video-management h3.list-title{font-size:18px;line-height:1.5;margin:0;font-weight:600}
-        .video-management .video-back,.video-management .video-nav a{display:inline-flex;align-items:center;min-height:44px;color:#6b1f2b;text-underline-offset:4px}
-        .video-management .video-nav{display:flex;flex-wrap:wrap;align-items:center;gap:8px 20px;margin:0 0 24px}
-        .video-management .video-nav .tab{flex:initial;min-width:0;padding:8px 12px;border-radius:6px;box-shadow:none;background:#f7eef0;color:#6b1f2b;border-color:#ded8ce;font-size:14px}
         .video-management .form-card,.video-management .list-card{box-shadow:none}
         .video-management .video-label{display:block;font-size:14px;font-weight:600;line-height:1.6;margin:16px 0 6px}
         .video-management .video-input{display:block;width:100%;min-height:44px;padding:12px;border:1px solid #c9c2b8;border-radius:8px;background:#fff;color:inherit;font:inherit;line-height:1.5;box-sizing:border-box}
@@ -327,30 +324,7 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
         @media(max-width:640px){.management-tools.video-management{padding:20px 16px}.video-management .list-card{align-items:stretch;gap:14px;padding:16px}.video-management .video-info{flex-basis:100%}.video-management .video-actions{width:100%}.video-management .video-primary{width:100%}.video-management .cancel-btn{width:100%;margin-left:0}}
       `}</style>
       <div className={`sp management-tools${tab === 'videos' ? ' video-management' : ''}`}>
-        {tab === 'videos' ? <>
-          <Link className="video-back" href="/admin">← 管理ホームへ戻る</Link>
-          <h1>動画管理</h1>
-          <nav className="video-nav" aria-label="管理メニュー">
-            <Link href="/admin/event-groups" prefetch={false}>開催回管理</Link>
-            <Link href="/admin/registrations" prefetch={false}>申込者管理</Link>
-            <Link className="tab act" aria-current="page" href="/admin/videos">動画管理</Link>
-            <Link href="/admin/passwords">パスワード管理</Link>
-          </nav>
-        </> : <>
-        <div className="sec-hd">{tab === 'schedules' ? '予定管理' : tab === 'passwords' ? 'パスワード管理' : '動画管理'}</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'flex-end', marginBottom: '16px' }}>
-          <Link href="/admin/event-groups" prefetch={false} className="edit-btn" style={{ textDecoration: 'none' }}>
-            開催回管理
-          </Link>
-          <Link href="/admin/registrations" prefetch={false} className="edit-btn" style={{ textDecoration: 'none' }}>
-            参加申込一覧
-          </Link>
-        </div>
-        <div className="tabs">
-          <Link className="tab" href="/admin/videos">▶ 動画管理</Link>
-          <Link className={`tab${tab === 'passwords' ? ' act' : ''}`} aria-current={tab === 'passwords' ? 'page' : undefined} href="/admin/passwords">🔑 パスワード管理</Link>
-        </div>
-        </> }
+        {tab === 'schedules' ? <div className="sec-hd">予定管理</div> : <h1>{tab === 'videos' ? '動画管理' : 'パスワード管理'}</h1>}
 
         {tab === 'videos' && (
           <>

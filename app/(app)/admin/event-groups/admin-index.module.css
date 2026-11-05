@@ -36,3 +36,9 @@
 .homePublicLinks a { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 0; font-size: 14px; }
 @media(min-width: 640px) { .homeGrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media(max-width: 639px) { .homeCard { min-height: 112px; gap: 12px; padding: 20px 16px; } }
+
+.adminNav { flex-shrink: 0; width: 100%; max-width: var(--hub-width); box-sizing: border-box; margin: 0 auto; padding: 12px var(--hub-gutter-mobile); border-bottom: 1px solid #ded8ce; }
+.adminNav a { display: inline-flex; align-items: center; min-height: 44px; padding: 8px 10px; color: var(--hub-muted); text-decoration: none; border-radius: 6px; overflow-wrap: anywhere; }
+.adminNav a[aria-current="page"] { color: var(--hub-primary); background: #f7eef0; font-weight: 700; }
+.adminNav a:focus-visible { outline: 2px solid var(--hub-primary); outline-offset: 2px; }
+@media(min-width: 768px) { .adminNav { padding-inline: var(--hub-gutter-pc); } }

@@ -271,7 +271,7 @@ function form({group={id:5,title:'Synthetic group'},store=storage(),postResponse
     calls.push([url,options]);if(options?.method==='POST'){if(postError)throw new Error('SECRET');if(pendingPost)return new Promise(resolve=>{release=resolve});return postResponse}
     if(classesFail)throw new Error('SECRET');return {ok:true,json:async()=>({schedules:classes,page:1,pageSize:50,total:classes.length})}
   }})
-  const render=()=>{harness.reset();return elements(Component({group,onClose:()=>calls.push(['closed'])}))}
+  const render=()=>{harness.reset();return elements(Component({group}))}
   return {render,calls,logs,Widget,release:()=>release(response()),async mount(){render();await harness.flush();return render()},find:id=>render().find(item=>item.props?.id===id),async completeInput(){await this.mount();for(const [id,value] of [['public-name','参加者'],['public-contact','電話'],['public-notes','備考']])this.find(id).props.onChange({target:{value}});render().find(item=>item.type==='input'&&item.props.type==='checkbox').props.onChange({target:{checked:true}})},confirm(){return render().find(item=>item.type==='form').props.onSubmit({preventDefault(){}})},token(value='fresh-token'){render().find(item=>item.type===Widget).props.onToken(value)},submit(){return render().find(item=>item.type==='button'&&['この内容で申し込む','同じ申込の結果を再確認する'].includes(item.props.children)).props.onClick()}}
 }
 
@@ -401,9 +401,10 @@ for(const value of [null,'','0','-1','1.5','NaN','100000',' 60','60 ','Wed, 21 O
 
 for(const [name,changes,label,disabled] of [
  ['open',{canRegister:true,remainingCapacity:8,status:'受付可能'},'受付可能',false],
- ['stopped with seats',{canRegister:false,remainingCapacity:8,status:'クラス受付停止中'},'満席',true],
- ['stopped with no seats',{canRegister:false,remainingCapacity:0,status:'クラス受付停止中'},'満席',true],
- ['zero seats',{canRegister:false,remainingCapacity:0,status:'満員'},'申込不可',true],
+ ['stopped with seats',{canRegister:false,remainingCapacity:8,status:'クラス受付停止中'},'受付停止中',true],
+ ['stopped with no seats',{canRegister:false,remainingCapacity:0,status:'クラス受付停止中'},'受付停止中',true],
+ ['zero seats',{canRegister:false,remainingCapacity:0,status:'満員'},'満員',true],
+ ['unset capacity',{canRegister:false,capacity:null,remainingCapacity:null,status:'定員未設定'},'現在受付できません',true],
  ['unknown seats',{canRegister:false,remainingCapacity:null,status:'残席確認不可'},'申込状況を確認できません',true],
 ])test(`public form hides numeric capacity and preserves selection: ${name}`,async()=>{
  const saved=row(11,changes),before=JSON.stringify(saved),context=form({classes:[saved]});await context.mount()
@@ -412,27 +413,27 @@ for(const [name,changes,label,disabled] of [
  assert.equal(nodes.find(item=>item.type==='input'&&item.props.type==='checkbox').props.disabled,disabled)
  const labels=nodes.filter(item=>item.type==='span').map(item=>item.props.children).join(' ')
  assert.doesNotMatch(labels,/定員|残席|残り[0-9]/)
- if(label!=='満席')assert.ok(!nodes.some(item=>item.props?.children==='満席'))
+ if(label!=='受付停止中')assert.ok(!nodes.some(item=>item.props?.children==='受付停止中'))
  assert.equal(JSON.stringify(saved),before);assert.equal(context.calls.some(call=>call[1]?.method==='POST'),false)
 })
 test('unavailable group/classes never become full labels and prevent confirmation',async()=>{
  const context=form({classesFail:true});await context.mount()
  assert.ok(context.render().some(item=>item.props?.role==='alert'))
- assert.ok(!context.render().some(item=>item.props?.children==='満席'))
+ assert.ok(!context.render().some(item=>item.props?.children==='受付停止中'))
  assert.equal(context.render().find(item=>item.type==='button'&&item.props.children==='入力内容を確認する').props.disabled,true)
  assert.equal(context.calls.some(call=>call[1]?.method==='POST'),false)
 })
 
-test('editing exposes a single primary review action before auxiliary refresh and close; auxiliary actions never submit',async()=>{
+test('editing retains one primary review action and a non-submitting direct detail link',async()=>{
  const c=form();await c.mount();let tree=c.render()
  const controls=tree.filter(n=>n.type==='button'),primary=controls.filter(n=>n.props.className==='events-primary')
  assert.equal(primary.length,1);assert.equal(primary[0].props.children,'入力内容を確認する');assert.equal(primary[0].props.type,'submit')
- const refresh=controls.find(n=>n.props.children==='申込状況を再取得'),close=controls.find(n=>n.props.children==='閉じる')
- assert.equal(refresh.props.className,'events-secondary');assert.equal(close.props.className,'events-secondary');assert.equal(refresh.props.type,'button');assert.equal(close.props.type,'button')
+ const refresh=controls.find(n=>n.props.children==='申込状況を再取得'),back=tree.find(n=>n.type==='a'&&n.props.children==='開催詳細へ戻る')
+ assert.equal(refresh.props.className,'events-secondary');assert.equal(refresh.props.type,'button');assert.equal(back.props.href,'/events/5');assert.equal(back.props.prefetch,false);assert.equal(back.props.onClick,undefined)
  assert.ok(controls.indexOf(primary[0])<controls.indexOf(refresh))
  const gets=c.calls.filter(([url,init])=>!init?.method&&url.startsWith('/api/')).length
  refresh.props.onClick();await c.mount();assert.ok(c.calls.filter(([url,init])=>!init?.method&&url.startsWith('/api/')).length>gets)
- close.props.onClick();assert.equal(c.calls.filter(([url])=>url==='closed').length,1);assert.equal(c.calls.filter(([,init])=>init?.method==='POST').length,0)
+ assert.equal(c.calls.filter(([,init])=>init?.method==='POST').length,0)
 })
 test('review retains the protected submit action and editing path; pending still prevents close and input changes',async()=>{
  const c=form({postError:true});await c.completeInput();c.confirm()
@@ -609,4 +610,56 @@ test('unknown and rejected submissions never offer the success return link or co
     assert.ok(tree.some(n => n.type === 'button' && n.props.children === '同じ申込の結果を再確認する'))
     assert.equal(JSON.parse(store.getItem(model.publicAttemptStorageKey)).pending.groupId, 5)
   }
+})
+
+
+test('editing and review return to the selected occurrence without allocating or removing request state',async()=>{
+ for (const id of [5,6]) {
+  const store=storage(), c=form({store,group:{id,title:`開催回${id}`}})
+  await c.completeInput()
+  for (const review of [false,true]) {
+   if(review)c.confirm()
+   const back=c.render().find(n=>n.type==='a'&&n.props.children==='開催詳細へ戻る')
+   assert.ok(back);assert.equal(back.props.href,`/events/${id}`);assert.equal(back.props.prefetch,false)
+   assert.equal(back.props.onClick,undefined)
+   assert.equal(c.calls.some(call=>call[1]?.method==='POST'),false)
+   assert.equal(store.getItem(model.publicAttemptStorageKey),null)
+   assert.equal(c.render().some(n=>n.props?.children==='閉じる'),false)
+  }
+ }
+})
+test('initialization and blocked reload offer no form exit link and preserve an unresolved key',async()=>{
+ const raw=JSON.stringify({version:2,completedGroupIds:[5],pending:{groupId:6,key:key2}})
+ const store=storage(raw),c=form({store})
+ assert.equal(c.render().some(n=>n.props?.children==='開催詳細へ戻る'),false)
+ await c.mount()
+ assert.equal(c.render().some(n=>['開催詳細へ戻る','開催案内へ戻る','新しい申込を始める'].includes(n.props?.children)),false)
+ assert.equal(store.getItem(model.publicAttemptStorageKey),raw)
+ assert.equal(c.calls.some(call=>call[1]?.method==='POST'),false)
+})
+test('in-flight and unknown outcomes retain their original request without exposing an exit link',async()=>{
+ for (const pendingPost of [true,false]) {
+  const store=storage(),c=form({store,pendingPost,postError:!pendingPost})
+  await c.completeInput();c.confirm();c.token();c.submit()
+  const raw=store.getItem(model.publicAttemptStorageKey)
+  await new Promise(resolve=>setImmediate(resolve))
+  assert.equal(c.render().some(n=>['開催詳細へ戻る','開催案内へ戻る','新しい申込を始める'].includes(n.props?.children)),false)
+  assert.equal(store.getItem(model.publicAttemptStorageKey),raw)
+  assert.equal(controllerFor(store,6).phase,'blocked')
+  assert.equal(controllerFor(store,5).phase,'blocked')
+  assert.equal(c.calls.filter(call=>call[1]?.method==='POST').length,1)
+  if(pendingPost){c.release();await new Promise(resolve=>setImmediate(resolve))}
+ }
+})
+test('successful reload keeps the guide link and explicit additional application, not the pre-submit exit',async()=>{
+ const store=storage(JSON.stringify({version:2,completedGroupIds:[5],pending:null})),c=form({store})
+ await c.mount()
+ assert.equal(c.render().filter(n=>n.type==='a'&&n.props.children==='開催案内へ戻る').length,1)
+ assert.equal(c.render().some(n=>n.props?.children==='開催詳細へ戻る'),false)
+ const before=store.getItem(model.publicAttemptStorageKey)
+ assert.equal(c.calls.some(call=>call[1]?.method==='POST'),false)
+ assert.equal(store.getItem(model.publicAttemptStorageKey),before)
+ c.render().find(n=>n.type==='button'&&n.props.children==='新しい申込を始める').props.onClick()
+ assert.equal(c.render().find(n=>n.type==='a'&&n.props.children==='開催詳細へ戻る').props.href,'/events/5')
+ assert.equal(c.calls.some(call=>call[1]?.method==='POST'),false)
 })

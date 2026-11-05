@@ -62,7 +62,7 @@ for (const options of [{ id: '0' }, { classId: '1e3' }, { id: '9007199254740992'
 })
 function nodes(tree) { return Array.isArray(tree) ? tree.flatMap(nodes) : tree && typeof tree === 'object' ? [tree, ...nodes(tree.props?.children)] : [] }
 function text(tree) { return Array.isArray(tree) ? tree.map(text).join('') : tree && typeof tree === 'object' ? text(tree.props?.children) : tree == null ? '' : String(tree) }
-function screen({ showControls = true, parentOpen = true, enabled = true, mutate = 'ok', readFails = false, capacity = 5, registeredCount = 5 } = {}) {
+function screen({ showControls = true, parentOpen = true, occurrenceBlocked = false, enabled = true, mutate = 'ok', readFails = false, capacity = 5, registeredCount = 5 } = {}) {
   let slot = 0, current = { id: 2, title: 'クラスA', date: '2030-01-01', capacity, registeredCount, registration_enabled: enabled }, readsFail = readFails, pending, deferred
   const slots = [], calls = [], effects = []
   const react = { useState(v) { const i = slot++; if (!(i in slots)) slots[i] = v; return [slots[i], v => { slots[i] = typeof v === 'function' ? v(slots[i]) : v }] }, useRef(v) { const i = slot++; if (!(i in slots)) slots[i] = { current: v }; return slots[i] }, useEffect(fn) { slot++; if (!effects.length) effects.push(fn) } }
@@ -74,7 +74,7 @@ function screen({ showControls = true, parentOpen = true, enabled = true, mutate
     if (mutate === 'throw') throw Error('lost response')
     return { ok: mutate !== 'conflict', json: async () => mutate === 'conflict' ? { error: '競合' } : { schedule: { id: 2, event_group_id: 7, registration_enabled: !enabled } } }
   } }).default
-  const render = () => { slot = 0; return Component({ groupId: 7, row: current, parentOpen, showControls, onRefreshed: row => { current = row } }) }
+  const render = () => { slot = 0; return Component({ groupId: 7, row: current, parentOpen, showControls, occurrenceBlocked, onRefreshed: row => { current = row } }) }
   const buttons = () => nodes(render()).filter(n => n.type === 'button')
   return { calls, render, buttons, text: () => text(render()), click(i = 0) { buttons()[i].props.onClick(); pending = new Promise(r => setImmediate(r)); return pending }, unblock() { deferred?.() }, allowRead() { readsFail = false } }
 }
@@ -106,7 +106,7 @@ test('existing API counts active items only and existing layout supports small s
 })
 
 test('single class display-only mode retains all statistics without mutation controls', () => {
-  const c = screen({ showControls: false }); assert.equal(c.buttons().length, 0); assert.match(c.text(), /5件/); assert.match(c.text(), /定員5名/); assert.match(c.text(), /残席0名/); assert.match(c.text(), /受付中/); assert.equal(c.calls.length, 0)
+  const c = screen({ showControls: false }); assert.equal(c.buttons().length, 0); assert.match(c.text(), /5件/); assert.match(c.text(), /定員5名/); assert.match(c.text(), /残席0名/); assert.match(c.text(), /クラス受付設定：有効/); assert.equal(c.calls.length, 0)
 })
 
 test('counts stay grouped with labels while reception state is separate', () => {
@@ -114,6 +114,34 @@ test('counts stay grouped with labels while reception state is separate', () => 
   const stats = tree.find(n => n.type === 'dl');
   assert.deepEqual(nodes(stats).filter(n => n.type === 'dt').map(n => text(n)), ['有効申込数', '定員', '残席']);
   assert.deepEqual(nodes(stats).filter(n => n.type === 'dd').map(n => text(n)), ['3件', '5名', '2名']);
-  assert.ok(!text(stats).includes('受付中')); assert.match(text(tree.find(n => n.props?.className === 'class-reception-state')), /クラス受付：受付中/);
+  assert.ok(!text(stats).includes('受付中')); assert.match(text(tree.find(n => n.props?.className === 'class-reception-state')), /クラス受付設定：有効/);
   assert.equal(c.buttons().length, 1); assert.equal(c.buttons()[0].props.className, 'reception-primary'); assert.equal(c.buttons()[0].props.disabled, false);
+})
+
+
+for (const parentOpen of [true,false]) for (const enabled of [true,false]) for (const [name,capacity,registeredCount] of [['available',5,2],['full',5,5],['unset',null,2]]) {
+ test(`settings and effective reception differ: parent=${parentOpen}, enabled=${enabled}, ${name}`, () => {
+  const c=screen({parentOpen,enabled,capacity,registeredCount})
+  const tree=nodes(c.render())
+  assert.equal(text(tree.find(n=>n.props?.className==='class-reception-state')),`クラス受付設定：${enabled?'有効':'停止'}`)
+  const expected=!parentOpen?'開催回全体が受付停止中':!enabled?'受付停止中（クラス受付が停止中）':capacity===null?'現在受付できません（定員未設定）':registeredCount>=capacity?'満員':'受付可能'
+  assert.equal(text(tree.find(n=>n.props?.className==='class-public-reception-state')),`現在の公開申込：${expected}`)
+  assert.equal(c.buttons()[0].props.disabled,false)
+  assert.equal(c.buttons()[0].props.children,enabled?'受付を停止':'受付を開始')
+  assert.equal(c.calls.length,0)
+ })
+}
+test('ambiguous update never promises public acceptance until the existing reread succeeds', async () => {
+ const c=screen({registeredCount:2,readFails:true})
+ await c.click()
+ assert.match(c.text(),/現在の公開申込：申込状況を確認できません/)
+ assert.doesNotMatch(c.text(),/現在の公開申込：受付可能/)
+ assert.equal(c.buttons()[0].props.disabled,true)
+ assert.equal(c.calls.filter(Array.isArray).length,1)
+})
+test('cancelled or hidden occurrence is never described as accepting even if raw flags are enabled', () => {
+ const c=screen({occurrenceBlocked:true,parentOpen:true,enabled:true,registeredCount:2})
+ assert.match(c.text(),/クラス受付設定：有効/)
+ assert.match(c.text(),/現在の公開申込：受付停止（開催中止・非表示）/)
+ assert.equal(c.calls.length,0)
 })

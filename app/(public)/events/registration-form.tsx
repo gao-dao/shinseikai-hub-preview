@@ -11,7 +11,7 @@ import TurnstileWidget from './turnstile-widget'
 type Input = NonNullable<ReturnType<typeof validateProxyRegistration>['data']>
 type Stage = 'initializing' | 'editing' | 'confirming' | 'pending' | 'success' | 'blocked'
 
-export default function RegistrationForm({ group, onClose }: { group: { id: number; title: string }; onClose: () => void }) {
+export default function RegistrationForm({ group }: { group: { id: number; title: string } }) {
   const [stage, setStage] = useState<Stage>('initializing')
   const [name, setName] = useState(''), [contact, setContact] = useState(''), [notes, setNotes] = useState('')
   const [classes, setClasses] = useState<PublicClass[]>([]), [selected, setSelected] = useState<number[]>([])
@@ -132,6 +132,6 @@ export default function RegistrationForm({ group, onClose }: { group: { id: numb
       </div>
     </>}
     {error && <p role="alert">{error}</p>}
-    {stage !== 'pending' && !saving && <div className="events-form-close">{stage === 'success' ? <Link href="/events" prefetch={false}>開催案内へ戻る</Link> : <button type="button" className="events-secondary" onClick={onClose}>閉じる</button>}</div>}
+    {['editing', 'confirming', 'success'].includes(stage) && !saving && <div className="events-form-close">{stage === 'success' ? <Link href="/events" prefetch={false}>開催案内へ戻る</Link> : <Link href={`/events/${group.id}`} prefetch={false}>開催詳細へ戻る</Link>}</div>}
   </section>
 }

@@ -3,6 +3,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import AdminNavigation from './admin/admin-navigation'
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -43,12 +44,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       setError('ログアウトできませんでした。時間をおいてお試しください。')
     } finally { setSigningOut(false) }
   }
+  const showAdminNavigation = session.checked && session.admin && (pathname === '/admin' || pathname.startsWith('/admin/'))
   const links = [
     { href: '/', label: 'ホーム' },
     { href: '/events', label: '開催案内' },
     { href: '/schedule', label: 'スケジュール' },
     ...(session.logged ? [{ href: '/videos', label: '動画ライブラリ' }] : []),
-    ...(session.admin ? [{ href: '/admin', label: '管理ホーム' }] : []),
+    ...(session.admin && !showAdminNavigation ? [{ href: '/admin', label: '管理ホーム' }] : []),
   ]
   return <>
     <style>{`
@@ -69,7 +71,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </nav>
       </header>
       {error && <p className="hub-error" role="alert">{error}</p>}
-      <div className="hub-content">{children}</div>
+      <div className="hub-content">
+        {showAdminNavigation && <AdminNavigation pathname={pathname} />}
+        {children}
+      </div>
     </div>
   </>
 }

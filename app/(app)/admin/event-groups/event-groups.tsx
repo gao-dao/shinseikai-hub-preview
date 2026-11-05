@@ -231,7 +231,16 @@ export default function EventGroups({ groupId, createOnly = false, returnTo = '/
         .occurrence-state-change p { font-size:13px; color:#657078; }
         .eg-card { max-width:1080px; margin-left:auto; margin-right:auto; }
         .eg-page button { font-size:14px; padding:8px 12px; }
-        .eg-page h1{font-size:28px;font-weight:700;line-height:1.4}.eg-page h2{font-size:21px;font-weight:700;line-height:1.5;margin:24px 0 12px}.eg-page h3{font-size:18px;font-weight:600;line-height:1.5;margin:18px 0 10px}.eg-page .reception-primary{background:#6b1f2b;border-color:#6b1f2b;color:#fff}.eg-page .reception-secondary{background:#fff;border-color:#c9c2b8;color:#52616e}.eg-page .reception-caution{background:#fff;border-color:#b91c1c;color:#b91c1c}.eg-page :is(button,a,summary):focus-visible{outline:3px solid #6b1f2b;outline-offset:3px}.eg-page summary{min-height:44px;padding:12px 0;cursor:pointer}.eg-description { white-space: pre-wrap; overflow-wrap: anywhere; margin: 12px 0; }
+        .eg-page h1{font-size:28px;font-weight:700;line-height:1.4}.eg-page h2{font-size:21px;font-weight:700;line-height:1.5;margin:24px 0 12px}.eg-page h3{font-size:18px;font-weight:600;line-height:1.5;margin:18px 0 10px}.eg-page .reception-primary{background:#6b1f2b;border-color:#6b1f2b;color:#fff}.eg-page .reception-secondary{background:#fff;border-color:#c9c2b8;color:#52616e}.eg-page .reception-caution{background:#fff;border-color:#c9c2b8;color:var(--hub-text)}.eg-page :is(button,a,summary):focus-visible{outline:3px solid #6b1f2b;outline-offset:3px}.eg-page summary{min-height:44px;padding:12px 0;cursor:pointer}.eg-description { white-space: pre-wrap; overflow-wrap: anywhere; margin: 12px 0; }
+        .eg-page .occurrence-lifecycle { margin-top:24px; padding-top:12px; border-top:1px solid #ded8ce; }
+        .eg-page .occurrence-lifecycle > summary { color:var(--hub-muted); font-weight:600; }
+        .occurrence-lifecycle-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+        .occurrence-cancellation { border-top:1px solid #ded8ce; margin-top:20px; padding-top:16px; }
+        .eg-page .occurrence-cancellation h3 { margin:0 0 8px; font-size:var(--hub-h3-size); font-weight:var(--hub-h3-weight); }
+        .occurrence-cancellation-note { color:var(--hub-muted); font-size:14px; line-height:1.7; }
+        .occurrence-cancellation-note strong { color:var(--hub-primary); }
+        .eg-page :is(.reception-secondary,.reception-caution):not(:disabled):hover { border-color:var(--hub-primary); color:var(--hub-primary); background:#f7eef0; }
+        .eg-page :is(.reception-primary,.reception-secondary,.reception-caution):disabled { opacity:1; background:#f1f1ee; border-color:#c9c2b8; border-style:dashed; color:#777e85; cursor:not-allowed; }
       `}</style>
       <Link href={returnTo}>{returnTo.startsWith('/admin/event-groups/history') ? '← 開催履歴へ戻る' : '← 開催回一覧へ'}</Link>
       <h1 id="event-groups-title">{groupId ? result?.eventGroups[0]?.title ?? '開催回の詳細' : '開催回を作成'}</h1>

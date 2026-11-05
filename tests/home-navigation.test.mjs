@@ -51,6 +51,7 @@ for (const role of ['anonymous', 'member', 'admin', 'profile-error', 'auth-error
       from(table) { assert.equal(table, 'profiles'); return { select(columns) { assert.equal(columns, 'role'); return { eq(key, value) { assert.equal(key, 'id'); assert.equal(value, 'own-user'); return { maybeSingle: async () => ({ data: { role }, error: role === 'profile-error' ? {} : null }) } } } } } },
     }
     const Layout = load('app/(app)/layout.tsx', {
+      './admin/admin-navigation': { default: 'AdminNavigation' },
       react: {
         useState(initial) { const slot = index++; if (!(slot in state)) state[slot] = initial; return [state[slot], next => { state[slot] = next }] },
         useMemo(fn) { return memo ??= fn() }, useEffect(fn) { effect = fn },

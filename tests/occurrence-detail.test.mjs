@@ -98,7 +98,7 @@ for (const parentOpen of [true, false]) for (const enabled of [true, false]) tes
   assert.equal(c.nodes().find(n => n.type === 'button').props.disabled, !parentOpen && !enabled)
   assert.match(c.text(), /有効申込数3件/); assert.match(c.text(), /定員10名/); assert.match(c.text(), /残席7名/)
   assert.match(c.text(), parentOpen ? /受付を停止/ : /受付を開始/)
-  assert.match(c.text(), parentOpen && enabled ? /現在の公開申込：受付可能/ : /現在の公開申込：受付停止/)
+  assert.match(c.text(), parentOpen ? enabled ? /現在の公開申込：受付可能/ : /現在の公開申込：受付停止中/ : /現在の公開申込：開催回全体が受付停止中/)
   const edit = c.nodes().filter(n => n.type === 'a')
   assert.equal(edit.length, enabled ? 0 : 1)
   if (!enabled) {
@@ -108,7 +108,7 @@ for (const parentOpen of [true, false]) for (const enabled of [true, false]) tes
   }
 })
 for (const extra of [{ capacity: null }, { capacity: 3 }, { capacity: 2 }]) test(`single reception does not promise acceptance without seats ${JSON.stringify(extra)}`, async () => {
-  const c = screen({ parentOpen: true, rows: [row(1, extra)] }); await c.flush(); assert.match(c.text(), /現在の公開申込：受付不可/); assert.doesNotMatch(c.text(), /現在の公開申込：受付可能/)
+  const c = screen({ parentOpen: true, rows: [row(1, extra)] }); await c.flush(); assert.match(c.text(), /現在の公開申込：(現在受付できません|満員)/); assert.doesNotMatch(c.text(), /現在の公開申込：受付可能/)
 })
 for (const option of [{ cancelled: true }, { hidden: true }]) test(`blocked occurrence stays closed ${JSON.stringify(option)}`, async () => {
   const c = screen({ parentOpen: true, ...option }); await c.flush(); assert.match(c.text(), /現在の公開申込：受付停止（開催中止・非表示）/)
@@ -120,7 +120,7 @@ test('multiple classes retain one reception control per class', async () => {
   const c = screen({ rows: [row(1), row(2, { registration_enabled: false })] }); await c.flush()
   assert.equal(c.nodes().filter(n => n.type === 'button').length, 3)
   assert.match(c.text(), /受付を開始/); assert.match(c.text(), /受付を停止/)
-  assert.doesNotMatch(c.text(), /現在の公開申込：/)
+  assert.equal(c.text().split('現在の公開申込：').length - 1, 2)
 })
 test('page containing one row does not make a two-class occurrence single', async () => {
   const rows = await loader([page([row(1)], 1, 2, 1), page([row(2)], 2, 2, 1)]).read()
@@ -150,5 +150,30 @@ test('parent stop notice appears once above multiple classes', async () => {
 
 test('closed Tokyo occurrence remains stopped after display-only loading', async () => {
   const c = screen({ parentOpen: false, groupData: { id: 6, title: '東京稽古会', start_date: '2026-10-23', end_date: '2026-10-26' }, rows: [row(61, { date: '2026-10-26', registration_enabled: true })] })
-  await c.flush(); assert.match(c.text(), /現在の公開申込：受付停止/); assert.match(c.text(), /グループ全体の申込受付：停止中/); assert.equal(c.calls.length, 1); assert.equal(c.calls[0][0], 6)
+  await c.flush(); assert.match(c.text(), /現在の公開申込：開催回全体が受付停止中/); assert.match(c.text(), /開催回全体の申込受付：停止中/); assert.equal(c.calls.length, 1); assert.equal(c.calls[0][0], 6)
+})
+
+
+for (const parentOpen of [true,false]) for (const enabled of [true,false]) test(`all class cards explain effective reception: parent=${parentOpen}, enabled=${enabled}`, async () => {
+ const data=[row(1,{registration_enabled:enabled}),row(2,{registration_enabled:enabled,capacity:3}),row(3,{registration_enabled:enabled,capacity:null})]
+ const before=JSON.stringify(data),c=screen({parentOpen,rows:data})
+ await c.flush()
+ const cards=c.nodes().filter(n=>n.type==='li')
+ assert.equal(cards.length,3)
+ for (let i=0;i<cards.length;i++) {
+  const current=text(cards[i])
+  assert.match(current,enabled?/クラス受付設定：有効/:/クラス受付設定：停止/)
+  const expected=!parentOpen?'開催回全体が受付停止中':!enabled?'受付停止中（クラス受付が停止中）':i===1?'満員':i===2?'現在受付できません（定員未設定）':'受付可能'
+  assert.ok(current.includes(`現在の公開申込：${expected}`))
+ }
+ assert.equal(c.nodes().filter(n=>n.type==='button').length,4)
+ assert.equal(JSON.stringify(data),before)
+ assert.equal(c.calls.length,1)
+})
+test('single public state is shown exactly once and class flags remain explicitly settings',async()=>{
+ const c=screen({parentOpen:false});await c.flush()
+ assert.equal(c.text().split('現在の公開申込：').length-1,1)
+ assert.match(c.text(),/クラス受付設定：有効/)
+ assert.match(c.text(),/現在の公開申込：開催回全体が受付停止中/)
+ assert.doesNotMatch(c.text(),/クラス受付：受付中/)
 })

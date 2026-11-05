@@ -1,21 +1,20 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import RegistrationForm from './registration-form'
 
 type Group = { id: number; title: string; description: string | null }
 
 // This component only hosts a server-validated, explicitly selected occurrence.
 export default function EventsList({ initialGroup }: { initialGroup: Group }) {
-  const [registrationGroup, setRegistrationGroup] = useState<Group | null>(initialGroup)
   const registrationStart = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!registrationGroup || !registrationStart.current) return
+    if (!registrationStart.current) return
     registrationStart.current.focus({ preventScroll: true })
     registrationStart.current.scrollIntoView({ behavior: 'instant', block: 'start' })
-  }, [registrationGroup])
+  }, [initialGroup.id])
 
   return <main className="events-page">
     <style>{`
@@ -50,11 +49,9 @@ export default function EventsList({ initialGroup }: { initialGroup: Group }) {
     <div className="events-inner">
       <nav className="events-navigation" aria-label="公開メニュー"><Link href="/events">開催案内へ</Link><Link href="/schedule">スケジュールへ</Link></nav>
       <h1>Web申込</h1>
-      {registrationGroup && <div className="events-registration-start" ref={registrationStart} tabIndex={-1} aria-label={`${registrationGroup.title}の参加申込`}>
-        <RegistrationForm key={registrationGroup.id} group={registrationGroup} onClose={() => setRegistrationGroup(null)} />
-      </div>}
-      {!registrationGroup && <><p>{initialGroup.title}の申込フォームを閉じました。</p><button type="button" className="events-secondary" onClick={() => setRegistrationGroup(initialGroup)}>申込フォームを開く</button></>}
-      <nav className="events-navigation" aria-label="開催案内へ"><Link href="/events">別の講習会を探す</Link></nav>
+      <div className="events-registration-start" ref={registrationStart} tabIndex={-1} aria-label={`${initialGroup.title}の参加申込`}>
+        <RegistrationForm key={initialGroup.id} group={initialGroup} />
+      </div>
     </div>
   </main>
 }

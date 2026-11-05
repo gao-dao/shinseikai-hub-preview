@@ -2,8 +2,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { loadDetailClasses, type DetailClass } from '@/lib/event-groups/detail'
 
-export default function ClassRegistrationControl({ groupId, row, parentOpen, onRefreshed, showControls = true, showParentNotice = true }: {
-  groupId: number; row: DetailClass; parentOpen: boolean; showControls?: boolean; showParentNotice?: boolean; onRefreshed: (row: DetailClass) => void
+export default function ClassRegistrationControl({ groupId, row, parentOpen, onRefreshed, showControls = true, occurrenceBlocked = false }: {
+  groupId: number; row: DetailClass; parentOpen: boolean; showControls?: boolean; occurrenceBlocked?: boolean; onRefreshed: (row: DetailClass) => void
 }) {
   const [busy, setBusy] = useState(false)
   const [needsCheck, setNeedsCheck] = useState(false)
@@ -42,10 +42,14 @@ export default function ClassRegistrationControl({ groupId, row, parentOpen, onR
     }
   }
 
+  // Display only: the existing flags, update handlers and capacity guards are unchanged.
+  const publicStatus = needsCheck ? '申込状況を確認できません' : occurrenceBlocked ? '受付停止（開催中止・非表示）'
+    : !parentOpen ? '開催回全体が受付停止中' : !row.registration_enabled ? '受付停止中（クラス受付が停止中）'
+    : row.capacity === null ? '現在受付できません（定員未設定）' : row.registeredCount >= row.capacity ? '満員' : '受付可能'
   return <div className="class-reception">
     <dl className="detail-stats"><div className="class-reception-count"><dt>有効申込数</dt><dd>{row.registeredCount}件</dd></div><div><dt>定員</dt><dd>{row.capacity === null ? '未設定' : `${row.capacity}名`}</dd></div><div><dt>残席</dt><dd>{row.capacity === null ? '確認できません' : `${Math.max(row.capacity - row.registeredCount, 0)}名`}</dd></div></dl>
-    <p className="class-reception-state">クラス受付：<strong>{row.registration_enabled ? '受付中' : '受付停止'}</strong></p>
-    {!parentOpen && showParentNotice && <p className="detail-note">開催回全体が受付停止中です。クラス受付がONでも公開申込は受け付けません。</p>}
+    <p className="class-reception-state">クラス受付設定：<strong>{row.registration_enabled ? '有効' : '停止'}</strong></p>
+    <p className="class-public-reception-state">現在の公開申込：<strong>{publicStatus}</strong></p>
     {showControls && <div className="class-reception-actions"><button className="reception-primary" type="button" disabled={busy || needsCheck} aria-label={`${row.title}：受付を${row.registration_enabled ? '停止' : '開始'}`} onClick={() => void run(true)}>{busy ? '確認・更新中…' : row.registration_enabled ? '受付を停止' : '受付を開始'}</button>
       {needsCheck && <button className="reception-secondary" type="button" disabled={busy} onClick={() => void run(false)}>最新状態を再取得</button>}</div>}
     {message && <p role={needsCheck ? 'alert' : 'status'}>{message}</p>}

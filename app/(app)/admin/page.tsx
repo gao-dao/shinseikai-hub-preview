@@ -13,12 +13,6 @@ const links = [
   { href: '/admin/event-groups/history', label: '開催履歴', description: '終了・中止・非表示の開催回を確認', icon: 'M3 11a9 9 0 1 1 2.6 7M3 4v7h7m2-5v6l4 2' },
   { href: '/admin/passwords', label: 'パスワード管理', description: '管理者・会員のパスワードを管理', icon: 'M7 14a5 5 0 1 1 4.9-6H22v4h-3v3h-4l-3.1-3A5 5 0 0 1 7 14ZM7 8h.01' },
 ]
-const publicLinks = [
-  { href: '/events', label: '開催案内' },
-  { href: '/schedule', label: 'スケジュール' },
-  { href: '/videos', label: '動画ライブラリ' },
-]
-
 export default async function AdminPage() {
   const auth = await requireAdmin()
   if (!auth.ok) redirect(auth.status === 401 ? '/login' : '/videos')
@@ -34,11 +28,5 @@ export default async function AdminPage() {
         <span className={styles.homeArrow} aria-hidden="true">→</span>
       </Link></li>
     )}</ul></nav>
-    <section className={styles.homePublic} aria-labelledby="admin-public-title">
-      <h2 id="admin-public-title" className={styles.homePublicTitle}>公開ページ</h2>
-      <nav className={styles.homePublicLinks} aria-label="公開ページ">{publicLinks.map(link =>
-        <Link key={link.href} href={link.href} prefetch={false}>{link.label}</Link>
-      )}</nav>
-    </section>
   </main>
 }

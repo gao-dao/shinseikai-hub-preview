@@ -251,29 +251,29 @@ for(const flags of [{is_hidden:true},{is_cancelled:true},{is_cancelled:true,is_h
 
 for (const [name, enabled, registered, missing, label, selectable] of [
   ['open',true,2,false,'受付可能',true],
-  ['stopped with seats',false,2,false,'満席',false],
-  ['stopped with zero seats',false,10,false,'満席',false],
-  ['open with zero seats',true,10,false,'申込不可',false],
+  ['stopped with seats',false,2,false,'受付停止中',false],
+  ['stopped with zero seats',false,10,false,'受付停止中',false],
+  ['open with zero seats',true,10,false,'満員',false],
   ['availability failed',true,0,true,'申込状況を確認できません',false],
-  ['stopped despite availability failure',false,0,true,'満席',false],
+  ['stopped despite availability failure',false,0,true,'受付停止中',false],
 ]) test(`public card presentation preserves eligibility and hides counts: ${name}`,()=>{
  const source=schedule(1,{registration_enabled:enabled})
  const item=availability.publicClassAvailability(source,missing?undefined:{capacity:10,registered_count:registered,remaining_capacity:Math.max(10-registered,0),is_full:registered>=10})
  const before=JSON.stringify(item)
  const labelText=display.publicClassLabel(item)
  assert.ok(labelText.includes(label));assert.doesNotMatch(labelText,/定員|残席|残り[0-9]/)
- if(label!=='満席')assert.doesNotMatch(labelText,/満席/)
+ assert.doesNotMatch(labelText,/満席/)
  assert.equal(item.canRegister,selectable);assert.equal(JSON.stringify(item),before);assert.equal(source.registration_enabled,enabled)
 })
 
-test('server-validated target opens immediately, scrolls/focuses once and cancellation does not reopen it',()=>{
+test('server-validated target opens immediately and retains its focus and scroll target',()=>{
  const c=ui(),initialGroup={id:501,title:'対象開催回',description:null},props={initialGroup}
  const render=()=>c.render(c.exports.default,props)
  let tree=render(),form=tree.find(n=>n.props?.group?.id===501);assert.ok(form)
  const start=tree.find(n=>n.props?.['aria-label']==='対象開催回の参加申込'),movement=[]
  start.props.ref.current={focus:o=>movement.push(['focus',o]),scrollIntoView:o=>movement.push(['scroll',o])};c.effects[0]()
  assert.equal(JSON.stringify(movement),JSON.stringify([['focus',{preventScroll:true}],['scroll',{behavior:'instant',block:'start'}]]))
- form.props.onClose();tree=render();assert.equal(tree.some(n=>n.props?.group),false);c.effects[0]();assert.equal(movement.length,2)
+ assert.equal(form.props.onClose,undefined);assert.equal(render().some(n=>n.props?.group?.id===501),true)
 })
 
 test('targeted registration omits unrelated groups, list refresh and pagination, without fetching the list',async()=>{
@@ -286,13 +286,29 @@ test('targeted registration omits unrelated groups, list refresh and pagination,
  assert.equal(tree.some(n=>n.type==='article'),false)
  assert.equal(tree.some(n=>n.props?.children==='講習会一覧を更新'),false)
  assert.equal(tree.some(n=>n.props?.['aria-label']==='講習会のページ切替'),false)
- const links=tree.filter(n=>n.props?.children==='別の講習会を探す');assert.equal(links.length,1);assert.equal(links[0].props.href,'/events');assert.equal(tree.some(n=>n.props?.href==='/events?view=registration'),false)
- tree.find(n=>n.props?.group?.id===501).props.onClose()
- tree=c.render(c.exports.default,props);assert.equal(tree.some(n=>n.props?.group),false)
- tree.find(n=>n.type==='button'&&n.props.children==='申込フォームを開く').props.onClick()
- tree=c.render(c.exports.default,props);assert.ok(tree.some(n=>n.props?.group?.id===501));assert.equal(c.calls.length,0)
+ assert.equal(tree.some(n=>n.props?.children==='別の講習会を探す'),false)
+ assert.equal(tree.some(n=>n.props?.href==='/events?view=registration'),false)
+ assert.equal(tree.some(n=>n.props?.children==='申込フォームを開く'),false)
+ assert.equal(tree.some(n=>n.type==='p'&&String(n.props?.children).includes('申込フォームを閉じました')),false)
+ assert.ok(tree.some(n=>n.props?.href==='/events'&&n.props.children==='開催案内へ'))
+ assert.equal(c.calls.length,0)
 })
 test('retired list rendering, class cards and list fetch are absent from the form host', () => {
  const source=fs.readFileSync('app/(public)/events/events-list.tsx','utf8')
  assert.doesNotMatch(source,/公開講習会|講習会一覧を更新|次の講習会|function EventClasses|function PublicClassCard|fetch\(/)
+})
+
+
+test('public labels explain every existing API status without changing eligibility or counts',()=>{
+ for (const [source,count,expected] of [
+  [schedule(),seats(),'受付可能'],
+  [schedule(1,{registration_enabled:false}),seats(),'受付停止中'],
+  [schedule(),seats(1,{registered_count:10,remaining_capacity:0,is_full:true}),'満員'],
+  [schedule(1,{capacity:null}),undefined,'現在受付できません'],
+  [schedule(),undefined,'申込状況を確認できません'],
+ ]) {
+  const item=availability.publicClassAvailability(source,count),before=JSON.stringify(item)
+  assert.equal(display.publicClassLabel(item),expected)
+  assert.equal(JSON.stringify(item),before)
+ }
 })
