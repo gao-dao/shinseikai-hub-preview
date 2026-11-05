@@ -6,6 +6,40 @@ export const publicAttemptStorageKey = 'shinseikai-public-registration-attempt-v
 type Input = NonNullable<ReturnType<typeof validateProxyRegistration>['data']>
 type FrozenInput = Readonly<Omit<Input, 'schedule_ids'>> & { readonly schedule_ids: readonly number[] }
 type Storage = Pick<globalThis.Storage, 'getItem' | 'setItem' | 'removeItem'>
+type Pending = { groupId: number; key: string }
+type Marker = { version: 2; completedGroupIds: number[]; pending: Pending | null }
+const validId = (id: unknown): id is number => typeof id === 'number' && Number.isSafeInteger(id) && id > 0
+const validKey = (key: unknown): key is string => typeof key === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key)
+const exactKeys = (row: Record<string, unknown>, keys: string[]) => Object.keys(row).length === keys.length && keys.every(key => Object.hasOwn(row, key))
+function readMarker(storage: Storage): Marker {
+  const raw = storage.getItem(publicAttemptStorageKey)
+  if (raw === null) return { version: 2, completedGroupIds: [], pending: null }
+  const row = JSON.parse(raw)
+  if (!row || typeof row !== 'object' || Array.isArray(row)) throw new Error('INVALID_MARKER')
+  // A legacy success has no attributable group. Retire only this exact known
+  // shape; legacy pending/unknown records (including their keys) remain intact.
+  if (row.version === 1 && row.phase === 'success' && exactKeys(row, ['version', 'phase'])) {
+    storage.removeItem(publicAttemptStorageKey)
+    if (storage.getItem(publicAttemptStorageKey) !== null) throw new Error('STORAGE_FAILED')
+    return { version: 2, completedGroupIds: [], pending: null }
+  }
+  if (row.version !== 2 || !exactKeys(row, ['version', 'completedGroupIds', 'pending']) ||
+      !Array.isArray(row.completedGroupIds) || !row.completedGroupIds.every(validId) ||
+      new Set(row.completedGroupIds).size !== row.completedGroupIds.length ||
+      (row.pending !== null && (typeof row.pending !== 'object' || Array.isArray(row.pending) ||
+        !exactKeys(row.pending, ['groupId', 'key']) || !validId(row.pending.groupId) || !validKey(row.pending.key)))) throw new Error('INVALID_MARKER')
+  return row as Marker
+}
+function writeMarker(storage: Storage, marker: Marker) {
+  if (!marker.pending && marker.completedGroupIds.length === 0) {
+    storage.removeItem(publicAttemptStorageKey)
+    if (storage.getItem(publicAttemptStorageKey) !== null) throw new Error('STORAGE_FAILED')
+  } else {
+    const raw = JSON.stringify(marker)
+    storage.setItem(publicAttemptStorageKey, raw)
+    if (storage.getItem(publicAttemptStorageKey) !== raw) throw new Error('STORAGE_FAILED')
+  }
+}
 export type SubmissionResult = { kind: 'success' | 'rejected' | 'unknown' | 'busy'; message: string; retryAfterSeconds?: number }
 const unknownResult: SubmissionResult = { kind: 'unknown', message: '申込結果を確認できません。同じ内容・同じ申込キーで再確認してください。新しく申し込まず、解決しない場合は主催者へお問い合わせください。' }
 
@@ -16,26 +50,25 @@ export class PublicRegistrationAttempt {
   payload: FrozenInput | null = null
   private key: string | null = null
   private sending = false
-  constructor(private storage: Storage, private uuid: () => string) {
+  constructor(private storage: Storage, private uuid: () => string, private groupId: number) {
     try {
-      const stored = storage.getItem(publicAttemptStorageKey)
-      if (stored !== null) {
-        const marker = JSON.parse(stored)
-        this.phase = marker?.version === 1 && marker.phase === 'success' ? 'success' : 'blocked'
-      }
+      if (!validId(groupId)) throw new Error('INVALID_GROUP')
+      const marker = readMarker(storage)
+      this.phase = marker.pending ? 'blocked' : marker.completedGroupIds.includes(groupId) ? 'success' : 'ready'
     } catch { this.phase = 'blocked' }
   }
   prepare(body: unknown): boolean {
     if (this.phase === 'pending') return this.payload !== null
     if (this.phase !== 'ready') return false
     const validation = validateProxyRegistration(body)
-    if (!validation.data) return false
+    if (!validation.data || validation.data.event_group_id !== this.groupId) return false
     try {
+      // Recheck storage to prevent a stale mounted form overwriting an unresolved request.
+      const marker = readMarker(this.storage)
+      if (marker.pending || marker.completedGroupIds.includes(this.groupId)) { this.phase = 'blocked'; return false }
       const key = this.uuid()
-      if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(key)) return false
-      const marker = JSON.stringify({ version: 1, phase: 'pending', key })
-      this.storage.setItem(publicAttemptStorageKey, marker)
-      if (this.storage.getItem(publicAttemptStorageKey) !== marker) return false
+      if (!validKey(key)) return false
+      writeMarker(this.storage, { ...marker, pending: { groupId: this.groupId, key } })
       const data = validation.data
       this.payload = Object.freeze({ ...data, schedule_ids: Object.freeze([...data.schedule_ids].sort((a, b) => a - b)) })
       this.key = key
@@ -46,6 +79,10 @@ export class PublicRegistrationAttempt {
   async submit(token: string, fetcher: typeof fetch): Promise<SubmissionResult> {
     if (this.sending) return { kind: 'busy', message: '送信中です' }
     if (this.phase !== 'pending' || !this.payload || !this.key || !/^[!-~]{1,2048}$/.test(token)) return { kind: 'rejected', message: '入力内容と操作確認を確認してください' }
+    try {
+      const marker = readMarker(this.storage)
+      if (marker.pending?.groupId !== this.groupId || marker.pending.key !== this.key) return unknownResult
+    } catch { return unknownResult }
     this.sending = true
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 20_000)
@@ -71,7 +108,12 @@ export class PublicRegistrationAttempt {
         this.phase = 'success'
         // If this write fails, the old pending marker remains, safely blocking
         // after reload. The successful response is still shown in this page.
-        try { this.storage.setItem(publicAttemptStorageKey, JSON.stringify({ version: 1, phase: 'success' })) } catch {}
+        try {
+          const marker = readMarker(this.storage)
+          if (marker.pending?.groupId === this.groupId && marker.pending.key === this.key) {
+            writeMarker(this.storage, { version: 2, completedGroupIds: [...new Set([...marker.completedGroupIds, this.groupId])], pending: null })
+          }
+        } catch {}
         return { kind: 'success', message: mapped.body.message }
       }
       if (!mapped.body.success && mapped.status < 500) return { kind: 'rejected', message: mapped.body.message }
@@ -97,8 +139,9 @@ export class PublicRegistrationAttempt {
   startNew(): boolean {
     if (this.phase !== 'success' || this.sending) return false
     try {
-      this.storage.removeItem(publicAttemptStorageKey)
-      if (this.storage.getItem(publicAttemptStorageKey) !== null) return false
+      const marker = readMarker(this.storage)
+      if (marker.pending || !marker.completedGroupIds.includes(this.groupId)) return false
+      writeMarker(this.storage, { ...marker, completedGroupIds: marker.completedGroupIds.filter(id => id !== this.groupId) })
       this.payload = null; this.key = null; this.phase = 'ready'
       return true
     } catch { return false }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { validateProxyRegistration } from '@/lib/registrations/proxy-registration'
 import { PublicRegistrationAttempt, loadPublicRegistrationClasses } from '@/lib/registrations/public-form'
 import type { PublicClass } from '@/lib/registrations/public-availability'
@@ -26,7 +27,7 @@ export default function RegistrationForm({ group, onClose }: { group: { id: numb
     let active = true
     async function initialize() {
       try {
-        const controller = new PublicRegistrationAttempt(window.sessionStorage, () => crypto.randomUUID())
+        const controller = new PublicRegistrationAttempt(window.sessionStorage, () => crypto.randomUUID(), group.id)
         if (active) { attempt.current = controller; setStage(controller.phase === 'ready' ? 'editing' : controller.phase === 'success' ? 'success' : 'blocked') }
       } catch { if (active) setStage('blocked') }
     }
@@ -36,7 +37,7 @@ export default function RegistrationForm({ group, onClose }: { group: { id: numb
     }
     window.addEventListener('beforeunload', warn)
     return () => { active = false; window.removeEventListener('beforeunload', warn) }
-  }, [])
+  }, [group.id])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -85,12 +86,12 @@ export default function RegistrationForm({ group, onClose }: { group: { id: numb
   }
 
   return <section className="events-group events-registration" aria-label="講習会への参加申込">
-    <h2>{stage === 'success' ? '申込完了' : '参加申込'}</h2>
-    {stage !== 'blocked' && stage !== 'success' && <p>講習会：{group.title}</p>}
+    <h2>{stage === 'success' ? '申込を受け付けました' : '参加申込'}</h2>
+    {stage !== 'blocked' && <p>{stage === 'success' ? '開催回' : '講習会'}：{group.title}</p>}
     {stage === 'initializing' && <p role="status">申込状態を確認中...</p>}
     {stage === 'blocked' && <p role="alert">前の申込結果が不明、または申込状態を保存できません。個人情報はブラウザに保存していないため、このページでは再送内容を復元できません。新しく申し込まず、主催者へ受付状況をお問い合わせください。</p>}
     {stage === 'success' && <>
-      <p role="status">申込を受け付けました。後日追加で申し込む場合は、新しい申込を開始してください。</p>
+      <p role="status">申込受付は完了しています。追加で申し込む場合は、新しい申込を開始してください。</p>
       <button type="button" onClick={startNew}>新しい申込を始める</button>
     </>}
     {stage === 'editing' && <form onSubmit={confirm}>
@@ -131,6 +132,6 @@ export default function RegistrationForm({ group, onClose }: { group: { id: numb
       </div>
     </>}
     {error && <p role="alert">{error}</p>}
-    {stage !== 'pending' && !saving && <div className="events-form-close"><button type="button" className="events-secondary" onClick={onClose}>閉じる</button></div>}
+    {stage !== 'pending' && !saving && <div className="events-form-close">{stage === 'success' ? <Link href="/events" prefetch={false}>開催案内へ戻る</Link> : <button type="button" className="events-secondary" onClick={onClose}>閉じる</button>}</div>}
   </section>
 }

@@ -125,7 +125,7 @@ test('actual form controller double-submit and manual retry work against the man
   const validation=compile('lib/registrations/public-registration.ts',{'./proxy-registration':proxy})
   const model=compile('lib/registrations/public-form.ts',{'./proxy-registration':proxy,'./public-registration':validation})
   const saved=new Map(),store={getItem:key=>saved.get(key)??null,setItem:(key,value)=>saved.set(key,value),removeItem:key=>saved.delete(key)}
-  const attempt=new model.PublicRegistrationAttempt(store,()=>key)
+  const attempt=new model.PublicRegistrationAttempt(store,()=>key,body.event_group_id)
   const {turnstile_token,...registration}=body
   assert.equal(attempt.prepare(registration),true)
   const mock=handler('unknown-retry')

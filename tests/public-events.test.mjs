@@ -4,8 +4,6 @@ import fs from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
 import * as jsxRuntime from 'react/jsx-runtime'
-import React from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
 
 function compile(path, dependencies = {}, globals = {}) {
   const exports = {}
@@ -235,85 +233,16 @@ function ui() {
   return { state, effects, calls, exports, render, setResponse(value) { response = value } }
 }
 
-test('legacy registration mode remains available without authentication', async () => {
-  const Client = () => null
-  const page = compile('app/(public)/events/page.tsx', { 'react/jsx-runtime': jsxRuntime, './events-list': { default: Client }, 'next/link': { default: () => null }, '@/lib/event-groups/public-guide-server': { loadGuidePage() { assert.fail('Legacy registration must not fetch guide data') } }, '@/lib/event-groups/public-guide': {}, './guide.module.css': { default: {} } })
-  assert.equal(page.dynamic, 'force-dynamic')
-  assert.equal(page.revalidate, 0)
-  assert.equal((await page.default({ searchParams: Promise.resolve({ view: 'registration' }) })).type, Client)
-})
-
-test('public UI renders metadata and availability without capacity or seat numbers', () => {
-  const { exports } = ui()
-  const item = availability.publicClassAvailability(schedule(), seats())
-  const html = renderToStaticMarkup(React.createElement(exports.PublicClassCard, { item }))
-  assert.match(html, /クラス1/)
-  assert.match(html, /2026-10-20/)
-  assert.doesNotMatch(html, /定員|残席/)
-  assert.match(html, /受付可能/)
-  assert.doesNotMatch(html, /<form|type="submit"/)
-  const unknown = renderToStaticMarkup(React.createElement(exports.PublicClassCard, { item: availability.publicClassAvailability(schedule()) }))
-  assert.match(unknown, /申込状況を確認できません/)
-  assert.doesNotMatch(unknown, /受付可能/)
-})
-
-test('group and class pagination controls advance to records beyond fifty', () => {
-  const groups = ui()
-  groups.render()
-  groups.state[2] = { eventGroups: [{ id: 1, title: '講習会', description: null }], page: 1, pageSize: 50, total: 51 }
-  groups.state[3] = false
-  const next = groups.render().find(item => item.type === 'button' && item.props.children === '次の講習会')
-  assert.equal(next.props.disabled, false)
-  next.props.onClick()
-  assert.equal(groups.state[0], 2)
-  const classes = ui()
-  classes.render(classes.exports.EventClasses, { groupId: 1 })
-  classes.state[2] = { schedules: [], page: 1, pageSize: 50, total: 51 }
-  classes.state[3] = false
-  classes.render(classes.exports.EventClasses, { groupId: 1 }).find(item => item.type === 'button' && item.props.children === '次のクラス').props.onClick()
-  assert.equal(classes.state[0], 2)
-})
-
-test('browser reads omit credentials, disable caching and expose safe read-error states', async () => {
-  for (const component of ['groups', 'classes']) {
-    const context = ui()
-    context.setResponse({ ok: false, status: 500 })
-    const render = () => context.render(component === 'groups' ? context.exports.default : context.exports.EventClasses, { groupId: 1 })
-    render()
-    const cleanup = context.effects[0]()
-    await new Promise(resolve => setImmediate(resolve))
-    assert.equal(context.calls.length, 1)
-    assert.equal(context.calls[0][1].credentials, 'omit')
-    assert.equal(context.calls[0][1].cache, 'no-store')
-    assert.equal(context.calls[0][1].method, undefined)
-    assert.ok(render().some(item => item.props?.role === 'alert'))
-    assert.equal(context.state[2], null)
-    cleanup()
+test('legacy list URL redirects to guide without querying groups or rendering registration', async () => {
+  const page = compile('app/(public)/events/page.tsx', {
+    'react/jsx-runtime': jsxRuntime, './events-list': { default: () => assert.fail('must not render') },
+    'next/link': { default: () => null }, 'next/navigation': { redirect(path) { throw Object.assign(new Error('REDIRECT'), { path }) } },
+    '@/lib/event-groups/public-guide-server': { loadGuidePage() { assert.fail('must not query') }, loadGuideDetail() { assert.fail('must not query') } },
+    '@/lib/event-groups/public-guide': {}, './guide.module.css': { default: {} },
+  })
+  for (const params of [{ view: 'registration' }, { view: 'registration', page: '2' }]) {
+    await assert.rejects(page.default({ searchParams: Promise.resolve(params) }), e => e.message === 'REDIRECT' && e.path === '/events')
   }
-})
-
-test('events opens the chosen public group form and prevents switching groups while it is open',()=>{
-  const context=ui()
-  context.render()
-  context.state[2]={eventGroups:[{id:5,title:'講習会5',description:null},{id:6,title:'講習会6',description:null}],page:1,pageSize:50,total:2}
-  context.state[3]=false
-  context.render().find(item=>item.type==='button'&&item.props.children==='この講習会に申し込む').props.onClick()
-  const tree=context.render()
-  const form=tree.find(item=>item.props?.group?.id===5)
-  assert.ok(form)
-  assert.equal(form.props.group.title,'講習会5')
-  const start=tree.find(item=>item.props?.['aria-label']==='講習会5の参加申込')
-  assert.equal(start.props.tabIndex,-1)
-  const movement=[]
-  start.props.ref.current={focus: options=>movement.push(['focus',options]),scrollIntoView: options=>movement.push(['scroll',options])}
-  context.effects[1]()
-  assert.equal(JSON.stringify(movement),JSON.stringify([['focus',{preventScroll:true}],['scroll',{behavior:'instant',block:'start'}]]))
-
-  assert.ok(tree.filter(item=>item.type==='button'&&item.props.children==='この講習会に申し込む').every(item=>item.props.disabled))
-  form.props.onClose()
-  assert.equal(context.render().some(item=>item.props?.group),false)
-  context.effects[1]()
-  assert.equal(movement.length,2)
 })
 
 for(const flags of [{is_hidden:true},{is_cancelled:true},{is_cancelled:true,is_hidden:true}])test(`public list and direct class URL reject lifecycle flags ${JSON.stringify(flags)}`,async()=>{
@@ -328,13 +257,12 @@ for (const [name, enabled, registered, missing, label, selectable] of [
   ['availability failed',true,0,true,'申込状況を確認できません',false],
   ['stopped despite availability failure',false,0,true,'満席',false],
 ]) test(`public card presentation preserves eligibility and hides counts: ${name}`,()=>{
- const {exports}=ui()
  const source=schedule(1,{registration_enabled:enabled})
  const item=availability.publicClassAvailability(source,missing?undefined:{capacity:10,registered_count:registered,remaining_capacity:Math.max(10-registered,0),is_full:registered>=10})
  const before=JSON.stringify(item)
- const html=renderToStaticMarkup(React.createElement(exports.PublicClassCard,{item}))
- assert.ok(html.includes(label));assert.doesNotMatch(html,/定員|残席|残り[0-9]/)
- if(label!=='満席')assert.doesNotMatch(html,/満席/)
+ const labelText=display.publicClassLabel(item)
+ assert.ok(labelText.includes(label));assert.doesNotMatch(labelText,/定員|残席|残り[0-9]/)
+ if(label!=='満席')assert.doesNotMatch(labelText,/満席/)
  assert.equal(item.canRegister,selectable);assert.equal(JSON.stringify(item),before);assert.equal(source.registration_enabled,enabled)
 })
 
@@ -343,15 +271,14 @@ test('server-validated target opens immediately, scrolls/focuses once and cancel
  const render=()=>c.render(c.exports.default,props)
  let tree=render(),form=tree.find(n=>n.props?.group?.id===501);assert.ok(form)
  const start=tree.find(n=>n.props?.['aria-label']==='対象開催回の参加申込'),movement=[]
- start.props.ref.current={focus:o=>movement.push(['focus',o]),scrollIntoView:o=>movement.push(['scroll',o])};c.effects[1]()
+ start.props.ref.current={focus:o=>movement.push(['focus',o]),scrollIntoView:o=>movement.push(['scroll',o])};c.effects[0]()
  assert.equal(JSON.stringify(movement),JSON.stringify([['focus',{preventScroll:true}],['scroll',{behavior:'instant',block:'start'}]]))
- form.props.onClose();tree=render();assert.equal(tree.some(n=>n.props?.group),false);c.effects[1]();assert.equal(movement.length,2)
+ form.props.onClose();tree=render();assert.equal(tree.some(n=>n.props?.group),false);c.effects[0]();assert.equal(movement.length,2)
 })
 
 test('targeted registration omits unrelated groups, list refresh and pagination, without fetching the list',async()=>{
  const c=ui(),initialGroup={id:501,title:'対象開催回',description:null},props={initialGroup}
  c.render(c.exports.default,props)
- c.state[2]={eventGroups:[{id:999,title:'無関係な開催回',description:null}],page:1,pageSize:50,total:100}
  c.effects[0]();await new Promise(resolve=>setImmediate(resolve))
  let tree=c.render(c.exports.default,props)
  assert.equal(c.calls.length,0)
@@ -359,18 +286,13 @@ test('targeted registration omits unrelated groups, list refresh and pagination,
  assert.equal(tree.some(n=>n.type==='article'),false)
  assert.equal(tree.some(n=>n.props?.children==='講習会一覧を更新'),false)
  assert.equal(tree.some(n=>n.props?.['aria-label']==='講習会のページ切替'),false)
- const links=tree.filter(n=>n.props?.href==='/events?view=registration');assert.equal(links.length,1);assert.equal(links[0].props.children,'別の講習会を探す')
+ const links=tree.filter(n=>n.props?.children==='別の講習会を探す');assert.equal(links.length,1);assert.equal(links[0].props.href,'/events');assert.equal(tree.some(n=>n.props?.href==='/events?view=registration'),false)
  tree.find(n=>n.props?.group?.id===501).props.onClose()
  tree=c.render(c.exports.default,props);assert.equal(tree.some(n=>n.props?.group),false)
  tree.find(n=>n.type==='button'&&n.props.children==='申込フォームを開く').props.onClick()
  tree=c.render(c.exports.default,props);assert.ok(tree.some(n=>n.props?.group?.id===501));assert.equal(c.calls.length,0)
 })
-test('ordinary registration keeps list retrieval, pagination and the auxiliary refresh operation',async()=>{
- const c=ui();c.setResponse({ok:true,json:async()=>({eventGroups:[{id:5,title:'通常開催回',description:null}],page:1,pageSize:50,total:51})})
- c.render();c.effects[0]();await new Promise(resolve=>setImmediate(resolve))
- let tree=c.render();assert.equal(c.calls.length,1);assert.equal(c.calls[0][0],'/api/event-groups?page=1');assert.equal(tree.filter(n=>n.type==='article').length,1)
- const refresh=tree.find(n=>n.props?.children==='講習会一覧を更新');assert.equal(refresh.props.className,'events-secondary');assert.equal(refresh.props.type,'button')
- assert.ok(tree.some(n=>n.props?.['aria-label']==='講習会のページ切替'))
- refresh.props.onClick();tree=c.render();c.effects[0]();await new Promise(resolve=>setImmediate(resolve));assert.equal(c.calls.length,2)
- assert.equal(tree.some(n=>n.props?.children==='別の講習会を探す'),false)
+test('retired list rendering, class cards and list fetch are absent from the form host', () => {
+ const source=fs.readFileSync('app/(public)/events/events-list.tsx','utf8')
+ assert.doesNotMatch(source,/公開講習会|講習会一覧を更新|次の講習会|function EventClasses|function PublicClassCard|fetch\(/)
 })

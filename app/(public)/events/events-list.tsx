@@ -3,95 +3,13 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import RegistrationForm from './registration-form'
-import type { PublicClass } from '@/lib/registrations/public-availability'
-import { publicClassLabel } from '@/lib/registrations/public-class-display'
 
 type Group = { id: number; title: string; description: string | null }
-type GroupList = { eventGroups: Group[]; page: number; pageSize: number; total: number }
-type ClassList = { schedules: PublicClass[]; page: number; pageSize: number; total: number }
 
-export function PublicClassCard({ item }: { item: PublicClass }) {
-  return <li className="events-class">
-    <h3>{item.title}</h3>
-    <p>開催日時：{item.date} {item.start_time ?? '開始時刻未設定'}〜{item.end_time ?? '終了時刻未設定'}</p>
-    <p className={item.canRegister ? 'events-available' : 'events-unavailable'}>受付状況：<strong>{publicClassLabel(item)}</strong></p>
-  </li>
-}
-
-export function EventClasses({ groupId }: { groupId: number }) {
-  const [page, setPage] = useState(1)
-  const [reload, setReload] = useState(0)
-  const [result, setResult] = useState<ClassList | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    const controller = new AbortController()
-    async function load() {
-      setLoading(true)
-      setResult(null)
-      setError('')
-      try {
-        const response = await fetch(`/api/event-groups/${groupId}/classes?page=${page}`, { cache: 'no-store', credentials: 'omit', signal: controller.signal })
-        if (!response.ok) throw new Error(response.status === 404 ? 'この講習会は受付停止中、または見つかりません。一覧を更新してください。' : '申込状況を確認できませんでした。受付可否は不明です。')
-        const data: ClassList = await response.json()
-        if (!controller.signal.aborted) setResult(data)
-      } catch (cause) {
-        if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '申込状況を確認できませんでした。')
-      } finally {
-        if (!controller.signal.aborted) setLoading(false)
-      }
-    }
-    void load()
-    return () => controller.abort()
-  }, [groupId, page, reload])
-
-  return <div aria-label="クラス一覧">
-    {loading && <p role="status">申込状況を読み込み中...</p>}
-    {error && <p role="alert">{error}</p>}
-    {result && result.schedules.length === 0 && <p>表示するクラスはありません。</p>}
-    {result && <>
-      <ul className="events-classes">{result.schedules.map(item => <PublicClassCard key={item.id} item={item} />)}</ul>
-      <p>クラス全{result.total}件・{result.page}ページ目</p>
-      <nav aria-label="クラスのページ切替" className="events-actions">
-        <button disabled={loading || page <= 1} onClick={() => setPage(value => value - 1)}>前のクラス</button>
-        <button disabled={loading || page * result.pageSize >= result.total} onClick={() => setPage(value => value + 1)}>次のクラス</button>
-      </nav>
-    </>}
-    <button disabled={loading} onClick={() => setReload(value => value + 1)}>申込状況を更新</button>
-  </div>
-}
-
-export default function EventsList({ initialGroup = null }: { initialGroup?: Group | null } = {}) {
-  const [page, setPage] = useState(1)
-  const [reload, setReload] = useState(0)
-  const [result, setResult] = useState<GroupList | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+// This component only hosts a server-validated, explicitly selected occurrence.
+export default function EventsList({ initialGroup }: { initialGroup: Group }) {
   const [registrationGroup, setRegistrationGroup] = useState<Group | null>(initialGroup)
   const registrationStart = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (initialGroup) return
-    const controller = new AbortController()
-    async function load() {
-      setLoading(true)
-      setResult(null)
-      setError('')
-      try {
-        const response = await fetch(`/api/event-groups?page=${page}`, { cache: 'no-store', credentials: 'omit', signal: controller.signal })
-        if (!response.ok) throw new Error('講習会を取得できませんでした。時間をおいて再度お試しください。')
-        const data: GroupList = await response.json()
-        if (!controller.signal.aborted) setResult(data)
-      } catch (cause) {
-        if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : '講習会を取得できませんでした。')
-      } finally {
-        if (!controller.signal.aborted) setLoading(false)
-      }
-    }
-    void load()
-    return () => controller.abort()
-  }, [page, reload, initialGroup])
 
   useEffect(() => {
     if (!registrationGroup || !registrationStart.current) return
@@ -113,11 +31,7 @@ export default function EventsList({ initialGroup = null }: { initialGroup?: Gro
       .events-registration label, .events-registration span { display: block; }
       .events-registration fieldset { border: 1px solid #EDE8DF; padding: 12px; margin: 16px 0; }
       .events-registration dd { white-space: pre-wrap; overflow-wrap: anywhere; margin: 4px 0 14px; }
-      .events-description { white-space: pre-wrap; overflow-wrap: anywhere; }
-      .events-classes { list-style: none; padding: 0; }
       .events-class { padding: 18px 0; border-top: 1px solid #EDE8DF; }
-      .events-available { color: #166534; }
-      .events-unavailable { color: #64748B; }
       .events-page button { min-height: 44px; padding: 10px 16px; border: 1px solid #6B1F2B; border-radius: 8px; color: #6B1F2B; background: #F7EEF0; cursor: pointer; font: inherit; white-space: normal; overflow-wrap: anywhere; }
       .events-page button.events-primary { background: #6B1F2B; color: #fff; font-weight: 700; }
       .events-page button.events-secondary { background: #fff; color: #475569; border-color: #CBD5E1; }
@@ -135,33 +49,12 @@ export default function EventsList({ initialGroup = null }: { initialGroup?: Gro
     `}</style>
     <div className="events-inner">
       <nav className="events-navigation" aria-label="公開メニュー"><Link href="/events">開催案内へ</Link><Link href="/schedule">スケジュールへ</Link></nav>
-      <h1>{initialGroup ? 'Web申込' : '公開講習会'}</h1>
-      {!initialGroup && <p>Web申込を受付中の講習会です。クラスの申込状況をご確認ください。</p>}
+      <h1>Web申込</h1>
       {registrationGroup && <div className="events-registration-start" ref={registrationStart} tabIndex={-1} aria-label={`${registrationGroup.title}の参加申込`}>
         <RegistrationForm key={registrationGroup.id} group={registrationGroup} onClose={() => setRegistrationGroup(null)} />
       </div>}
-      {initialGroup ? <>
-        {!registrationGroup && <><p>{initialGroup.title}の申込フォームを閉じました。</p><button type="button" className="events-secondary" onClick={() => setRegistrationGroup(initialGroup)}>申込フォームを開く</button></>}
-        <nav className="events-navigation" aria-label="Web申込一覧へ"><Link href="/events?view=registration">別の講習会を探す</Link></nav>
-      </> : <>
-      <button type="button" className="events-secondary" disabled={loading} onClick={() => { setPage(1); setReload(value => value + 1) }}>講習会一覧を更新</button>
-      {loading && <p role="status">講習会を読み込み中...</p>}
-      {error && <p role="alert">{error}</p>}
-      {result && result.eventGroups.length === 0 && <p>現在、公開受付中の講習会はありません。</p>}
-      {result?.eventGroups.map(group => <article className="events-group" key={group.id}>
-        <h2>{group.title}</h2>
-        {group.description && <p className="events-description">{group.description}</p>}
-        <EventClasses groupId={group.id} />
-        <button type="button" disabled={registrationGroup !== null} onClick={() => setRegistrationGroup(group)}>この講習会に申し込む</button>
-      </article>)}
-      {result && <>
-        <p>講習会全{result.total}件・{result.page}ページ目</p>
-        <nav aria-label="講習会のページ切替" className="events-actions">
-          <button disabled={loading || page <= 1} onClick={() => setPage(value => value - 1)}>前の講習会</button>
-          <button disabled={loading || page * result.pageSize >= result.total} onClick={() => setPage(value => value + 1)}>次の講習会</button>
-        </nav>
-      </>}
-      </>}
+      {!registrationGroup && <><p>{initialGroup.title}の申込フォームを閉じました。</p><button type="button" className="events-secondary" onClick={() => setRegistrationGroup(initialGroup)}>申込フォームを開く</button></>}
+      <nav className="events-navigation" aria-label="開催案内へ"><Link href="/events">別の講習会を探す</Link></nav>
     </div>
   </main>
 }

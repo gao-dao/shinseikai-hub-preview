@@ -6,6 +6,7 @@ import ts from 'typescript'
 import * as jsxRuntime from 'react/jsx-runtime'
 import { renderToStaticMarkup } from 'react-dom/server'
 function compile(file, deps = {}) {
+ deps = { 'next/navigation': { redirect(path) { throw Object.assign(new Error('REDIRECT'), { path }) } }, ...deps }
  const exports = {}
  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports,Date,Intl,Map,Set,require(name){assert.ok(name in deps,`Unexpected dependency ${name}`);return deps[name]}})
  return exports
@@ -142,4 +143,34 @@ test('public headers expose one non-prefetched admin entry without any authoriza
   const header=tree.find(n=>n.type==='header'),links=nodes(header).filter(n=>n.type===HeaderLink),admin=links.filter(n=>n.props.href==='/admin');assert.equal(admin.length,1);assert.equal(admin[0].props.prefetch,false);assert.equal(admin[0].props.children,'管理ホーム');assert.ok(links.some(n=>n.props.href==='/login'));
  }
  assert.equal(lists,1);assert.equal(details,1);
+})
+
+
+test('targeted registration URL preserves validation, reception state and guide error return', async () => {
+ const Client='RegistrationHost', Link='Link'
+ function nodes(tree){return Array.isArray(tree)?tree.flatMap(nodes):tree&&typeof tree==='object'?[tree,...nodes(tree.props?.children)]:[]}
+ const source=fs.readFileSync('app/(public)/events/page.tsx','utf8')
+ assert.ok(source.includes("if (params.groupId === undefined) redirect('/events')"))
+ for(const [id,g,shouldOpen,expectedReads] of [
+  ['7',group(7,{registration_open:true}),true,1],
+  ['7',group(7,{registration_open:false}),false,1],
+  ['7',null,false,1],
+  ['',null,false,0],['0',null,false,0],['-1',null,false,0],['abc',null,false,0],
+  [['7','8'],null,false,0],['9007199254740992',null,false,0],
+ ]) {
+  let reads=0
+  const page=compile('app/(public)/events/page.tsx',{
+   'react/jsx-runtime':jsxRuntime,'next/link':{default:Link},'./events-list':{default:Client},
+   '@/lib/event-groups/public-guide-server':{loadGuidePage(){assert.fail('target must not query list')},loadGuideDetail:async value=>{reads++;assert.equal(value,7);return g?{group:g,classes:[row()]}:null}},
+   '@/lib/event-groups/public-guide':guide,'./guide.module.css':{default:{}},
+  })
+  const tree=nodes(await page.default({searchParams:Promise.resolve({view:'registration',groupId:id})}))
+  assert.equal(tree.some(n=>n.type===Client),shouldOpen);assert.equal(reads,expectedReads)
+  if(shouldOpen)assert.equal(tree.find(n=>n.type===Client).props.initialGroup.id,7)
+  else {
+   assert.ok(tree.some(n=>n.props?.role==='alert'))
+   assert.ok(tree.some(n=>n.type===Link&&n.props.href==='/events'))
+  }
+  assert.equal(tree.some(n=>n.props?.href==='/events?view=registration'),false)
+ }
 })

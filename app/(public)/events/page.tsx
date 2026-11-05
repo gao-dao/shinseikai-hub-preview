@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import EventsList from './events-list'
 import { loadGuidePage, loadGuideDetail } from '@/lib/event-groups/public-guide-server'
 import { guidePage } from '@/lib/event-groups/public-guide'
@@ -12,7 +13,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
   const params = await searchParams
   // Preserve the existing registration UI and APIs without coupling announcement visibility to reception.
   if (params.view === 'registration') {
-    if (params.groupId === undefined) return <EventsList key="list" />
+    if (params.groupId === undefined) redirect('/events')
     let target: Awaited<ReturnType<typeof loadGuideDetail>> = null
     let message = '指定された開催回はWeb申込を受け付けていないか、公開されていません。'
     if (typeof params.groupId === 'string' && /^[1-9][0-9]*$/.test(params.groupId) && Number.isSafeInteger(Number(params.groupId))) {
@@ -23,7 +24,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
       const { id, title, description } = target.group
       return <EventsList key={id} initialGroup={{ id, title, description }} />
     }
-    return <main className={styles.page}><div className={styles.inner}><h1>Web申込</h1><p role="alert">{message}</p><Link href="/events?view=registration">Web申込一覧へ</Link>{' ／ '}<Link href="/events">開催案内へ</Link></div></main>
+    return <main className={styles.page}><div className={styles.inner}><h1>Web申込</h1><p role="alert">{message}</p><Link href="/events">開催案内へ戻る</Link></div></main>
   }
   let result: Awaited<ReturnType<typeof loadGuidePage>> | null = null
   let error = ''

@@ -22,7 +22,7 @@ function storage(initial) {
   return {getItem:key=>data.get(key)??null,setItem:(key,value)=>data.set(key,value),removeItem:key=>data.delete(key),data}
 }
 function response(code='REGISTERED',status=201,extra={}) {return {ok:status>=200&&status<300,status,headers:new Headers(),json:async()=>({success:code==='REGISTERED',code,message:'UNTRUSTED_SECRET_TOKEN_MESSAGE',...extra})}}
-function attempt(store=storage()) {let generated=0;const instance=new model.PublicRegistrationAttempt(store,()=>++generated===1?key1:key2);return {instance,store,generated:()=>generated}}
+function attempt(store=storage()) {let generated=0;const instance=new model.PublicRegistrationAttempt(store,()=>++generated===1?key1:key2,5);return {instance,store,generated:()=>generated}}
 function row(id=11,changes={}) {return {id,title:`Class ${id}`,date:'2030-01-01',start_time:'10:00',end_time:'11:00',capacity:10,remainingCapacity:8,canRegister:true,status:'受付可能',...changes}}
 
 test('attempt normalizes, freezes and persists only a marker before sending',async()=>{
@@ -30,7 +30,7 @@ test('attempt normalizes, freezes and persists only a marker before sending',asy
   assert.equal(instance.prepare(input),true)
   assert.deepEqual(plain(instance.payload),{...input,name:'Synthetic attendee',contact:'synthetic.contact.invalid',notes:'Synthetic notes',schedule_ids:[11,12]})
   assert.throws(()=>instance.payload.schedule_ids.push(13))
-  const result=await instance.submit('fresh-token',async(...args)=>{calls.push(args);assert.equal(JSON.parse(store.getItem(model.publicAttemptStorageKey)).phase,'pending');return response()})
+  const result=await instance.submit('fresh-token',async(...args)=>{calls.push(args);assert.equal(JSON.parse(store.getItem(model.publicAttemptStorageKey)).pending.groupId,5);return response()})
   assert.equal(result.kind,'success')
   assert.equal(generated(),1)
   assert.equal(calls.length,1)
@@ -101,6 +101,7 @@ test('20-second timeout preserves the attempt for manual retry with a fresh toke
       generatedKeys += 1
       return key1
     },
+    5,
   )
   const calls = []
   const fetcher = async (url, options) => {
@@ -209,7 +210,7 @@ test('retry-after is displayed as a bounded numeric hint only',async()=>{
 
 test('reload never recreates an unresolved applicant payload or silently generates a new key',()=>{
   const {instance,store}=attempt();instance.prepare(input)
-  const recovered=new model.PublicRegistrationAttempt(store,()=>{throw new Error('must not generate')})
+  const recovered=new model.PublicRegistrationAttempt(store,()=>{throw new Error('must not generate')},5)
   assert.equal(recovered.phase,'blocked');assert.equal(recovered.payload,null);assert.equal(recovered.prepare(input),false);assert.equal(recovered.startNew(),false)
   for(const marker of ['bad JSON','{}','null','{"version":99,"phase":"success"}'])assert.equal(attempt(storage(marker)).instance.phase,'blocked')
 })
@@ -218,7 +219,7 @@ test('new keys and reset are permitted only after confirmed success, including c
   const {instance,store,generated}=attempt()
   assert.equal(instance.startNew(),false);instance.prepare(input)
   await instance.submit('token',async()=>response())
-  assert.equal(new model.PublicRegistrationAttempt(store,()=>key2).phase,'success')
+  assert.equal(new model.PublicRegistrationAttempt(store,()=>key2,5).phase,'success')
   assert.equal(instance.startNew(),true);assert.equal(instance.payload,null)
   assert.equal(store.getItem(model.publicAttemptStorageKey),null)
   instance.prepare(input);assert.equal(generated(),2)
@@ -234,7 +235,7 @@ test('storage or UUID failure prevents POST; invalid inputs do not allocate keys
   assert.equal(instance.prepare({...input,name:''}),false);assert.equal(generated(),0)
   assert.equal(instance.prepare(input),false)
   let calls=0;await instance.submit('token',async()=>{calls++;return response()});assert.equal(calls,0)
-  assert.equal(new model.PublicRegistrationAttempt(storage(),()=>{throw new Error('SECRET')}).prepare(input),false)
+  assert.equal(new model.PublicRegistrationAttempt(storage(),()=>{throw new Error('SECRET')},5).prepare(input),false)
 })
 
 test('public class loader retrieves all pages beyond fifty and omits credentials',async()=>{
@@ -262,15 +263,15 @@ function hooks() {
     useEffect(fn,deps){const i=cursor++;if(!same(slots[i]?.deps,deps)){const old=slots[i];const entry={deps,fn,cleanup:old?.cleanup};slots[i]=entry;pending.push(entry)}},
   }}
 }
-function form({store=storage(),postResponse=response(),postError=false,pendingPost=false,classes=[row(11),row(12),row(13,{canRegister:false,remainingCapacity:0,status:'満員'})],classesFail=false}={}) {
+function form({group={id:5,title:'Synthetic group'},store=storage(),postResponse=response(),postError=false,pendingPost=false,classes=[row(11),row(12),row(13,{canRegister:false,remainingCapacity:0,status:'満員'})],classesFail=false}={}) {
   const harness=hooks(),calls=[],logs=[],Widget=()=>null;let release
   const {default:Component}=compile('app/(public)/events/registration-form.tsx',{
-    '@/lib/registrations/public-class-display':compile('lib/registrations/public-class-display.ts'),react:harness.react,'react/jsx-runtime':jsxRuntime,'@/lib/registrations/proxy-registration':proxy,'@/lib/registrations/public-form':model,'./turnstile-widget':{default:Widget},
+    'next/link':{default:'a'},'@/lib/registrations/public-class-display':compile('lib/registrations/public-class-display.ts'),react:harness.react,'react/jsx-runtime':jsxRuntime,'@/lib/registrations/proxy-registration':proxy,'@/lib/registrations/public-form':model,'./turnstile-widget':{default:Widget},
   },{crypto:{randomUUID:()=>key1},window:{sessionStorage:store,addEventListener(){},removeEventListener(){}},console:{log:(...args)=>logs.push(args),error:(...args)=>logs.push(args)},fetch:async(url,options)=>{
     calls.push([url,options]);if(options?.method==='POST'){if(postError)throw new Error('SECRET');if(pendingPost)return new Promise(resolve=>{release=resolve});return postResponse}
     if(classesFail)throw new Error('SECRET');return {ok:true,json:async()=>({schedules:classes,page:1,pageSize:50,total:classes.length})}
   }})
-  const render=()=>{harness.reset();return elements(Component({group:{id:5,title:'Synthetic group'},onClose:()=>calls.push(['closed'])}))}
+  const render=()=>{harness.reset();return elements(Component({group,onClose:()=>calls.push(['closed'])}))}
   return {render,calls,logs,Widget,release:()=>release(response()),async mount(){render();await harness.flush();return render()},find:id=>render().find(item=>item.props?.id===id),async completeInput(){await this.mount();for(const [id,value] of [['public-name','参加者'],['public-contact','電話'],['public-notes','備考']])this.find(id).props.onChange({target:{value}});render().find(item=>item.type==='input'&&item.props.type==='checkbox').props.onChange({target:{checked:true}})},confirm(){return render().find(item=>item.type==='form').props.onSubmit({preventDefault(){}})},token(value='fresh-token'){render().find(item=>item.type===Widget).props.onToken(value)},submit(){return render().find(item=>item.type==='button'&&['この内容で申し込む','同じ申込の結果を再確認する'].includes(item.props.children)).props.onClick()}}
 }
 
@@ -296,7 +297,7 @@ test('successful form sends once and renders completion; fresh form fields reset
   const context=form();await context.completeInput();context.confirm();context.token()
   context.submit();await new Promise(resolve=>setImmediate(resolve))
   assert.equal(context.calls.filter(call=>call[1]?.method==='POST').length,1)
-  assert.ok(context.render().some(item=>item.props?.role==='status'&&String(item.props.children).includes('受け付けました')))
+  assert.ok(context.render().some(item=>item.props?.role==='status'&&String(item.props.children).includes('申込受付は完了しています')))
   context.render().find(item=>item.type==='button'&&item.props.children==='新しい申込を始める').props.onClick()
   assert.equal(context.find('public-name').props.value,'');assert.equal(context.find('public-contact').props.value,'');assert.equal(context.find('public-notes').props.value,'')
 })
@@ -337,7 +338,7 @@ test('reloaded pending marker blocks new form submission and class retrieval err
 test('Turnstile widget uses public key and registration action, clears expired tokens and ignores stale callbacks',async()=>{
   const harness=hooks(),tokens=[],rendered=[],removed=[],Script=()=>null
   const win={turnstile:{render:(_,options)=>{rendered.push(options);return String(rendered.length)},remove:id=>removed.push(id)}}
-  const {default:Widget}=compile('app/(public)/events/turnstile-widget.tsx',{'@/lib/registrations/public-class-display':compile('lib/registrations/public-class-display.ts'),react:harness.react,'react/jsx-runtime':jsxRuntime,'next/script':{default:Script}},{window:win,process:{env:{NEXT_PUBLIC_TURNSTILE_SITE_KEY:'SYNTHETIC_PUBLIC_SITEKEY'}}})
+  const {default:Widget}=compile('app/(public)/events/turnstile-widget.tsx',{'next/link':{default:'a'},'@/lib/registrations/public-class-display':compile('lib/registrations/public-class-display.ts'),react:harness.react,'react/jsx-runtime':jsxRuntime,'next/script':{default:Script}},{window:win,process:{env:{NEXT_PUBLIC_TURNSTILE_SITE_KEY:'SYNTHETIC_PUBLIC_SITEKEY'}}})
   const onToken=value=>tokens.push(value)
   const render=generation=>{harness.reset();return elements(Widget({onToken,generation}))}
   let tree=render(0);tree.find(item=>item.type==='div'&&item.props.ref).props.ref.current={}
@@ -354,7 +355,7 @@ test('Turnstile widget uses public key and registration action, clears expired t
 
 test('Turnstile missing public configuration renders an error and no script, without bypass',()=>{
   const harness=hooks(),Script=()=>null
-  const {default:Widget}=compile('app/(public)/events/turnstile-widget.tsx',{'@/lib/registrations/public-class-display':compile('lib/registrations/public-class-display.ts'),react:harness.react,'react/jsx-runtime':jsxRuntime,'next/script':{default:Script}},{process:{env:{NODE_ENV:'development'}}})
+  const {default:Widget}=compile('app/(public)/events/turnstile-widget.tsx',{'next/link':{default:'a'},'@/lib/registrations/public-class-display':compile('lib/registrations/public-class-display.ts'),react:harness.react,'react/jsx-runtime':jsxRuntime,'next/script':{default:Script}},{process:{env:{NODE_ENV:'development'}}})
   harness.reset();const tree=elements(Widget({onToken(){},generation:0}))
   assert.ok(tree.some(item=>item.props?.role==='alert'));assert.equal(tree.some(item=>item.type===Script),false)
 })
@@ -441,4 +442,171 @@ test('review retains the protected submit action and editing path; pending still
  c.token();c.submit();await new Promise(resolve=>setImmediate(resolve));tree=c.render()
  assert.ok(tree.some(n=>n.type==='button'&&n.props.children==='同じ申込の結果を再確認する'))
  assert.equal(tree.some(n=>n.type==='button'&&['閉じる','入力を修正する'].includes(n.props.children)),false)
+})
+
+
+const controllerFor = (store, id, key = key1) => new model.PublicRegistrationAttempt(store, () => key, id)
+test('A success survives B success, switching and reload; explicit restart clears only its group', async () => {
+  const store = storage(), a = controllerFor(store, 5)
+  assert.equal(a.prepare(input), true)
+  await a.submit('token-a', async () => response())
+  const b = controllerFor(store, 6, key2)
+  assert.equal(b.phase, 'ready')
+  assert.equal(controllerFor(store, 5).phase, 'success')
+  assert.equal(b.prepare({ ...input, event_group_id: 6 }), true)
+  await b.submit('token-b', async () => response())
+  assert.equal(controllerFor(store, 5).phase, 'success')
+  assert.equal(controllerFor(store, 6).phase, 'success')
+  assert.equal(controllerFor(store, 5).startNew(), true)
+  assert.equal(controllerFor(store, 5).phase, 'ready')
+  assert.equal(controllerFor(store, 6).phase, 'success')
+})
+test('exact legacy success migrates without attributing completion to A or B', () => {
+  const store = storage(JSON.stringify({ version: 1, phase: 'success' }))
+  assert.equal(controllerFor(store, 5).phase, 'ready')
+  assert.equal(controllerFor(store, 6).phase, 'ready')
+  assert.equal(store.getItem(model.publicAttemptStorageKey), null)
+})
+test('legacy pending and malformed records remain byte-for-byte intact and block every group', () => {
+  for (const raw of [JSON.stringify({ version: 1, phase: 'pending', key: key1 }),
+    '{', 'null', '[]', '{}', JSON.stringify({ version: 1, phase: 'success', key: key1 }),
+    JSON.stringify({ version: 2, completedGroupIds: [5,5], pending: null }),
+    JSON.stringify({ version: 2, completedGroupIds: [5], pending: { groupId: 6, key: 'bad' } }),
+    JSON.stringify({ version: 2, completedGroupIds: ['5'], pending: null })]) {
+    const store = storage(raw)
+    for (const id of [5,6,5]) {
+      const c = controllerFor(store, id)
+      assert.equal(c.phase, 'blocked'); assert.equal(c.prepare({ ...input, event_group_id: id }), false)
+      assert.equal(c.startNew(), false); assert.equal(store.getItem(model.publicAttemptStorageKey), raw)
+    }
+  }
+})
+test('unknown A keeps the key across B, reload and failed reset; original controller retries same request', async () => {
+  const store = storage(), a = controllerFor(store, 5)
+  a.prepare(input)
+  assert.equal((await a.submit('token-a', async () => { throw new Error('offline') })).kind, 'unknown')
+  const raw = store.getItem(model.publicAttemptStorageKey)
+  for (const id of [6,5,6]) {
+    const c = controllerFor(store, id)
+    assert.equal(c.phase, 'blocked'); assert.equal(c.prepare({ ...input, event_group_id: id }), false)
+    assert.equal(c.startNew(), false); assert.equal(store.getItem(model.publicAttemptStorageKey), raw)
+  }
+  let sent
+  await a.submit('fresh-token', async (_, init) => { sent = init; return response() })
+  assert.equal(sent.headers['Idempotency-Key'], key1)
+  assert.equal(controllerFor(store, 5).phase, 'success')
+  assert.equal(controllerFor(store, 6).phase, 'ready')
+})
+test('unknown B takes precedence over completed A without losing either record', async () => {
+  const store = storage(), a = controllerFor(store, 5)
+  a.prepare(input); await a.submit('a', async () => response())
+  const b = controllerFor(store, 6, key2)
+  b.prepare({ ...input, event_group_id: 6 })
+  const raw = store.getItem(model.publicAttemptStorageKey)
+  assert.equal(a.startNew(), false)
+  assert.equal(controllerFor(store, 5).phase, 'blocked')
+  assert.equal(store.getItem(model.publicAttemptStorageKey), raw)
+  await b.submit('b', async () => response())
+  assert.equal(controllerFor(store, 5).phase, 'success')
+})
+test('stale mounted form cannot overwrite another pending key or retry after storage replacement', async () => {
+  const store = storage(), a = controllerFor(store, 5), b = controllerFor(store, 6, key2)
+  a.prepare(input)
+  const raw = store.getItem(model.publicAttemptStorageKey)
+  assert.equal(b.prepare({ ...input, event_group_id: 6 }), false)
+  assert.equal(store.getItem(model.publicAttemptStorageKey), raw)
+  store.setItem(model.publicAttemptStorageKey, 'invalid')
+  let calls = 0
+  await a.submit('token', async () => { calls++; return response() })
+  assert.equal(calls, 0)
+})
+test('completion storage failure preserves pending key and refuses explicit restart', async () => {
+  for (const silent of [false,true]) {
+    const store = storage(), a = controllerFor(store, 5)
+    a.prepare(input)
+    const raw = store.getItem(model.publicAttemptStorageKey)
+    store.setItem = () => { if (!silent) throw new Error('quota') }
+    assert.equal((await a.submit('token', async () => response())).kind, 'success')
+    assert.equal(a.startNew(), false)
+    assert.equal(store.getItem(model.publicAttemptStorageKey), raw)
+    assert.equal(controllerFor(store, 5).phase, 'blocked')
+    assert.equal(controllerFor(store, 6).phase, 'blocked')
+  }
+})
+test('legacy migration storage failure blocks without overwriting old marker', () => {
+  for (const silent of [false,true]) {
+    const store = storage(JSON.stringify({ version: 1, phase: 'success' })), raw = store.getItem(model.publicAttemptStorageKey)
+    store.removeItem = () => { if (!silent) throw new Error('denied') }
+    assert.equal(controllerFor(store, 5).phase, 'blocked')
+    assert.equal(store.getItem(model.publicAttemptStorageKey), raw)
+  }
+})
+test('failed pending persistence never sends, and mismatched group never allocates a key', async () => {
+  const store = storage(), a = controllerFor(store, 5)
+  store.setItem = () => {}
+  assert.equal(a.prepare(input), false)
+  let calls = 0
+  await a.submit('token', async () => { calls++; return response() })
+  assert.equal(calls, 0)
+  const other = new model.PublicRegistrationAttempt(storage(), () => { throw new Error('must not allocate') }, 6)
+  assert.equal(other.prepare(input), false)
+})
+test('form restores completion only for its group and blocks on another unresolved group', async () => {
+  for (const [marker, completed, blocked] of [
+    [{ version: 2, completedGroupIds: [5], pending: null }, true, false],
+    [{ version: 2, completedGroupIds: [6], pending: null }, false, false],
+    [{ version: 2, completedGroupIds: [5], pending: { groupId: 6, key: key2 } }, false, true],
+    [{ version: 1, phase: 'success' }, false, false],
+  ]) {
+    const c = form({ store: storage(JSON.stringify(marker)) })
+    const tree = await c.mount()
+    assert.equal(tree.some(n => n.type === 'h2' && n.props.children === '申込を受け付けました'), completed)
+    assert.equal(tree.some(n => n.props?.role === 'alert' && String(n.props.children).includes('前の申込結果が不明')), blocked)
+    assert.equal(c.calls.some(call => call[1]?.method === 'POST'), false)
+  }
+})
+
+
+const textContent = value => Array.isArray(value) ? value.map(textContent).join('') : value && typeof value === 'object' ? textContent(value.props?.children) : value == null ? '' : String(value)
+test('success names its group and returns directly to guide without closing or posting', async () => {
+  const c = form()
+  await c.completeInput(); c.confirm(); c.token(); c.submit()
+  await new Promise(resolve => setImmediate(resolve))
+  const tree = c.render()
+  assert.ok(tree.some(n => n.type === 'h2' && n.props.children === '申込を受け付けました'))
+  assert.ok(tree.some(n => n.type === 'p' && textContent(n).includes('開催回：Synthetic group')))
+  const back = tree.find(n => n.type === 'a' && n.props.children === '開催案内へ戻る')
+  assert.equal(back.props.href, '/events'); assert.equal(back.props.prefetch, false); assert.equal(back.props.onClick, undefined)
+  assert.equal(tree.some(n => n.type === 'button' && n.props.children === '閉じる'), false)
+  assert.equal(c.calls.some(call => call[0] === 'closed'), false)
+  assert.equal(c.calls.filter(call => call[1]?.method === 'POST').length, 1)
+  assert.doesNotMatch(textContent(tree), /メール.*送信しました|メール.*届きます|申込フォームを閉じました/)
+  assert.ok(tree.some(n => n.type === 'button' && n.props.children === '新しい申込を始める'))
+})
+test('success reload and A to B to A show only the corresponding completion and never submit', async () => {
+  const store = storage(), a = controllerFor(store, 5)
+  a.prepare(input); await a.submit('a', async () => response())
+  const marker = store.getItem(model.publicAttemptStorageKey)
+  for (const [id,title,success] of [[5,'開催回A',true],[6,'開催回B',false],[5,'開催回A',true],[5,'開催回A',true]]) {
+    const c = form({ store, group: { id, title } }), tree = await c.mount()
+    assert.equal(tree.some(n => n.type === 'h2' && n.props.children === '申込を受け付けました'), success)
+    assert.ok(tree.some(n => n.type === 'p' && textContent(n).includes(`${success ? '開催回' : '講習会'}：${title}`)))
+    assert.equal(tree.some(n => n.type === 'a' && n.props.href === '/events' && n.props.children === '開催案内へ戻る'), success)
+    assert.equal(tree.some(n => n.type === 'button' && n.props.children === '新しい申込を始める'), success)
+    assert.equal(c.calls.some(call => call[1]?.method === 'POST'), false)
+    assert.equal(store.getItem(model.publicAttemptStorageKey), marker)
+  }
+})
+test('unknown and rejected submissions never offer the success return link or completion heading', async () => {
+  for (const options of [{postError:true},{postResponse:response('CAPACITY_EXCEEDED',409)},{postResponse:response('REGISTRATION_CLOSED',409)}]) {
+    const store = storage(), c = form({ ...options, store })
+    await c.completeInput(); c.confirm(); c.token(); c.submit()
+    await new Promise(resolve => setImmediate(resolve))
+    const tree = c.render()
+    assert.equal(tree.some(n => n.type === 'h2' && n.props.children === '申込を受け付けました'), false)
+    assert.equal(tree.some(n => n.props?.children === '開催案内へ戻る'), false)
+    assert.equal(tree.some(n => n.type === 'button' && n.props.children === '閉じる'), false)
+    assert.ok(tree.some(n => n.type === 'button' && n.props.children === '同じ申込の結果を再確認する'))
+    assert.equal(JSON.parse(store.getItem(model.publicAttemptStorageKey)).pending.groupId, 5)
+  }
 })
