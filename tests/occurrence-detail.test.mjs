@@ -177,3 +177,11 @@ test('single public state is shown exactly once and class flags remain explicitl
  assert.match(c.text(),/現在の公開申込：開催回全体が受付停止中/)
  assert.doesNotMatch(c.text(),/クラス受付：受付中/)
 })
+
+
+for(const notes of [undefined,null,'','  \n　','服装：道着\n支払方法：当日'])test(`admin participation notes visibility: ${JSON.stringify(notes)}`,async()=>{
+ const c=screen({groupData:{participation_notes:notes,description:'既存の説明'}});await c.flush()
+ assert.match(c.text(),/既存の説明/)
+ assert.equal(c.text().includes('参加にあたって'),typeof notes==='string'&&!!notes.trim())
+ if(typeof notes==='string'&&notes.trim())assert.ok(c.text().includes(notes))
+})

@@ -48,7 +48,7 @@ function context({ auth = { ok: true }, result = { data: { group_id: 1, class_id
     '@/lib/event-groups/occurrence-editor': validation,
   }
   const post = compile('app/api/admin/occurrences/route.ts', dependencies).POST, get = compile('app/api/admin/occurrences/[id]/route.ts', dependencies).GET
-  return { calls, post: (input = fixture(), headers = {}, raw = false) => post(new Request('http://localhost/api/admin/occurrences', { method: 'POST', headers: { Origin: 'http://localhost', 'Content-Type': 'application/json', 'Idempotency-Key': key, ...headers }, body: raw ? input : JSON.stringify(input) })), get: (id = '1') => get(new Request('http://localhost/api/admin/occurrences/'+id), { params: Promise.resolve({ id }) }) }
+  return { calls, post: (input = fixture(), headers = {}, raw = false) => post(new Request('http://localhost/api/admin/occurrences', { method: 'POST', headers: { Origin: 'http://localhost', 'Content-Type': 'application/json', 'Idempotency-Key': key, ...headers }, body: raw ? input : JSON.stringify(input) })), get: (id = '1', includeNotes = false) => get(new Request('http://localhost/api/admin/occurrences/'+id+(includeNotes?'?includeParticipationNotes=1':'')), { params: Promise.resolve({ id }) }) }
 }
 for (const status of [401, 403]) test(`API authorization ${status} runs before RPC`, async () => {
   const c = context({ auth: { ok: false, status, error: 'denied' } }); assert.equal((await c.post()).status, status); assert.equal((await c.get()).status, status); assert.equal(c.calls.length, 0)
@@ -135,4 +135,65 @@ test('forward reception migration changes only new-group false to true and prese
  const marker='v_start, v_end, false)'
  assert.equal(before.split(marker).length-1,1)
  assert.equal(after,'-- Preview forward migration: only new group reception defaults to ON. Existing states and class input are preserved.\n'+before.replace(marker,'v_start, v_end, true)'))
+})
+
+
+for (const [notes, accepted] of [[null,true],['',true],['  \n\t　',true],['服装：道着\n支払：当日',true],['a'.repeat(3000),true],['😀'.repeat(3000),true],['a'.repeat(3001),false],[42,false],[{},false],[undefined,false]]) test(`participation notes validation: ${typeof notes}, length ${typeof notes==='string'?Array.from(notes).length:0}`, () => {
+ const input=fixture();input.group.participation_notes=notes
+ const result=validation.validateOccurrenceInput(input)
+ assert.equal(!!result.data,accepted)
+ if(accepted)assert.equal(result.data.group.participation_notes,typeof notes==='string'&&notes.trim()?notes:null)
+})
+test('legacy payload remains absent rather than gaining NULL; extended snapshot is raw and required for notes changes', () => {
+ const legacy=editing(), validated=validation.validateOccurrenceInput(legacy).data
+ assert.ok(validated)
+ assert.equal(Object.hasOwn(validated.group,'participation_notes'),false)
+ assert.equal(Object.hasOwn(validated.expected.group,'participation_notes'),false)
+ legacy.group.participation_notes='新しい案内'
+ assert.ok(validation.validateOccurrenceInput(legacy).error)
+ legacy.expected.group.participation_notes='  既存の案内\n '
+ const current=validation.validateOccurrenceInput(legacy).data
+ assert.equal(current.expected.group.participation_notes,'  既存の案内\n ')
+ assert.equal(current.group.participation_notes,'新しい案内')
+ delete legacy.group.participation_notes
+ assert.equal(Object.hasOwn(validation.validateOccurrenceInput(legacy).data.group,'participation_notes'),false)
+ legacy.expected.group.participation_notes=42
+ assert.equal(validation.validSnapshot(legacy.expected),false)
+})
+test('GET opts in to the new getter overload; default calls and legacy snapshots remain unchanged',async()=>{
+ const extended=snapshot();extended.group.participation_notes='保険は各自確認'
+ const c=context({result:{data:extended,error:null}})
+ assert.equal((await c.get('1',true)).body.snapshot.group.participation_notes,'保険は各自確認')
+ assert.deepEqual(plain(c.calls[0]),['admin_get_occurrence_editor',{p_group_id:1,p_include_participation_notes:true}])
+ const old=context({result:{data:snapshot(),error:null}})
+ assert.equal((await old.get()).status,200)
+ assert.deepEqual(plain(old.calls[0]),['admin_get_occurrence_editor',{p_group_id:1}])
+ assert.equal((await old.get('1',true)).status,503,'new editor must fail closed if the extended snapshot is unavailable')
+})
+for(const status of [401,403])test(`notes opt-in GET preserves server authorization ${status}`,async()=>{
+ const c=context({auth:{ok:false,status,error:'Denied'}})
+ assert.equal((await c.get('1',true)).status,status);assert.equal(c.calls.length,0)
+})
+test('POST forwards notes through the existing save RPC with unchanged public success response',async()=>{
+ const input=fixture();input.group.description='説明は独立';input.group.participation_notes='持ち物\n支払方法'
+ const c=context();const response=await c.post(input)
+ assert.equal(response.status,200);assert.deepEqual(plain(response.body),{saved:true,group_id:1})
+ assert.equal(c.calls[0][0],'admin_save_occurrence')
+ assert.equal(c.calls[0][1].p_input.group.participation_notes,'持ち物\n支払方法')
+ assert.equal(c.calls[0][1].p_input.group.description,'説明は独立')
+ const legacy=context();await legacy.post()
+ assert.equal(Object.hasOwn(legacy.calls[0][1].p_input.group,'participation_notes'),false)
+})
+test('notes remain frozen with the same save key/body across unknown result and reload',async()=>{
+ const store=memory(), calls=[];let failed=true
+ const send=async(_u,o)=>{calls.push(o);if(failed)throw Error('unknown');return{ok:true,status:200,json:async()=>({saved:true,group_id:12})}}
+ const input=fixture();input.group.participation_notes='凍結した案内\n改行'
+ const first=saving.createOccurrenceSaver(send,()=>key,store)
+ assert.equal((await first.save(input)).state,'unknown')
+ input.group.participation_notes='送信してはいけない変更';failed=false
+ const second=saving.createOccurrenceSaver(send,()=>assert.fail('must reuse key'),store)
+ second.restore(null);assert.equal((await second.save()).state,'saved')
+ assert.equal(calls[0].body,calls[1].body)
+ assert.equal(calls[1].headers['Idempotency-Key'],key)
+ assert.match(calls[1].body,/凍結した案内/);assert.doesNotMatch(calls[1].body,/送信してはいけない/)
 })

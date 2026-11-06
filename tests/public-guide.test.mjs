@@ -6,11 +6,13 @@ import ts from 'typescript'
 import * as jsxRuntime from 'react/jsx-runtime'
 import { renderToStaticMarkup } from 'react-dom/server'
 function compile(file, deps = {}) {
+ if (file.startsWith('app/(public)/events/') && file.endsWith('page.tsx')) deps = { './type-labels': { default: TypeLabels }, '../type-labels': { default: TypeLabels }, ...deps }
  deps = { 'next/navigation': { redirect(path) { throw Object.assign(new Error('REDIRECT'), { path }) } }, ...deps }
  const exports = {}
  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports,Date,Intl,Map,Set,require(name){assert.ok(name in deps,`Unexpected dependency ${name}`);return deps[name]}})
  return exports
 }
+const TypeLabels = compile('app/(public)/events/type-labels.tsx', { 'react/jsx-runtime': jsxRuntime, './guide.module.css': { default: { typeLabels: 'type-labels', typeLabel: 'type-label', practiceType: 'practice', openType: 'open' } } }).default
 const presentation=compile('lib/event-groups/presentation.ts')
 const guide=compile('lib/event-groups/public-guide.ts',{'./presentation':presentation})
 const server=compile('lib/event-groups/public-guide-server.ts',{'server-only':{},'@/lib/supabase/anonymous':{createAnonymousClient(){assert.fail('No external clients in tests')}},'./public-guide':guide})
@@ -221,8 +223,10 @@ for (const [types, expected] of [
  assert.ok(client.calls.filter(c => c.table === 'schedules').every(c => c.columns.split(',').includes('type')))
  const listing = await guideList(result.items), html = await detail(detailData.group, detailData.classes)
  if (expected) {
-  assert.ok(listing.includes(`>${expected}</span>`))
-  assert.ok(html.includes(`>${expected}</p>`))
+  for (const type of expected.split('・')) {
+   assert.ok(listing.includes(`>${type}</span>`))
+   assert.ok(html.includes(`>${type}</span>`))
+  }
  } else {
   assert.doesNotMatch(listing, />稽古会(?:・一般参加)?<|>一般参加<|>未定</)
   assert.doesNotMatch(html, />稽古会(?:・一般参加)?<|>一般参加<|>未定</)
@@ -254,4 +258,36 @@ test('type labels are independent of reception flags and do not broaden publicat
   assert.equal((await server.loadGuidePage(1, db(groups, [row()]), '2030-01-01')).items.length, 0)
   assert.equal(await server.loadGuideDetail(1, db(groups, [row()]), '2030-01-01'), null)
  }
+})
+
+
+for(const notes of [undefined,null,'',' \t\n　','服装：道着\n持ち物：飲料\n保険：各自確認'])test(`public participation notes hide blank sections and retain description: ${JSON.stringify(notes)}`,async()=>{
+ const html=await detail(group(1,{participation_notes:notes,description:'従来の開催内容'}),[row()])
+ assert.ok(html.includes('従来の開催内容'))
+ assert.equal(html.includes('<h2>参加にあたって</h2>'),typeof notes==='string'&&!!notes.trim())
+ if(typeof notes==='string'&&notes.trim())assert.ok(html.includes(notes))
+})
+test('public notes render as escaped plain text, never executable HTML',async()=>{
+ const html=await detail(group(1,{participation_notes:'<script>alert(1)</script>\n<img src=x onerror=alert(2)> & 支払方法'}),[row()])
+ assert.match(html,/&lt;script&gt;alert\(1\)&lt;\/script&gt;/)
+ assert.match(html,/&lt;img/);assert.doesNotMatch(html,/<script>|<img /)
+ assert.ok(html.includes('\n'));assert.match(fs.readFileSync('app/(public)/events/guide.module.css','utf8'),/\.description[^}]*white-space: pre-wrap/)
+})
+for(const [label,expected] of [['稽古会',['稽古会']],['一般参加',['一般参加']],['稽古会・一般参加',['稽古会','一般参加']],[null,[]],['稽古会・未定',[]]])test(`shared type badges preserve names and display both mixed types: ${label}`,()=>{
+ const html=renderToStaticMarkup(jsxRuntime.jsx(TypeLabels,{label}))
+ assert.equal((html.match(/class="type-label /g)||[]).length,expected.length)
+ for(const name of expected)assert.ok(html.includes(`>${name}</span>`))
+ if(expected.length===0)assert.equal(html,'')
+ if(expected.includes('稽古会'))assert.match(html,/type-label practice/)
+ if(expected.includes('一般参加'))assert.match(html,/type-label open/)
+})
+test('list and detail share the badge component and responsive low-decoration CSS',()=>{
+ assert.match(fs.readFileSync('app/(public)/events/page.tsx','utf8'),/<TypeLabels label=\{group.typeLabel\}/)
+ assert.match(fs.readFileSync('app/(public)/events/[id]/page.tsx','utf8'),/<TypeLabels label=\{typeLabel\}/)
+ const css=fs.readFileSync('app/(public)/events/guide.module.css','utf8')
+ assert.match(css,/\.page \.typeLabels[^}]*display: inline-flex;[^}]*flex-wrap: wrap;[^}]*max-width: 100%/)
+ assert.match(css,/\.page \.typeLabel[^}]*margin: 0;/)
+ assert.match(css,/\.typeLabel[^}]*max-width: 100%;[^}]*font-size: 14px;[^}]*font-weight: 600;[^}]*overflow-wrap: anywhere/)
+ assert.match(css,/\.practiceType[^}]*color: #294b3b;[^}]*background: #edf3ef/)
+ assert.match(css,/\.openType[^}]*color: var\(--hub-primary\);[^}]*background: #f7eef0/)
 })

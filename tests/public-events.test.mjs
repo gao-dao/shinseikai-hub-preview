@@ -238,7 +238,7 @@ test('legacy list URL redirects to guide without querying groups or rendering re
     'react/jsx-runtime': jsxRuntime, './events-list': { default: () => assert.fail('must not render') },
     'next/link': { default: () => null }, 'next/navigation': { redirect(path) { throw Object.assign(new Error('REDIRECT'), { path }) } },
     '@/lib/event-groups/public-guide-server': { loadGuidePage() { assert.fail('must not query') }, loadGuideDetail() { assert.fail('must not query') } },
-    '@/lib/event-groups/public-guide': {}, './guide.module.css': { default: {} },
+    '@/lib/event-groups/public-guide': {}, './type-labels': { default: () => null }, './guide.module.css': { default: {} },
   })
   for (const params of [{ view: 'registration' }, { view: 'registration', page: '2' }]) {
     await assert.rejects(page.default({ searchParams: Promise.resolve(params) }), e => e.message === 'REDIRECT' && e.path === '/events')

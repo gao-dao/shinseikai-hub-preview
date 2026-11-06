@@ -10,7 +10,7 @@ import { findOccurrence } from '@/lib/event-groups/admin-overview'
 import NewScheduleForm from '../new-schedule-form'
 import { validateEventGroupOccurrence, type EventGroupOccurrence } from '@/lib/event-groups/validation'
 
-type Group = { id: number; title: string; description: string | null; registration_open: boolean; is_cancelled?: boolean; is_hidden?: boolean; state_version?: number } & EventGroupOccurrence
+type Group = { id: number; title: string; description: string | null; participation_notes?: string | null; registration_open: boolean; is_cancelled?: boolean; is_hidden?: boolean; state_version?: number } & EventGroupOccurrence
 type List = { eventGroups: Group[]; page: number; pageSize: number; total: number }
 
 export default function EventGroups({ groupId, createOnly = false, returnTo = '/admin/event-groups' }: { groupId?: number; createOnly?: boolean; returnTo?: string } = {}) {

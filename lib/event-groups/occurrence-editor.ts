@@ -1,7 +1,7 @@
 import { validateEventGroupOccurrence } from './validation'
 import { validateNewSchedule } from '../schedules/new-schedule'
 
-export type OccurrenceGroup = { title: string; description: string | null; city: string | null; start_date: string; end_date: string }
+export type OccurrenceGroup = { title: string; description: string | null; participation_notes?: string | null; city: string | null; start_date: string; end_date: string }
 export type OccurrenceClass = { id: number | null; end_time?: string | null; title: string; date: string; start_time: string | null; location: string; type: '稽古会' | '一般参加'; capacity: number | null; registration_enabled: boolean }
 export type OccurrenceSnapshot = { group: Omit<OccurrenceGroup, 'start_date' | 'end_date'> & { start_date: string | null; end_date: string | null; registration_open: boolean }; classes: (OccurrenceClass & { id: number; end_time: string | null })[] }
 export type OccurrenceInput = { group_id: number | null; group: OccurrenceGroup; classes: OccurrenceClass[]; expected: OccurrenceSnapshot | null }
@@ -9,12 +9,14 @@ const object = (v: unknown): v is Record<string, unknown> => !!v && typeof v ===
 const exact = (v: Record<string, unknown>, fields: string[]) => Object.keys(v).length === fields.length && fields.every(k => Object.hasOwn(v, k))
 export const validId = (v: unknown): v is number => typeof v === 'number' && Number.isSafeInteger(v) && v > 0
 const groupFields = ['title', 'description', 'city', 'start_date', 'end_date']
+const fieldsFor = (group: Record<string, unknown>) => Object.hasOwn(group, 'participation_notes') ? [...groupFields, 'participation_notes'] : groupFields
 const classFields = ['id', 'title', 'date', 'start_time', 'location', 'type', 'capacity', 'registration_enabled']
 
 // Snapshot values are compared verbatim in PostgreSQL; never trim or normalize them.
 export function validSnapshot(v: unknown): v is OccurrenceSnapshot {
-  if (!object(v) || !exact(v, ['group', 'classes']) || !object(v.group) || !exact(v.group, [...groupFields, 'registration_open']) || !Array.isArray(v.classes)) return false
+  if (!object(v) || !exact(v, ['group', 'classes']) || !object(v.group) || !exact(v.group, [...fieldsFor(v.group), 'registration_open']) || !Array.isArray(v.classes)) return false
   const group = v.group
+  if (Object.hasOwn(group, 'participation_notes') && group.participation_notes !== null && typeof group.participation_notes !== 'string') return false
   if (typeof group.title !== 'string' || typeof group.registration_open !== 'boolean' || ['description', 'city', 'start_date', 'end_date'].some(k => group[k] !== null && typeof group[k] !== 'string')) return false
   const ids = new Set<number>()
   return v.classes.every(row => {
@@ -28,10 +30,13 @@ export function validateOccurrenceInput(value: unknown): { data: OccurrenceInput
   if (!object(value) || !exact(value, ['group_id', 'group', 'classes', 'expected'])) return fail('保存内容の形式が不正です。')
   if (value.group_id !== null && !validId(value.group_id)) return fail('開催回IDが不正です。')
   if ((value.group_id === null && value.expected !== null) || (value.group_id !== null && !validSnapshot(value.expected))) return fail('編集開始時の情報が必要です。再読み込みしてください。')
-  if (!object(value.group) || !exact(value.group, groupFields)) return fail('開催回の入力項目が不正です。')
+  if (!object(value.group) || !exact(value.group, fieldsFor(value.group))) return fail('開催回の入力項目が不正です。')
   const g = value.group
   if (typeof g.title !== 'string' || !g.title.trim() || Array.from(g.title.trim()).length > 200) return fail('開催名は1〜200文字で入力してください。')
   if (g.description !== null && (typeof g.description !== 'string' || Array.from(g.description).length > 3000)) return fail('説明は3000文字以内で入力してください。')
+  const hasNotes = Object.hasOwn(g, 'participation_notes')
+  if (hasNotes && g.participation_notes !== null && (typeof g.participation_notes !== 'string' || Array.from(g.participation_notes).length > 3000)) return fail('参加にあたっては3000文字以内で入力してください。')
+  if (hasNotes && value.group_id !== null && !Object.hasOwn((value.expected as OccurrenceSnapshot).group, 'participation_notes')) return fail('参加案内を含む最新情報を再取得してから編集してください。')
   const occurrence = validateEventGroupOccurrence({ city: g.city, start_date: g.start_date, end_date: g.end_date })
   if (!occurrence.data || !occurrence.data.start_date || !occurrence.data.end_date) return fail(occurrence.error || '開催期間を入力してください。')
   if (!Array.isArray(value.classes) || value.classes.length < 1 || value.classes.length > 100) return fail('クラスは1〜100件で登録してください。')
@@ -56,5 +61,5 @@ export function validateOccurrenceInput(value: unknown): { data: OccurrenceInput
     const snapshot = value.expected as OccurrenceSnapshot
     if (ids.size !== snapshot.classes.length || snapshot.classes.some(row => !ids.has(row.id))) return fail('既存クラスを取り除くことはできません。最新情報を再取得してください。')
   }
-  return { data: { group_id: value.group_id as number | null, group: { title: g.title.trim(), description: g.description as string | null, ...occurrence.data } as OccurrenceGroup, classes, expected: value.expected as OccurrenceSnapshot | null } }
+  return { data: { group_id: value.group_id as number | null, group: { title: g.title.trim(), description: g.description as string | null, ...(hasNotes ? { participation_notes: typeof g.participation_notes === 'string' && g.participation_notes.trim() ? g.participation_notes : null } : {}), ...occurrence.data } as OccurrenceGroup, classes, expected: value.expected as OccurrenceSnapshot | null } }
 }

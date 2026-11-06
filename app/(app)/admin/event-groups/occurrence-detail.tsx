@@ -34,6 +34,7 @@ export default function OccurrenceDetail({ group, refreshToken = 0, onUpdated }:
     {group.is_hidden && <p role="status">一覧から非表示（管理者のみ閲覧可能）</p>}
     <dl className="detail-basics" aria-label="開催日時と会場"><div><dt>開催日時</dt><dd>{single ? `${single.date} ${timeRange(single)}` : period}</dd></div><div><dt>会場</dt><dd>{rows === null ? error ? '確認できません' : '確認中' : rows.length === 0 ? 'クラス未登録のため未設定' : single ? single.location || '未設定' : venues.length === 1 ? venues[0] || '未設定' : 'クラスごとに異なります（下記参照）'}</dd></div></dl>
     {group.description && <p className="detail-description">{group.description}</p>}
+    {group.participation_notes?.trim() && <section aria-label="参加にあたって"><h2>参加にあたって</h2><p className="detail-description">{group.participation_notes}</p></section>}
     {error && <p role="alert">{error}</p>}
     {!rows && !error && <p role="status">クラス・申込状況を読み込み中...</p>}
     {rows?.length === 0 && <p className="single-reception-help">クラス未登録。受付するにはクラスの登録が必要です。<Link data-admin-link href={`/admin/event-groups/${group.id}/edit`}>クラスを登録・編集</Link></p>}

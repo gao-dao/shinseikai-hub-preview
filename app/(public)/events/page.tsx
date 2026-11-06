@@ -1,3 +1,4 @@
+import TypeLabels from './type-labels'
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
@@ -37,7 +38,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
       <ul className={styles.list}>{result.items.map(group => <li key={group.id}><Link className={styles.item} href={`/events/${group.id}`}>
         <h2>{group.title} →</h2><span className={styles.date}>{group.start_date}{group.end_date !== group.start_date ? `〜${group.end_date}` : ''}</span>
         <span className={styles.meta}>地域：{group.city || '未設定'}{group.classCount > 1 ? ` ／ ${group.classCount}クラス` : ''}</span>
-        {group.typeLabel && <span className={styles.meta}>{group.typeLabel}</span>}
+        <TypeLabels label={group.typeLabel} />
       </Link></li>)}</ul>
       <nav className={styles.pagination} aria-label="開催案内のページ切替">
         {result.page > 1 && <Link href={`/events?page=${result.page - 1}`}>← 前へ</Link>}

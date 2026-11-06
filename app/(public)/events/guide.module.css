@@ -25,3 +25,8 @@
 .page .webLink { justify-content: center; box-sizing: border-box; max-width: 100%; padding: 10px 18px; border: 1px solid #ded8ce; border-radius: 6px; background: #f7eef0; color: var(--hub-primary); font-weight: 700; text-align: center; text-decoration: none; }
 .page .webLink:hover { border-color: var(--hub-primary); }
 @media (max-width: 640px) { .page { padding: 24px var(--hub-gutter-mobile) 32px; } }
+
+.page .typeLabels { display: inline-flex; flex-wrap: wrap; gap: 6px; max-width: 100%; vertical-align: middle; }
+.page .typeLabel { display: inline-block; box-sizing: border-box; max-width: 100%; margin: 0; padding: 3px 9px; border: 1px solid; border-radius: 5px; font-size: 14px; font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; }
+.practiceType { color: #294b3b; background: #edf3ef; border-color: #d5e1da; }
+.openType { color: var(--hub-primary); background: #f7eef0; border-color: #e4cdd1; }

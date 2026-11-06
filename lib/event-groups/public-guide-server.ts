@@ -3,7 +3,7 @@ import { createAnonymousClient } from '@/lib/supabase/anonymous'
 import { guideToday, publishable, validGroup, sortClasses, classType, type GuideGroup, type GuideClass } from './public-guide'
 
 type Client = ReturnType<typeof createAnonymousClient>
-const columns = 'id,title,description,city,start_date,end_date,registration_open,is_cancelled,is_hidden'
+const columns = 'id,title,description,participation_notes,city,start_date,end_date,registration_open,is_cancelled,is_hidden'
 const batchSize = 50
 const classBatch = 500
 export const guidePageSize = 20

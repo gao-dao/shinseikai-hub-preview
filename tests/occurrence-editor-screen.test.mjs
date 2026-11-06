@@ -14,7 +14,7 @@ const presentation = compile('lib/event-groups/presentation.ts', {})
 const plain = v => JSON.parse(JSON.stringify(v))
 function all(tree) { if (Array.isArray(tree)) return tree.flatMap(all); return tree && typeof tree === 'object' ? [tree, ...all(tree.props?.children)] : [] }
 function text(tree) { if (Array.isArray(tree)) return tree.map(text).join(''); if (tree && typeof tree === 'object') return text(tree.props?.children); return typeof tree === 'string' || typeof tree === 'number' ? String(tree) : '' }
-const snapshot = () => ({ group: { title: '既存開催回', description: null, city: null, start_date: null, end_date: null, registration_open: false }, classes: [{ id: 7, title: '既存クラス', date: '2030-10-23', start_time: '12:00:30', end_time: '17:00', location: '既存会場', type: '稽古会', capacity: 25, registration_enabled: false }] })
+const snapshot = () => ({ group: { title: '既存開催回', description: null, participation_notes: null, city: null, start_date: null, end_date: null, registration_open: false }, classes: [{ id: 7, title: '既存クラス', date: '2030-10-23', start_time: '12:00:30', end_time: '17:00', location: '既存会場', type: '稽古会', capacity: 25, registration_enabled: false }] })
 function setup({ groupId, returnTo, data = snapshot(), status = 200, result = { state: 'saved', groupId: 9 }, pending = null, deferred = false } = {}) {
   const slots = [], effects = [], calls = []; let cursor = 0, release, confirmResult = true, confirmations = 0
   const react = {
@@ -286,4 +286,47 @@ test('new creation explains class OFF and separate publication without adding a 
  await c.submit();assert.match(c.text(),/受付を無効にしても、掲載条件を満たす開催回は開催案内に表示/);await c.save();
  const input=c.calls.find(v=>v[0]==='save')[1];assert.equal('registration_open' in input.group,false);assert.equal(input.classes[0].registration_enabled,true);
  const link=c.render().find(n=>n.type==='Link'&&text(n)==='開催回の詳細・受付管理へ');assert.equal(link.props.href,'/admin/event-groups/9');assert.match(link.props.className,/primary/);
+})
+
+
+test('new participation textarea is independent, reviewed and saved with line breaks',async()=>{
+ const c=setup();await c.mount();fill(c)
+ c.change('説明（任意）','開催内容の説明')
+ c.change('参加にあたって（任意）','服装：道着\n持ち物：飲料\n支払方法：当日')
+ await c.submit();assert.match(text(c.render()),/参加にあたって/)
+ await c.save();const input=c.calls.find(v=>v[0]==='save')[1]
+ assert.equal(input.group.description,'開催内容の説明')
+ assert.equal(input.group.participation_notes,'服装：道着\n持ち物：飲料\n支払方法：当日')
+})
+test('notes load, modify, clear and reload without changing the raw edit-start snapshot',async()=>{
+ const data=snapshot();data.group.participation_notes='保険について\n各自確認';data.group.description='従来の説明'
+ const c=setup({groupId:1,data});await c.mount()
+ assert.match(c.calls.find(v=>v[0]==='fetch')[1],/includeParticipationNotes=1$/)
+ assert.equal(c.fields('参加にあたって（任意）')[0].props.value,'保険について\n各自確認')
+ c.change('参加にあたって（任意）','更新案内');c.confirm(false);c.button('最新情報を再取得').props.onClick()
+ assert.equal(c.fields('参加にあたって（任意）')[0].props.value,'更新案内')
+ c.confirm(true);c.button('最新情報を再取得').props.onClick();await c.mount()
+ assert.equal(c.fields('参加にあたって（任意）')[0].props.value,'保険について\n各自確認')
+ c.change('参加にあたって（任意）','  \n　');await c.submit();await c.save()
+ const input=c.calls.find(v=>v[0]==='save')[1]
+ assert.equal(input.group.participation_notes,null)
+ assert.equal(input.expected.group.participation_notes,'保険について\n各自確認')
+ assert.equal(input.group.description,'従来の説明')
+})
+test('notes above 3000 code points are rejected before saving',async()=>{
+ const c=setup();await c.mount();fill(c);c.change('参加にあたって（任意）','a'.repeat(3001));await c.submit()
+ assert.match(c.text(),/3000文字/);assert.equal(c.button('まとめて保存'),undefined)
+ assert.equal(c.calls.filter(v=>v[0]==='save').length,0)
+})
+test('new editor rejects a legacy-only loaded snapshot instead of overwriting unknown notes',async()=>{
+ const data=snapshot();delete data.group.participation_notes
+ const c=setup({groupId:1,data});await c.mount()
+ assert.equal(c.render().some(n=>n.type==='form'),false)
+ assert.equal(c.calls.filter(v=>v[0]==='save').length,0)
+})
+test('notes survive conflict rejection and in-flight edit protection',async()=>{
+ const data=snapshot();data.group.participation_notes='編集前'
+ const c=setup({groupId:1,data,result:{state:'rejected',error:'競合しました'}});await c.mount()
+ c.change('参加にあたって（任意）','編集後');await c.submit();await c.save();assert.match(c.text(),/競合/)
+ c.button('入力へ戻る').props.onClick();assert.equal(c.fields('参加にあたって（任意）')[0].props.value,'編集後')
 })

@@ -1,9 +1,10 @@
-export type Occurrence = { id: number; title: string; description: string | null; city: string | null; start_date: string | null; end_date: string | null; registration_open: boolean; is_cancelled?: boolean; is_hidden?: boolean; state_version?: number }
+export type Occurrence = { id: number; title: string; description: string | null; participation_notes?: string | null; city: string | null; start_date: string | null; end_date: string | null; registration_open: boolean; is_cancelled?: boolean; is_hidden?: boolean; state_version?: number }
 export type ClassSummary = { classCount: number; activeClassBookings: number; classDates: unknown[] }
 export function validOccurrence(value: unknown): value is Occurrence {
   if (!value || typeof value !== 'object') return false
   const v = value as Occurrence
   return Number.isSafeInteger(v.id) && v.id > 0 && typeof v.title === 'string' && typeof v.registration_open === 'boolean' &&
+    (v.participation_notes === undefined || v.participation_notes === null || typeof v.participation_notes === 'string') &&
     ['description', 'city', 'start_date', 'end_date'].every(key => v[key as keyof Occurrence] === null || typeof v[key as keyof Occurrence] === 'string')
 }
 export async function loadOccurrencePage(page: number, signal: AbortSignal, visibility: 'visible' | 'hidden' = 'visible') {

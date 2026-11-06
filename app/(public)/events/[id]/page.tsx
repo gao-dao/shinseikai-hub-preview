@@ -1,3 +1,4 @@
+import TypeLabels from '../type-labels'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { loadGuideDetail } from '@/lib/event-groups/public-guide-server'
@@ -21,11 +22,12 @@ export default async function EventDetail({ params }: { params: Promise<{ id: st
     <h1>{group.title}</h1>
     <p>開催日時：{single ? `${single.date} ${timeRange(single)}` : `${group.start_date}${group.end_date !== group.start_date ? `〜${group.end_date}` : ''}`}</p>
     <p>会場：{venue || (classes.length > 1 ? 'クラスごとの会場をご確認ください' : '未設定')}</p>
-    {typeLabel && <p className={styles.meta}>{typeLabel}</p>}
+    {typeLabel && <p className={styles.meta}><TypeLabels label={typeLabel} /></p>}
     {!single && classes.length > 0 && <section><h2>クラス情報</h2><ul className={styles.classes}>{classes.map(row => <li key={row.id}>
       <h3>{row.title}</h3><p>{row.date} {timeRange(row)}</p>{!venue && <p>会場：{row.location || '未設定'}</p>}
     </li>)}</ul></section>}
     {group.description && <p className={styles.description}>{group.description}</p>}
+    {group.participation_notes?.trim() && <section><h2>参加にあたって</h2><p className={styles.description}>{group.participation_notes}</p></section>}
     <div className={styles.participation}>
       {group.registration_open ? <p><Link href={`/events?view=registration&groupId=${group.id}`} className={styles.webLink}>Web申込ページへ</Link></p> : <p>現在、Web申込の受付は停止しています。</p>}
     </div>

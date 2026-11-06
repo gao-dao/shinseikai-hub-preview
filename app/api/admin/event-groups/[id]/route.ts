@@ -70,7 +70,7 @@ export async function GET(_request: Request, context: Context) {
     const { id } = await context.params
     if (!/^[1-9][0-9]*$/.test(id) || !Number.isSafeInteger(Number(id))) return fail('開催回IDが不正です', 400)
     const supabase = await createClient()
-    const { data, error } = await supabase.from('event_groups').select('id, title, description, city, start_date, end_date, registration_open, is_cancelled, is_hidden, state_version').eq('id', Number(id)).maybeSingle()
+    const { data, error } = await supabase.from('event_groups').select('id, title, description, participation_notes, city, start_date, end_date, registration_open, is_cancelled, is_hidden, state_version').eq('id', Number(id)).maybeSingle()
     if (error) return fail('開催回を取得できませんでした', 500)
     if (!data) return fail('開催回が見つかりません', 404)
     return NextResponse.json({ eventGroup: data }, { headers })

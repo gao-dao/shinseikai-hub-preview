@@ -1,6 +1,6 @@
 import { calendarDay, occurrencePhase, tokyoDay } from './presentation'
 
-export type GuideGroup = { id: number; title: string; description: string | null; city: string | null; start_date: string; end_date: string; registration_open: boolean; is_cancelled: boolean; is_hidden: boolean }
+export type GuideGroup = { id: number; title: string; description: string | null; participation_notes?: string | null; city: string | null; start_date: string; end_date: string; registration_open: boolean; is_cancelled: boolean; is_hidden: boolean }
 export type GuideClass = { id: number; event_group_id: number; title: string; date: string; start_time: string | null; end_time: string | null; location: string; type?: string | null }
 export function publishable(group: GuideGroup, dates: readonly string[], today: string) {
   return group.is_hidden === false && group.is_cancelled === false && occurrencePhase(group, dates, today) === 'upcoming'
