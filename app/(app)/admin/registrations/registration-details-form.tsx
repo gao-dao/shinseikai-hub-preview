@@ -44,7 +44,6 @@ export default function RegistrationDetailsForm({ registration, onSaved, onCance
   }
 
   const fieldStyle = { width: '100%', border: '1px solid #EDE8DF', borderRadius: 8, padding: 10, margin: '6px 0 14px', font: 'inherit' }
-  const buttonStyle = { border: '1px solid #6B1F2B', borderRadius: 8, padding: '8px 16px', background: '#F7EEF0', color: '#6B1F2B', cursor: 'pointer' }
   return <form onSubmit={save} aria-labelledby="registration-edit-title" style={{ background: '#fff', border: '1px solid #EDE8DF', borderRadius: 14, padding: 20, margin: '20px 0' }}>
     <h2 id="registration-edit-title" style={{ fontSize: 18, marginBottom: 16 }}>申込者情報の編集</h2>
     <fieldset disabled={saving} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
@@ -55,8 +54,8 @@ export default function RegistrationDetailsForm({ registration, onSaved, onCance
       <label htmlFor="registration-edit-notes">備考（2000文字以内）</label>
       <textarea id="registration-edit-notes" style={fieldStyle} rows={4} value={notes} onChange={event => setNotes(event.target.value)} />
       <div style={{ display: 'flex', gap: 12 }}>
-        <button type="submit" style={buttonStyle}>{saving ? '更新中...' : '更新する'}</button>
-        <button type="button" style={buttonStyle} onClick={onCancel}>キャンセル</button>
+        <button data-admin-action="primary" type="submit">{saving ? '更新中...' : '更新する'}</button>
+        <button data-admin-action="secondary" type="button" onClick={onCancel}>キャンセル</button>
       </div>
     </fieldset>
     {error && <p role="alert" style={{ color: '#B91C1C', marginTop: 12 }}>{error}</p>}

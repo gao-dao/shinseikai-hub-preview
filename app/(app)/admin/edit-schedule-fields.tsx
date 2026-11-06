@@ -61,7 +61,7 @@ export default function EditScheduleFields({ independentOnly = false, schedule, 
     </select>
     <p id="edit-schedule-group-reason" style={{ fontSize: 12, marginBottom: 12 }}>{groupReason}</p>
     {loading && <p role="status">講習会グループを読み込み中...</p>}
-    {error && <p role="alert">{error} <button type="button" className="edit-btn" onClick={() => setReload(value => value + 1)}>再取得</button></p>}
+    {error && <p role="alert">{error} <button data-admin-action="secondary" type="button" className="edit-btn" onClick={() => setReload(value => value + 1)}>再取得</button></p>}
     </>}
     <label htmlFor="edit-schedule-capacity" style={{ display: 'block', marginBottom: 6 }}>定員（任意・1〜2147483647）</label>
     <input id="edit-schedule-capacity" style={style} type="text" inputMode="numeric" pattern="[1-9][0-9]*" value={capacity} disabled={!known}

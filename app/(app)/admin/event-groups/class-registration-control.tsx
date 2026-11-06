@@ -50,8 +50,8 @@ export default function ClassRegistrationControl({ groupId, row, parentOpen, onR
     <dl className="detail-stats"><div className="class-reception-count"><dt>有効申込数</dt><dd>{row.registeredCount}件</dd></div><div><dt>定員</dt><dd>{row.capacity === null ? '未設定' : `${row.capacity}名`}</dd></div><div><dt>残席</dt><dd>{row.capacity === null ? '確認できません' : `${Math.max(row.capacity - row.registeredCount, 0)}名`}</dd></div></dl>
     <p className="class-reception-state">クラス受付設定：<strong>{row.registration_enabled ? '有効' : '停止'}</strong></p>
     <p className="class-public-reception-state">現在の公開申込：<strong>{publicStatus}</strong></p>
-    {showControls && <div className="class-reception-actions"><button className="reception-primary" type="button" disabled={busy || needsCheck} aria-label={`${row.title}：受付を${row.registration_enabled ? '停止' : '開始'}`} onClick={() => void run(true)}>{busy ? '確認・更新中…' : row.registration_enabled ? '受付を停止' : '受付を開始'}</button>
-      {needsCheck && <button className="reception-secondary" type="button" disabled={busy} onClick={() => void run(false)}>最新状態を再取得</button>}</div>}
+    {showControls && <div className="class-reception-actions"><button data-admin-action="primary" className="reception-primary" type="button" disabled={busy || needsCheck} aria-label={`${row.title}：受付を${row.registration_enabled ? '停止' : '開始'}`} onClick={() => void run(true)}>{busy ? '確認・更新中…' : row.registration_enabled ? '受付を停止' : '受付を開始'}</button>
+      {needsCheck && <button data-admin-action="secondary" className="reception-secondary" type="button" disabled={busy} onClick={() => void run(false)}>最新状態を再取得</button>}</div>}
     {message && <p role={needsCheck ? 'alert' : 'status'}>{message}</p>}
   </div>
 }

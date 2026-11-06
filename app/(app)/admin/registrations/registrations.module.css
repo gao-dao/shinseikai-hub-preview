@@ -4,9 +4,7 @@
 .page p { margin:12px 0; }
 .page a { color:#6b1f2b; display:inline-flex; align-items:center; min-height:44px; text-underline-offset:4px; }
 .controls { display:flex; align-items:center; flex-wrap:wrap; gap:10px; margin:12px 0; }
-.page button,.page select,.page input { min-height:44px; border:1px solid #b9b2ad; border-radius:6px; padding:8px 12px; background:#fff; color:inherit; font:inherit; max-width:100%; }
-.page button { cursor:pointer; }
-.page button:disabled { opacity:.55; cursor:default; }
+.page select,.page input { min-height:44px; border:1px solid #b9b2ad; border-radius:6px; padding:8px 12px; background:#fff; color:inherit; font:inherit; max-width:100%; }
 .page :is(button,a,input,select):focus-visible,.tabs a:focus-visible { outline:3px solid #6b1f2b; outline-offset:3px; }
 .choices { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
 .choices button { display:flex; flex-direction:column; text-align:left; gap:6px; overflow-wrap:anywhere; }

@@ -50,7 +50,7 @@ export default function GroupClasses({ groupId, refreshToken = 0, initiallyExpan
   }, [expanded, groupId, page, reload, refreshToken])
 
   return <div style={{ marginTop: 12 }}>
-    <button type="button" aria-expanded={expanded} aria-controls={regionId}
+    <button data-admin-action="secondary" type="button" aria-expanded={expanded} aria-controls={regionId}
       onClick={() => { setResult(null); setError(''); setExpanded(value => !value) }}>
       {expanded ? '所属クラス一覧を閉じる' : '所属クラス一覧を表示'}
     </button>
@@ -70,10 +70,10 @@ export default function GroupClasses({ groupId, refreshToken = 0, initiallyExpan
           <p>クラス受付：{item.registration_enabled ? '有効' : '無効'}</p>
         </li>)}</ul>
         <p>全{result.total}クラス・{result.page}ページ目</p>
-        <button type="button" disabled={loading || page <= 1} onClick={() => setPage(value => value - 1)}>前のクラス</button>
-        <button type="button" disabled={loading || page * result.pageSize >= result.total} onClick={() => setPage(value => value + 1)}>次のクラス</button>
+        <button data-admin-action="secondary" type="button" disabled={loading || page <= 1} onClick={() => setPage(value => value - 1)}>前のクラス</button>
+        <button data-admin-action="secondary" type="button" disabled={loading || page * result.pageSize >= result.total} onClick={() => setPage(value => value + 1)}>次のクラス</button>
       </>}
-      <button type="button" disabled={loading} onClick={() => { setResult(null); setError(''); setReload(value => value + 1) }}>所属クラスを再取得</button>
+      <button data-admin-action="secondary" type="button" disabled={loading} onClick={() => { setResult(null); setError(''); setReload(value => value + 1) }}>所属クラスを再取得</button>
     </section>}
   </div>
 }

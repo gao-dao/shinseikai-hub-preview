@@ -92,7 +92,7 @@ export default function AddRegistrationItems({ registrationId, participantName, 
     <p>参加者：{participantName} ／ 講習会：{eventGroupTitle}</p>
     <p style={{ fontSize: 12, margin: '12px 0' }}>グループ全体の公開受付が停止中でも追加できます。取消済みクラスへの再申込も可能です。クラス受付が無効・満員の場合は追加できません。</p>
     <fieldset disabled={saving} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-      <button type="button" disabled={loading} onClick={() => setReload(value => value + 1)}>候補を再取得</button>
+      <button data-admin-action="secondary" type="button" disabled={loading} onClick={() => setReload(value => value + 1)}>候補を再取得</button>
       {loading && <p role="status">追加候補を読み込み中...</p>}
       {loadError && <p role="alert">{loadError}</p>}
       {!loading && !loadError && candidates.length === 0 && <p>この講習会グループのクラスはありません。</p>}
@@ -105,8 +105,8 @@ export default function AddRegistrationItems({ registrationId, participantName, 
       </label>)}
       {error && <p role="alert" style={{ color: '#B91C1C', marginTop: 12 }}>{error}</p>}
       <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-        <button type="submit" disabled={loading || !!loadError || selected.length === 0}>{saving ? '追加中...' : '選択したクラスを確認して追加'}</button>
-        <button type="button" onClick={onCancel}>キャンセル</button>
+        <button data-admin-action="primary" type="submit" disabled={loading || !!loadError || selected.length === 0}>{saving ? '追加中...' : '選択したクラスを確認して追加'}</button>
+        <button data-admin-action="secondary" type="button" onClick={onCancel}>キャンセル</button>
       </div>
     </fieldset>
   </form>

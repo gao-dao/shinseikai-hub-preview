@@ -75,9 +75,9 @@ export default function RegistrationList() {
     <section aria-labelledby="registrations-title" style={{ flex: 1, overflowY: 'auto', padding: '24px 20px' }}>
       <h1 id="registrations-title" style={{ fontSize: 22, margin: '20px 0' }}>申込者管理｜申込順・全履歴</h1>
       <p style={{ marginBottom: 16 }}>取消済みのクラスも含めて表示します。日時は日本時間です。</p>
-      <button type="button" disabled={proxyOpen || editing !== null || adding !== null} onClick={() => { setMessage(''); setProxyOpen(true) }}
-        style={{ padding: '8px 16px', border: '1px solid #6B1F2B', borderRadius: 8, color: '#6B1F2B', background: '#F7EEF0' }}>代理申込を登録</button>
-      {' '}<button type="button" disabled={loading || proxyOpen || editing !== null || adding !== null} onClick={() => { setPage(1); setCursors(['']); setReload(value => value + 1) }}>一覧を再取得</button>
+      <button data-admin-action="primary" type="button" disabled={proxyOpen || editing !== null || adding !== null} onClick={() => { setMessage(''); setProxyOpen(true) }}
+        >代理申込を登録</button>
+      {' '}<button data-admin-action="secondary" type="button" disabled={loading || proxyOpen || editing !== null || adding !== null} onClick={() => { setPage(1); setCursors(['']); setReload(value => value + 1) }}>一覧を再取得</button>
       {proxyOpen && <ProxyRegistrationForm onCancel={() => setProxyOpen(false)} onSaved={() => {
         setProxyOpen(false); setMessage('代理申込を登録しました。'); setPage(1); setCursors(['']); setReload(value => value + 1)
       }} />}
@@ -93,7 +93,7 @@ export default function RegistrationList() {
         {loading && <p>読み込み中...</p>}
         {result && <p>全{result.total}件・{result.page}ページ目</p>}
       </div>
-      {error && <div role="alert"><p>{error}</p><Link href="/login">ログイン画面へ</Link>{' '}<button onClick={() => setReload(value => value + 1)}>再取得</button></div>}
+      {error && <div role="alert"><p>{error}</p><Link data-admin-link href="/login">ログイン画面へ</Link>{' '}<button data-admin-action="secondary" onClick={() => setReload(value => value + 1)}>再取得</button></div>}
       {result && result.registrations.length === 0 && <p style={{ marginTop: 20 }}>表示する申込はありません。</p>}
       {result && result.registrations.length > 0 && (
         <div style={{ overflowX: 'auto', marginTop: 16 }}>
@@ -123,18 +123,18 @@ export default function RegistrationList() {
                   )}
                 </td>
                 <td style={{ padding: 12, whiteSpace: 'nowrap' }}>{formatDate(registration.created_at)}</td>
-                <td style={{ padding: 12 }}><button type="button" disabled={editing !== null || adding !== null || proxyOpen} onClick={() => { setMessage(''); setEditing(registration) }}
-                  style={{ padding: '8px 12px', border: '1px solid #6B1F2B', borderRadius: 8, color: '#6B1F2B', background: '#F7EEF0', whiteSpace: 'nowrap' }}>情報を編集</button></td>
-                <td style={{ padding: 12 }}><button type="button" disabled={editing !== null || adding !== null || proxyOpen} onClick={() => { setMessage(''); setAdding(registration) }}
-                  style={{ padding: '8px 12px', border: '1px solid #6B1F2B', borderRadius: 8, color: '#6B1F2B', background: '#F7EEF0', whiteSpace: 'nowrap' }}>クラスを追加</button></td>
+                <td style={{ padding: 12 }}><button data-admin-action="secondary" type="button" disabled={editing !== null || adding !== null || proxyOpen} onClick={() => { setMessage(''); setEditing(registration) }}
+                  >情報を編集</button></td>
+                <td style={{ padding: 12 }}><button data-admin-action="secondary" type="button" disabled={editing !== null || adding !== null || proxyOpen} onClick={() => { setMessage(''); setAdding(registration) }}
+                  >クラスを追加</button></td>
               </tr>
             ))}</tbody>
           </table>
         </div>
       )}
       {result && <nav aria-label="申込一覧のページ切替" style={{ display: 'flex', gap: 16, marginTop: 20 }}>
-        <button disabled={loading || editing !== null || adding !== null || proxyOpen || page <= 1} onClick={() => setPage(value => value - 1)}>前のページ</button>
-        <button disabled={loading || editing !== null || adding !== null || proxyOpen || !result.nextCursor} onClick={() => { if (result.nextCursor) { setCursors(old => [...old.slice(0, page), result.nextCursor!]); setPage(value => value + 1) } }}>次のページ</button>
+        <button data-admin-action="secondary" disabled={loading || editing !== null || adding !== null || proxyOpen || page <= 1} onClick={() => setPage(value => value - 1)}>前のページ</button>
+        <button data-admin-action="secondary" disabled={loading || editing !== null || adding !== null || proxyOpen || !result.nextCursor} onClick={() => { if (result.nextCursor) { setCursors(old => [...old.slice(0, page), result.nextCursor!]); setPage(value => value + 1) } }}>次のページ</button>
       </nav>}
     </section>
   )

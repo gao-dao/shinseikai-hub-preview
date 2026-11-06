@@ -36,11 +36,11 @@ export default function OccurrenceDetail({ group, refreshToken = 0, onUpdated }:
     {group.description && <p className="detail-description">{group.description}</p>}
     {error && <p role="alert">{error}</p>}
     {!rows && !error && <p role="status">クラス・申込状況を読み込み中...</p>}
-    {rows?.length === 0 && <p className="single-reception-help">クラス未登録。受付するにはクラスの登録が必要です。<Link href={`/admin/event-groups/${group.id}/edit`}>クラスを登録・編集</Link></p>}
+    {rows?.length === 0 && <p className="single-reception-help">クラス未登録。受付するにはクラスの登録が必要です。<Link data-admin-link href={`/admin/event-groups/${group.id}/edit`}>クラスを登録・編集</Link></p>}
     {rows && rows.length > 1 && <section aria-label="クラス情報"><h2>クラス情報</h2>{!group.registration_open && <p className="detail-note">開催回全体が受付停止中です。クラス受付がONでも公開申込は受け付けません。</p>}<ol className="detail-classes">{rows.map(row => <li key={row.id}><h3>{row.title}</h3><p>{row.date} {timeRange(row)}</p>{venues.length > 1 && <p>会場：{row.location || '未設定'}</p>}<ClassRegistrationControl key={`${group.id}-${row.id}`} groupId={group.id} row={row} parentOpen={group.registration_open} onRefreshed={refreshed} occurrenceBlocked={!!(group.is_cancelled || group.is_hidden)} /></li>)}</ol></section>}
     <section aria-label="申込状況" className="detail-applications"><h2>申込状況</h2><p>開催回全体の申込受付：<strong>{group.registration_open ? '受付中' : '停止中'}</strong></p>
       {single && <><h3>{single.title}</h3><ClassRegistrationControl key={`${group.id}-${single.id}`} groupId={group.id} row={single} parentOpen={group.registration_open} onRefreshed={refreshed} showControls={false} occurrenceBlocked={!!(group.is_cancelled || group.is_hidden)} />
-        {!single.registration_enabled && <p className="single-reception-help">クラス受付が停止中のため、開催回全体だけを開始しても申し込めません。<Link href={`/admin/event-groups/${group.id}/edit`}>受付設定を編集</Link>し、「クラスの受付を有効にする」をONにして保存してください。</p>}
+        {!single.registration_enabled && <p className="single-reception-help">クラス受付が停止中のため、開催回全体だけを開始しても申し込めません。<Link data-admin-link href={`/admin/event-groups/${group.id}/edit`}>受付設定を編集</Link>し、「クラスの受付を有効にする」をONにして保存してください。</p>}
       </>}
       {rows && rows.length > 1 && <p>有効クラス申込：{Number.isSafeInteger(bookings) ? `${bookings}件（延べ）` : '集計できません'}。同じ人の複数クラス申込を含みます。</p>}
       {!rows && <p>定員・申込数・クラス受付状態は確認できません。</p>}

@@ -54,9 +54,8 @@ export default function CancelRegistrationItem({ itemId, status, participantName
 
   if (status !== 'active') return null
   return <div style={{ marginTop: 8 }}>
-    <button type="button" disabled={disabled || busy || completed || !knownTarget} onClick={cancel}
-      aria-label={`${participantName}・${eventGroupTitle ?? '講習会不明'}・${classTitle ?? 'クラス不明'}の申込を取消`}
-      style={{ border: '1px solid #B91C1C', borderRadius: 8, padding: '6px 10px', color: '#B91C1C', background: '#FEF2F2', cursor: disabled || busy || completed || !knownTarget ? 'not-allowed' : 'pointer', opacity: disabled || busy || completed || !knownTarget ? .5 : 1 }}>
+    <button data-admin-action="danger" type="button" disabled={disabled || busy || completed || !knownTarget} onClick={cancel}
+      aria-label={`${participantName}・${eventGroupTitle ?? '講習会不明'}・${classTitle ?? 'クラス不明'}の申込を取消`}>
       {completed ? '取消完了・一覧更新待ち' : busy ? '取消中...' : '申込を取消'}
     </button>
     {!knownTarget && <p>対象情報を確認できないため取消できません。一覧を再取得してください。</p>}

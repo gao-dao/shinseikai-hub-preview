@@ -2,8 +2,8 @@
 .header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 16px; }
 .page h1 { font-size: 26px; font-weight: 700; }
 .page h2 { font-size: 19px; font-weight: 700; margin: 24px 0 8px; }
-.page a { color: #6b1f2b; text-underline-offset: 4px; }
-.page .primary { background: #6b1f2b; color: white; padding: 10px 18px; border-radius: 6px; text-decoration: none; }
+.page a { color: var(--hub-primary); text-underline-offset: 4px; }
+.page .primary { text-decoration: none; }
 .nav { display: flex; gap: 12px 20px; flex-wrap: wrap; font-size: 14px; padding: 12px 0; }
 .list { list-style: none; padding: 0; }
 .list li { border-bottom: 1px solid #ded8ce; }
@@ -12,19 +12,19 @@
 .item span { display: block; color: #52616e; line-height: 1.8; }
 .filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin: 20px 0; }
 .filters label { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 150px; font-size: 14px; }
-.filters input, .filters select, .filters button { padding: 10px; border: 1px solid #c9c2b8; border-radius: 6px; background: white; font: inherit; min-height: 44px; }
+.filters input, .filters select { padding: 10px; border: 1px solid #c9c2b8; border-radius: 6px; background: white; font: inherit; min-height: 44px; }
 .page p { margin: 12px 0; line-height: 1.8; }
-.page a:focus-visible, .filters :focus-visible { outline: 2px solid #6b1f2b; outline-offset: 4px; }
+.page a:focus-visible, .filters :focus-visible { outline: 2px solid var(--hub-primary); outline-offset: 4px; }
 @media(min-width: 768px) { .page { padding: 32px; } }
 
 .homeHeader { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; padding-bottom: 24px; border-bottom: 1px solid #ded8ce; }
-.page .homeBrand { margin: 0 0 8px; color: #6b1f2b; font-size: 18px; font-weight: 700; }
+.page .homeBrand { margin: 0 0 8px; color: var(--hub-primary); font-size: 18px; font-weight: 700; }
 .page .homeTitle { margin: 0; font-size: 26px; line-height: 1.4; }
 .homeRole { flex-shrink: 0; padding: 5px 12px; border: 1px solid #ded8ce; border-radius: 6px; color: #52616e; background: #fff; font-size: 13px; }
 .homeGrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; list-style: none; padding: 0; margin: 24px 0 32px; }
 .homeGrid > li { min-width: 0; }
-.homeCard { display: grid; grid-template-columns: 28px minmax(0, 1fr) 20px; align-items: center; gap: 16px; height: 100%; min-height: 120px; padding: 22px 20px; border: 1px solid #ded8ce; border-radius: 10px; background: #fff; color: #6b1f2b; text-decoration: none; overflow-wrap: anywhere; }
-.homeCard:hover { border-color: #6b1f2b; }
+.homeCard { display: grid; grid-template-columns: 28px minmax(0, 1fr) 20px; align-items: center; gap: 16px; height: 100%; min-height: 120px; padding: 22px 20px; border: 1px solid #ded8ce; border-radius: 10px; background: #fff; color: var(--hub-primary); text-decoration: none; overflow-wrap: anywhere; }
+.homeCard:hover { border-color: var(--hub-primary); }
 .homeIcon { width: 28px; height: 28px; }
 .homeCardText { min-width: 0; }
 .homeCardText strong { display: block; font-size: 18px; font-weight: 700; line-height: 1.5; }

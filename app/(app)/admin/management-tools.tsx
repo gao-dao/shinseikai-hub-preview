@@ -261,13 +261,7 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
     transition: 'border-color .2s'
   }
   const labelStyle = { display: 'block' as const, fontSize: '11px', fontWeight: '700' as const, color: '#64748B', marginBottom: '6px', textTransform: 'uppercase' as const }
-  const btnStyle = {
-    width: '100%', padding: '14px',
-    background: 'linear-gradient(135deg, #6B1F2B, #8A3041)',
-    border: 'none', borderRadius: '10px',
-    color: '#fff', fontWeight: '700' as const, fontSize: '14px',
-    cursor: 'pointer', marginTop: '4px', boxShadow: '0 4px 12px rgba(107,31,43,.15)'
-  }
+  const btnStyle = { width: '100%', marginTop: '4px' }
 
   return (
     <>
@@ -286,18 +280,12 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
         .list-card { background: #fff; border: 1px solid #EDE8DF; border-radius: 12px; padding: 18px 20px; margin-bottom: 12px; display: flex; align-items: center; gap: 14px; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
         .list-title { flex: 1; font-size: 14px; font-weight: 700; color: #1E293B; }
         .list-sub { font-size: 12px; color: #64748B; margin-top: 4px; }
-        .edit-btn { padding: 8px 16px; background: #F7EEF0; border: 1px solid #6B1F2B; border-radius: 8px; color: #6B1F2B; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all .2s; }
-        .edit-btn:hover { background: #6B1F2B; color: #fff; }
-        .del-btn { padding: 8px 16px; background: #FEF2F2; border: 1px solid #EF4444; border-radius: 8px; color: #EF4444; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; transition: all .2s; }
-        .del-btn:hover { background: #EF4444; color: #fff; }
-        .cancel-btn { width: 100%; padding: 12px; background: transparent; border: 1px solid #EDE8DF; border-radius: 10px; color: #64748B; font-size: 13px; font-weight: 500; cursor: pointer; margin-top: 10px; transition: all .2s; }
-        .cancel-btn:hover { background: #F8FAFC; border-color: #94A3B8; color: #475569; }
+        .cancel-btn { width: 100%; margin-top: 10px; }
         .list-hd { font-size: 11px; font-weight: 700; letter-spacing: .1em; color: #94A3B8; margin-bottom: 14px; text-transform: uppercase; }
         .management-tools :focus-visible { outline: 2px solid #6B1F2B; outline-offset: 3px; }
         .management-tools .tab, .management-tools button, .management-tools a.edit-btn { min-height: 44px; }
         .management-tools .tab, .management-tools a.edit-btn { display: inline-flex; align-items: center; justify-content: center; }
         .management-tools .tab { min-width: 120px; }
-        .management-tools button:disabled { opacity: .5; cursor: not-allowed; }
         .management-tools .list-hd { scroll-margin-top: 16px; }
         .management-tools .list-card { flex-wrap: wrap; }
         .management-tools .list-title { overflow-wrap: anywhere; }
@@ -309,16 +297,10 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
         .video-management .form-card,.video-management .list-card{box-shadow:none}
         .video-management .video-label{display:block;font-size:14px;font-weight:600;line-height:1.6;margin:16px 0 6px}
         .video-management .video-input{display:block;width:100%;min-height:44px;padding:12px;border:1px solid #c9c2b8;border-radius:8px;background:#fff;color:inherit;font:inherit;line-height:1.5;box-sizing:border-box}
-        .video-management .video-primary{min-height:44px;padding:10px 18px;margin-top:20px;border:1px solid #6b1f2b;border-radius:8px;background:#6b1f2b;color:#fff;font:inherit;font-weight:600;cursor:pointer}
-        .video-management .cancel-btn{width:auto;min-height:44px;padding:10px 18px;margin:12px 0 0 12px;background:#fff;border-color:#c9c2b8;font:inherit;box-shadow:none}
+        .video-management .cancel-btn{width:auto;margin:12px 0 0 12px}
         .video-management .video-info{flex:1;min-width:0;overflow-wrap:anywhere}
         .video-management .list-sub{font-size:14px;line-height:1.6;margin-top:6px}
         .video-management .video-actions{display:flex;flex-wrap:wrap;gap:10px;flex-shrink:0}
-        .video-management .edit-btn,.video-management .del-btn{min-height:44px;padding:10px 16px;font-size:14px;box-shadow:none}
-        .video-management .edit-btn{background:#fff;border-color:#c9c2b8;color:#52616e}
-        .video-management .del-btn{background:#fff;border-color:#b91c1c;color:#b91c1c}
-        .video-management .edit-btn:hover{background:#f7eef0;color:#6b1f2b}
-        .video-management .del-btn:hover{background:#fef2f2;color:#b91c1c}
         .video-management .success,.video-management .error{font-size:14px;line-height:1.6;text-align:left}
         .video-management :focus-visible{outline:3px solid #6b1f2b;outline-offset:3px}
         @media(max-width:640px){.management-tools.video-management{padding:20px 16px}.video-management .list-card{align-items:stretch;gap:14px;padding:16px}.video-management .video-info{flex-basis:100%}.video-management .video-actions{width:100%}.video-management .video-primary{width:100%}.video-management .cancel-btn{width:100%;margin-left:0}}
@@ -343,8 +325,8 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
                 <select id="management-vTag" className="video-input" value={vTag} onChange={e => setVTag(e.target.value)}>
                   <option>基本型</option><option>稽古動画</option><option>参考動画</option>
                 </select>
-                <button type="submit" className="video-primary">{editVideo ? '更新する' : '追加する'}</button>
-                {editVideo && <button type="button" className="cancel-btn" onClick={() => { setEditVideo(null); setVTitle(''); setVDesc(''); setVUrl(''); setVDuration(''); setVTag('基本型') }}>キャンセル</button>}
+                <button data-admin-action="primary" type="submit" className="video-primary">{editVideo ? '更新する' : '追加する'}</button>
+                {editVideo && <button data-admin-action="secondary" type="button" className="cancel-btn" onClick={() => { setEditVideo(null); setVTitle(''); setVDesc(''); setVUrl(''); setVDuration(''); setVTag('基本型') }}>キャンセル</button>}
                 {vMsg && <div className={vMsg.includes('エラー') ? 'error' : 'success'}>{vMsg}</div>}
               </form>
             </div>
@@ -355,8 +337,8 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
                   <h3 className="list-title">{v.title}</h3>
                   <div className="list-sub">{v.tag} · {v.duration}</div>
                 </div>
-                <div className="video-actions"><button className="edit-btn" onClick={() => startEditVideo(v)}>編集</button>
-                <button className="del-btn" onClick={() => deleteVideo(v.id)}>削除</button></div>
+                <div className="video-actions"><button data-admin-action="secondary" className="edit-btn" onClick={() => startEditVideo(v)}>編集</button>
+                <button data-admin-action="danger" className="del-btn" onClick={() => deleteVideo(v.id)}>削除</button></div>
               </div>
             ))}
           </>
@@ -387,16 +369,16 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
                 {<EditScheduleFields independentOnly key={`${editSchedule.id}-${editScheduleKey}`} schedule={editSchedule}
                   history={scheduleStatuses.statuses[String(editSchedule.id)]} historyLoading={scheduleStatuses.loading} historyError={scheduleStatuses.error}
                   groupTitle={scheduleStatuses.statuses[String(editSchedule.id)]?.event_groups?.title} />}
-                <button type="submit" style={btnStyle} disabled={!!editSchedule && (scheduleStatuses.loading || !!scheduleStatuses.error || !scheduleStatuses.statuses[String(editSchedule.id)])}>{editSchedule ? updatingSchedule ? '更新中...' : '更新する' : creatingSchedule ? '作成中...' : '追加する'}</button>
-                {editSchedule && <button type="button" className="cancel-btn" onClick={() => { setEditSchedule(null); setSTitle(''); setSDate(''); setSStart(''); setSEnd(''); setSLocation(''); setSType('稽古会'); setSMsg('') }}>キャンセル</button>}
+                <button data-admin-action="primary" type="submit" style={btnStyle} disabled={!!editSchedule && (scheduleStatuses.loading || !!scheduleStatuses.error || !scheduleStatuses.statuses[String(editSchedule.id)])}>{editSchedule ? updatingSchedule ? '更新中...' : '更新する' : creatingSchedule ? '作成中...' : '追加する'}</button>
+                {editSchedule && <button data-admin-action="secondary" type="button" className="cancel-btn" onClick={() => { setEditSchedule(null); setSTitle(''); setSDate(''); setSStart(''); setSEnd(''); setSLocation(''); setSType('稽古会'); setSMsg('') }}>キャンセル</button>}
                 {sMsg && <div className={sMsg.includes('エラー') ? 'error' : 'success'}>{sMsg}</div>}
                 </fieldset>
               </form>
             </div>}
-            <p style={{ marginBottom: 16 }}>開催回に属さない独立予定を管理します。開催回のクラスは<Link href="/admin/event-groups">開催回管理</Link>で編集してください。</p>
+            <p style={{ marginBottom: 16 }}>開催回に属さない独立予定を管理します。開催回のクラスは<Link data-admin-link href="/admin/event-groups">開催回管理</Link>で編集してください。</p>
             <div className="list-hd">登録済み独立予定 ({schedules.filter(row => row.event_group_id === null).length}件)</div>
             <div style={{ marginBottom: '14px' }}>
-              <button type="button" className="edit-btn" disabled={scheduleStatuses.loading} onClick={scheduleStatuses.refresh}>申込状況を再取得</button>
+              <button data-admin-action="secondary" type="button" className="edit-btn" disabled={scheduleStatuses.loading} onClick={scheduleStatuses.refresh}>申込状況を再取得</button>
               {scheduleStatuses.error && <p role="alert" style={{ color: '#B91C1C', marginTop: '8px' }}>{scheduleStatuses.error} 履歴の有無は不明です。</p>}
               {deleteError && <p role="alert" style={{ color: '#B91C1C', marginTop: '8px' }}>{deleteError}</p>}
             </div>
@@ -410,10 +392,9 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
                   <div className="list-sub">{s.date} · {s.start_time || '--:--'}〜{s.end_time || '--:--'} · {s.location}</div>
                   <ScheduleRegistrationStatus status={scheduleStatuses.statuses[String(s.id)]} loading={scheduleStatuses.loading} />
                 </div>
-                <button className="edit-btn" disabled={creatingSchedule || updatingSchedule || !!scopeChanged} onClick={() => startEditSchedule(s)}>編集</button>
+                <button data-admin-action="secondary" className="edit-btn" disabled={creatingSchedule || updatingSchedule || !!scopeChanged} onClick={() => startEditSchedule(s)}>編集</button>
                 <div>
-                  <button className="del-btn" disabled={deletingSchedule || updatingSchedule || deleteReason !== null} aria-describedby={deleteReason ? `schedule-delete-reason-${s.id}` : undefined}
-                    style={deletingSchedule || updatingSchedule || deleteReason !== null ? { opacity: .5, cursor: 'not-allowed' } : undefined}
+                  <button data-admin-action="danger" className="del-btn" disabled={deletingSchedule || updatingSchedule || deleteReason !== null} aria-describedby={deleteReason ? `schedule-delete-reason-${s.id}` : undefined}
                     onClick={() => deleteSchedule(s.id)}>削除</button>
                   {deleteReason && <p id={`schedule-delete-reason-${s.id}`} className="list-sub" style={{ maxWidth: '180px' }}>{deleteReason}</p>}
                 </div>
@@ -433,7 +414,7 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
                 <input id="management-adminNewPw" style={inputStyle} type="password" value={adminNewPw} onChange={e => setAdminNewPw(e.target.value)} required minLength={6} />
                 <label htmlFor="management-adminNewPw2" style={labelStyle}>確認用パスワード *</label>
                 <input id="management-adminNewPw2" style={inputStyle} type="password" value={adminNewPw2} onChange={e => setAdminNewPw2(e.target.value)} required minLength={6} />
-                <button type="submit" style={btnStyle}>更新する</button>
+                <button data-admin-action="primary" type="submit" style={btnStyle}>更新する</button>
                 {adminPwMsg && <div className={adminPwMsg.includes('エラー') ? 'error' : 'success'}>{adminPwMsg}</div>}
               </form>
             </div>
@@ -450,7 +431,7 @@ export default function AdminPage({ initialTab = 'videos' }: { initialTab?: 'vid
                 <input id="management-memberNewPw" style={inputStyle} type="password" value={memberNewPw} onChange={e => setMemberNewPw(e.target.value)} required minLength={6} />
                 <label htmlFor="management-memberNewPw2" style={labelStyle}>確認用パスワード *</label>
                 <input id="management-memberNewPw2" style={inputStyle} type="password" value={memberNewPw2} onChange={e => setMemberNewPw2(e.target.value)} required minLength={6} />
-                <button type="submit" style={btnStyle}>更新する</button>
+                <button data-admin-action="primary" type="submit" style={btnStyle}>更新する</button>
                 {memberPwMsg && <div className={memberPwMsg.includes('エラー') ? 'error' : 'success'}>{memberPwMsg}</div>}
               </form>
             </div>

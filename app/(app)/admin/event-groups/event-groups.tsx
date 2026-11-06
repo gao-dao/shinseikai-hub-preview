@@ -194,13 +194,13 @@ export default function EventGroups({ groupId, createOnly = false, returnTo = '/
         <label htmlFor="eg-edit-end">終了日（任意）</label>
         <input id="eg-edit-end" type="date" value={editEnd} onChange={event => setEditEnd(event.target.value)} disabled={editSaving || refreshing || conflict} />
         <p>開始日と終了日は両方入力するか、両方空欄にしてください。</p>
-        <button type="submit" disabled={editSaving || refreshing || conflict}>{editSaving ? '保存中...' : '開催情報を保存'}</button>
-        <button type="button" disabled={editSaving || refreshing} onClick={() => { setEditing(null); setEditError(''); setLatest(null); setConflict(false) }}>編集をキャンセル</button>
+        <button data-admin-action="primary" type="submit" disabled={editSaving || refreshing || conflict}>{editSaving ? '保存中...' : '開催情報を保存'}</button>
+        <button data-admin-action="secondary" type="button" disabled={editSaving || refreshing} onClick={() => { setEditing(null); setEditError(''); setLatest(null); setConflict(false) }}>編集をキャンセル</button>
         {editError && <p role="alert">{editError}</p>}
-        {conflict && <button type="button" disabled={refreshing || editSaving} onClick={refreshConflict}>{refreshing ? '再取得中...' : '最新情報を再取得'}</button>}
+        {conflict && <button data-admin-action="secondary" type="button" disabled={refreshing || editSaving} onClick={refreshConflict}>{refreshing ? '再取得中...' : '最新情報を再取得'}</button>}
         {latest && <div role="status">
           <p>最新の開催地：{latest.city ?? '未設定'} ／ 開始日：{latest.start_date ?? '未設定'} ／ 終了日：{latest.end_date ?? '未設定'}</p>
-          <button type="button" disabled={refreshing || editSaving} onClick={() => beginEdit(latest)}>最新情報で編集を再開</button>
+          <button data-admin-action="secondary" type="button" disabled={refreshing || editSaving} onClick={() => beginEdit(latest)}>最新情報で編集を再開</button>
         </div>}
       </form>
 
@@ -231,7 +231,7 @@ export default function EventGroups({ groupId, createOnly = false, returnTo = '/
         .occurrence-state-change p { font-size:13px; color:#657078; }
         .eg-card { max-width:1080px; margin-left:auto; margin-right:auto; }
         .eg-page button { font-size:14px; padding:8px 12px; }
-        .eg-page h1{font-size:28px;font-weight:700;line-height:1.4}.eg-page h2{font-size:21px;font-weight:700;line-height:1.5;margin:24px 0 12px}.eg-page h3{font-size:18px;font-weight:600;line-height:1.5;margin:18px 0 10px}.eg-page .reception-primary{background:#6b1f2b;border-color:#6b1f2b;color:#fff}.eg-page .reception-secondary{background:#fff;border-color:#c9c2b8;color:#52616e}.eg-page .reception-caution{background:#fff;border-color:#c9c2b8;color:var(--hub-text)}.eg-page :is(button,a,summary):focus-visible{outline:3px solid #6b1f2b;outline-offset:3px}.eg-page summary{min-height:44px;padding:12px 0;cursor:pointer}.eg-description { white-space: pre-wrap; overflow-wrap: anywhere; margin: 12px 0; }
+        .eg-page h1{font-size:28px;font-weight:700;line-height:1.4}.eg-page h2{font-size:21px;font-weight:700;line-height:1.5;margin:24px 0 12px}.eg-page h3{font-size:18px;font-weight:600;line-height:1.5;margin:18px 0 10px}.eg-page :is(button,a,summary):focus-visible{outline:3px solid #6b1f2b;outline-offset:3px}.eg-page summary{min-height:44px;padding:12px 0;cursor:pointer}.eg-description { white-space: pre-wrap; overflow-wrap: anywhere; margin: 12px 0; }
         .eg-page .occurrence-lifecycle { margin-top:24px; padding-top:12px; border-top:1px solid #ded8ce; }
         .eg-page .occurrence-lifecycle > summary { color:var(--hub-muted); font-weight:600; }
         .occurrence-lifecycle-actions { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
@@ -239,12 +239,10 @@ export default function EventGroups({ groupId, createOnly = false, returnTo = '/
         .eg-page .occurrence-cancellation h3 { margin:0 0 8px; font-size:var(--hub-h3-size); font-weight:var(--hub-h3-weight); }
         .occurrence-cancellation-note { color:var(--hub-muted); font-size:14px; line-height:1.7; }
         .occurrence-cancellation-note strong { color:var(--hub-primary); }
-        .eg-page :is(.reception-secondary,.reception-caution):not(:disabled):hover { border-color:var(--hub-primary); color:var(--hub-primary); background:#f7eef0; }
-        .eg-page :is(.reception-primary,.reception-secondary,.reception-caution):disabled { opacity:1; background:#f1f1ee; border-color:#c9c2b8; border-style:dashed; color:#777e85; cursor:not-allowed; }
       `}</style>
-      <Link href={returnTo}>{returnTo.startsWith('/admin/event-groups/history') ? '← 開催履歴へ戻る' : '← 開催回一覧へ'}</Link>
+      <Link data-admin-action="secondary" href={returnTo}>{returnTo.startsWith('/admin/event-groups/history') ? '← 開催履歴へ戻る' : '← 開催回一覧へ'}</Link>
       <h1 id="event-groups-title">{groupId ? result?.eventGroups[0]?.title ?? '開催回の詳細' : '開催回を作成'}</h1>
-      {!groupId && <nav className="occurrence-nav" aria-label="管理メニュー"><Link href="/admin/videos">動画管理</Link><Link href="/admin/passwords">パスワード管理</Link><Link href="/admin/registrations">全開催回の申込一覧 →</Link></nav>}
+      {!groupId && <nav className="occurrence-nav" aria-label="管理メニュー"><Link data-admin-link href="/admin/videos">動画管理</Link><Link data-admin-link href="/admin/passwords">パスワード管理</Link><Link data-admin-link href="/admin/registrations">全開催回の申込一覧 →</Link></nav>}
       {!groupId && <form onSubmit={create} className="eg-card">
         <h2>開催回の基本情報</h2>
         <p>新規作成時の申込受付は停止中になります。</p>
@@ -259,7 +257,7 @@ export default function EventGroups({ groupId, createOnly = false, returnTo = '/
         <label htmlFor="eg-end">終了日（任意）</label>
         <input id="eg-end" type="date" value={endDate} onChange={event => setEndDate(event.target.value)} disabled={saving} />
         <p>開始日と終了日は両方入力するか、両方空欄にしてください。</p>
-        <button className="eg-submit" type="submit" disabled={saving || addingGroup !== null}>{saving ? '作成中...' : '作成する'}</button>
+        <button data-admin-action="primary" className="eg-submit" type="submit" disabled={saving || addingGroup !== null}>{saving ? '作成中...' : '作成する'}</button>
         {formError && <p role="alert" style={{ color: '#B91C1C', marginTop: 12 }}>{formError}</p>}
         <p role="status" style={{ marginTop: 12 }}>{message}</p>
       </form>}
@@ -267,14 +265,14 @@ export default function EventGroups({ groupId, createOnly = false, returnTo = '/
       {!groupId && editForm}
       {!createOnly && <>
       {!groupId && <h2>登録済みの開催回</h2>}
-      {!groupId && <button onClick={() => setReload(value => value + 1)} disabled={loading || addingGroup !== null}>一覧を再取得</button>}
+      {!groupId && <button data-admin-action="secondary" onClick={() => setReload(value => value + 1)} disabled={loading || addingGroup !== null}>一覧を再取得</button>}
       <p role="status" style={{ margin: '16px 0' }}>{loading ? '読み込み中...' : !groupId && result ? `全${result.total}件・${result.page}ページ目` : ''}</p>
-      {listError && <p role="alert">{listError} <Link href="/login">ログイン画面へ</Link></p>}
+      {listError && <p role="alert">{listError} <Link data-admin-link href="/login">ログイン画面へ</Link></p>}
       {result?.eventGroups.length === 0 && <p>表示する講習会グループはありません。</p>}
       {result?.eventGroups.map(group => <article className="eg-card" key={group.id}>
         {groupId ? <OccurrenceDetail group={group} refreshToken={classRefresh[group.id] ?? 0} onUpdated={() => setReload(value => value + 1)} /> : <>
         <h2 style={{ overflowWrap: 'anywhere' }}>{group.title}</h2>
-        <nav className="occurrence-nav" aria-label="開催回の項目"><a href={`#basic-${group.id}`}>基本情報</a><a href={`#classes-${group.id}`}>クラス・受付</a><a href={`#applications-${group.id}`}>申込管理</a></nav>
+        <nav className="occurrence-nav" aria-label="開催回の項目"><a data-admin-link href={`#basic-${group.id}`}>基本情報</a><a data-admin-link href={`#classes-${group.id}`}>クラス・受付</a><a data-admin-link href={`#applications-${group.id}`}>申込管理</a></nav>
         <h3 id={`basic-${group.id}`}>基本情報</h3>
         <p className="eg-description">{group.description || '説明なし'}</p>
         <p>グループ全体の申込受付：<strong>{group.registration_open ? '受付中' : '停止中'}</strong></p>
@@ -282,11 +280,11 @@ export default function EventGroups({ groupId, createOnly = false, returnTo = '/
         </>}
         <section className="occurrence-management" aria-label="管理操作">
         {groupId && <h2>管理操作</h2>}
-        <div className="occurrence-navigation"><Link href={`/admin/event-groups/${group.id}/edit${returnTo !== '/admin/event-groups' ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} onClick={event => { if (classBusy.current || editBusy.current || (classDirty.current && !window.confirm('未保存の予定入力を破棄して編集画面へ移動しますか？'))) event.preventDefault() }}>{groupId ? '開催回を編集' : '開催回と全クラスをまとめて編集 →'}</Link></div>
+        <div className="occurrence-navigation"><Link data-admin-action="navigation" href={`/admin/event-groups/${group.id}/edit${returnTo !== '/admin/event-groups' ? `?returnTo=${encodeURIComponent(returnTo)}` : ''}`} onClick={event => { if (classBusy.current || editBusy.current || (classDirty.current && !window.confirm('未保存の予定入力を破棄して編集画面へ移動しますか？'))) event.preventDefault() }}>{groupId ? '開催回を編集' : '開催回と全クラスをまとめて編集 →'}</Link></div>
         {!groupId && <>
-        <button type="button" disabled={editing !== null || addingGroup !== null} onClick={() => beginEdit(group)}>開催情報を編集</button>
+        <button data-admin-action="secondary" type="button" disabled={editing !== null || addingGroup !== null} onClick={() => beginEdit(group)}>開催情報を編集</button>
         {!groupId && <h3 id={`classes-${group.id}`}>クラス・受付</h3>}
-        <button type="button" disabled={editing !== null || creatingClass} aria-expanded={addingGroup?.id === group.id}
+        <button data-admin-action="secondary" type="button" disabled={editing !== null || creatingClass} aria-expanded={addingGroup?.id === group.id}
           onClick={() => toggleClassForm(group)}>{groupId ? '＋ クラスを追加' : 'このグループに予定を追加'}</button>
         {addingGroup?.id === group.id && <div>
           <NewScheduleForm key={addingGroup.id} hideEndTime={!!groupId} fixedGroup={{ id: addingGroup.id, title: addingGroup.title, registration_open: group.registration_open }}
@@ -298,7 +296,7 @@ export default function EventGroups({ groupId, createOnly = false, returnTo = '/
               setClassSuccess(value => ({ ...value, [group.id]: '予定を保存しました。所属クラス一覧をご確認ください。' }))
               setClassRefresh(value => ({ ...value, [group.id]: (value[group.id] ?? 0) + 1 }))
             }} />
-          <button type="button" disabled={creatingClass} onClick={closeClassForm}>予定追加を閉じる</button>
+          <button data-admin-action="secondary" type="button" disabled={creatingClass} onClick={closeClassForm}>予定追加を閉じる</button>
         </div>}
         {classSuccess[group.id] && <p role="status">{classSuccess[group.id]}</p>}
         </>}
@@ -307,15 +305,15 @@ export default function EventGroups({ groupId, createOnly = false, returnTo = '/
         {!groupId && <div className="occurrence-state-change"><p>受付状態を変更する操作</p><RegistrationControl id={group.id} title={group.title} registrationOpen={group.registration_open} stateVersion={group.state_version} onUpdated={() => setReload(value => value + 1)} /></div>}
         <section id={`applications-${group.id}`} className="occurrence-applications"><h3>申込管理</h3>
           <p>申込者の情報編集・クラス追加・取消は、申込者管理で行えます。</p>
-          <Link href={`/admin/registrations?groupId=${group.id}`}>申込者管理を開く →</Link><p>申込者管理で対象クラスを選択してください。</p>
+          <Link data-admin-action="navigation" href={`/admin/registrations?groupId=${group.id}`}>申込者管理を開く →</Link><p>申込者管理で対象クラスを選択してください。</p>
         </section>
-        {groupId && <button className="reception-secondary" type="button" disabled={loading || addingGroup !== null || editSaving} onClick={() => setReload(value => value + 1)}>最新情報を再取得</button>}
+        {groupId && <button data-admin-action="secondary" className="reception-secondary" type="button" disabled={loading || addingGroup !== null || editSaving} onClick={() => setReload(value => value + 1)}>最新情報を再取得</button>}
         {groupId && <OccurrenceState group={group} disabled={editing !== null || addingGroup !== null || saving || editSaving} onUpdated={() => setReload(value => value + 1)} />}
         </section>
       </article>)}
       {!groupId && result && <nav aria-label="講習会グループのページ切替" style={{ display: 'flex', gap: 16 }}>
-        <button disabled={addingGroup !== null || page <= 1} onClick={() => setPage(value => value - 1)}>前のページ</button>
-        <button disabled={addingGroup !== null || page * result.pageSize >= result.total} onClick={() => setPage(value => value + 1)}>次のページ</button>
+        <button data-admin-action="secondary" disabled={addingGroup !== null || page <= 1} onClick={() => setPage(value => value - 1)}>前のページ</button>
+        <button data-admin-action="secondary" disabled={addingGroup !== null || page * result.pageSize >= result.total} onClick={() => setPage(value => value + 1)}>次のページ</button>
       </nav>}
       </>}
     </section>

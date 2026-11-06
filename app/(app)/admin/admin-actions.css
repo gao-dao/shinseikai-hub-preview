@@ -1,0 +1,73 @@
+/* Only explicitly marked admin controls. Keep layout and behavior in each page. */
+.hub-content :is(button, a)[data-admin-action] {
+  box-sizing: border-box;
+  min-height: 44px;
+  max-width: 100%;
+  padding: 10px 16px;
+  border: 1px solid var(--admin-action-border, #c9c2b8);
+  border-radius: 6px;
+  background: var(--admin-action-background, #fff);
+  color: var(--admin-action-color, var(--hub-muted));
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-decoration: none;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  box-shadow: none;
+  cursor: pointer;
+}
+.hub-content a[data-admin-action] { display: inline-flex; align-items: center; justify-content: center; text-align: center; }
+.hub-content [data-admin-action="primary"] {
+  --admin-action-background: var(--hub-primary);
+  --admin-action-color: #fff;
+  --admin-action-border: var(--hub-primary);
+  --admin-action-hover: var(--hub-primary);
+}
+.hub-content [data-admin-action="navigation"] {
+  --admin-action-background: #f7eef0;
+  --admin-action-color: var(--hub-primary);
+  --admin-action-border: #ded8ce;
+}
+.hub-content [data-admin-action="danger"] {
+  --admin-action-background: #fff;
+  --admin-action-color: #9b303b;
+  --admin-action-border: #cdaeb2;
+  --admin-action-hover: #fdf2f3;
+  --admin-action-hover-border: #9b303b;
+}
+.hub-content [data-admin-action]:not(:disabled):not([aria-disabled="true"]):hover {
+  background: var(--admin-action-hover, #f7eef0);
+  border-color: var(--admin-action-hover-border, var(--hub-primary));
+}
+.hub-content [data-admin-action]:focus-visible {
+  outline: 3px solid var(--hub-primary);
+  outline-offset: 3px;
+}
+.hub-content [data-admin-action]:is(:disabled, [aria-disabled="true"]) {
+  background: #f1f1ee;
+  color: #777e85;
+  border: 1px dashed #c9c2b8;
+  opacity: 1;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+.hub-content [data-admin-action="secondary"][aria-pressed="true"] {
+  background: #f7eef0;
+  color: var(--hub-primary);
+  border: 2px solid var(--hub-primary);
+}
+.hub-content a[data-admin-link] {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  max-width: 100%;
+  color: var(--hub-primary);
+  text-underline-offset: 4px;
+  overflow-wrap: anywhere;
+}
+.hub-content a[data-admin-link]:focus-visible {
+  outline: 3px solid var(--hub-primary);
+  outline-offset: 3px;
+}

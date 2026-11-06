@@ -148,8 +148,8 @@ export default function ProxyRegistrationForm({ onSaved, onCancel }: { onSaved: 
       </select>
       {groupsLoading && <p role="status">講習会を読み込み中...</p>}
       {groupsError && <p role="alert">{groupsError}</p>}
-      <button type="button" disabled={groupsLoading} onClick={() => setGroupsReload(value => value + 1)}>講習会を再取得</button>{' '}
-      <button type="button" disabled={!group || classesLoading} onClick={() => { setLoadedFor(''); setClassesReload(value => value + 1) }}>クラス候補を再取得</button>
+      <button data-admin-action="secondary" type="button" disabled={groupsLoading} onClick={() => setGroupsReload(value => value + 1)}>講習会を再取得</button>{' '}
+      <button data-admin-action="secondary" type="button" disabled={!group || classesLoading} onClick={() => { setLoadedFor(''); setClassesReload(value => value + 1) }}>クラス候補を再取得</button>
       {classesLoading && <p role="status">クラス候補を読み込み中...</p>}
       {classesError && <p role="alert">{classesError}</p>}
       {candidatesReady && candidates.length === 0 && <p>この講習会にクラスはありません。</p>}
@@ -163,8 +163,8 @@ export default function ProxyRegistrationForm({ onSaved, onCancel }: { onSaved: 
       <p style={{ fontSize: 12, marginTop: 12 }}>残席は参考情報です。登録時にDBで再判定します。同じ参加者の別申込がないかも確認してください。</p>
       {error && <p role="alert" style={{ color: '#B91C1C', marginTop: 12 }}>{error}</p>}
       <div style={{ display: 'flex', gap: 12, marginTop: 16 }}>
-        <button type="submit" disabled={uncertain || groupsLoading || !!groupsError || !candidatesReady}>{saving ? '登録中...' : '内容を確認して登録'}</button>
-        <button type="button" onClick={onCancel}>{uncertain ? '閉じて一覧を確認' : 'キャンセル'}</button>
+        <button data-admin-action="primary" type="submit" disabled={uncertain || groupsLoading || !!groupsError || !candidatesReady}>{saving ? '登録中...' : '内容を確認して登録'}</button>
+        <button data-admin-action="secondary" type="button" onClick={onCancel}>{uncertain ? '閉じて一覧を確認' : 'キャンセル'}</button>
       </div>
     </fieldset>
   </form>

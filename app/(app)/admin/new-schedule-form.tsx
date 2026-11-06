@@ -73,14 +73,14 @@ export default function NewScheduleForm({ independentOnly = false, hideEndTime =
           <option value="稽古会">稽古会</option><option value="一般参加">一般参加</option>
         </select></label>
         {independentOnly ? <label>定員（任意・1〜2147483647）<input key={fieldsKey} name="new_capacity" type="text" inputMode="numeric" pattern="[1-9][0-9]*" placeholder="未設定" /></label> : <NewScheduleFields key={fieldsKey} fixedGroup={fixedGroup} />}
-        <button type="submit">{saving ? '作成中...' : '追加する'}</button>
+        <button data-admin-action="primary" type="submit">{saving ? '作成中...' : '追加する'}</button>
         {message && <p role={message.startsWith('エラー:') ? 'alert' : 'status'}>{message}</p>}
       </fieldset>
     </form>
     <style jsx>{`
       label { display: block; font-size: 11px; font-weight: 700; color: #64748B; margin-bottom: 6px; }
       input, select { display: block; width: 100%; background: #fff; border: 1px solid #EDE8DF; border-radius: 10px; padding: 12px 14px; font-size: 13px; margin-bottom: 12px; box-sizing: border-box; }
-      button { width: 100%; padding: 12px; background: #6B1F2B; border: none; border-radius: 10px; color: white; font-weight: 700; cursor: pointer; }
+      button { width: 100%; }
       fieldset:disabled { opacity: .7; }
     `}</style>
   </div>

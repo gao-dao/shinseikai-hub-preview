@@ -70,7 +70,7 @@ export default function NewScheduleFields({ fixedGroup }: { fixedGroup?: Group }
         {groups.map(item => <option key={item.id} value={item.id}>{item.title}（{item.registration_open ? '受付中' : '停止中'}）</option>)}
       </select>
       {loading && <p role="status">講習会グループを読み込み中...</p>}
-      {error && <p role="alert">{error} <button type="button" className="edit-btn" onClick={() => setReload(value => value + 1)}>再取得</button></p>}
+      {error && <p role="alert">{error} <button data-admin-action="secondary" type="button" className="edit-btn" onClick={() => setReload(value => value + 1)}>再取得</button></p>}
       </>}
       <label htmlFor="new-schedule-capacity" style={{ display: 'block', marginBottom: 6 }}>定員（任意・1〜2147483647）</label>
       <input id="new-schedule-capacity" name="new_capacity" style={fieldStyle} type="text" inputMode="numeric" pattern="[1-9][0-9]*" value={capacity}
