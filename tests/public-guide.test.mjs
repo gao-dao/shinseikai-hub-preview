@@ -130,8 +130,8 @@ test('direct invalid or unavailable detail returns not found, not an application
 })
 
 test('public application link keeps group ID and does not promise class availability',async()=>{
- const open=await detail(group(7,{registration_open:true}),[row()]);assert.ok(open.includes('Web申込ページを確認'));assert.ok(open.includes('/events?view=registration&amp;groupId=7'));assert.equal((open.match(/href="\/admin"/g)||[]).length,1);
- const closed=await detail(group(7,{registration_open:false}),[row()]);assert.ok(!closed.includes('Web申込ページを確認'));assert.ok(closed.includes('Web申込の受付は停止しています'));
+ const open=await detail(group(7,{registration_open:true}),[row()]);assert.ok(open.includes('Web申込ページへ'));assert.ok(open.includes('/events?view=registration&amp;groupId=7'));assert.equal((open.match(/href="\/admin"/g)||[]).length,1);
+ const closed=await detail(group(7,{registration_open:false}),[row()]);assert.ok(!closed.includes('Web申込ページへ'));assert.ok(closed.includes('Web申込の受付は停止しています'));
 })
 
 test('public headers expose one non-prefetched admin entry without any authorization query',async()=>{
@@ -173,4 +173,25 @@ test('targeted registration URL preserves validation, reception state and guide 
   }
   assert.equal(tree.some(n=>n.props?.href==='/events?view=registration'),false)
  }
+})
+
+
+test('detail removes the fixed participation text while preserving occurrence description', async () => {
+ for (const registration_open of [true, false]) {
+  const html = await detail(group(7, { registration_open, description: '開催内容の説明\n二行目' }), [row()])
+  assert.ok(html.includes('開催内容の説明\n二行目'))
+  assert.ok(!html.includes('参加方法'))
+  assert.ok(!html.includes('参加希望・お問い合わせの連絡先は、主催者の案内をご確認ください。'))
+  assert.ok(!html.includes('お問い合わせのみで参加確定とはなりません。'))
+  assert.ok(!html.includes('Web申込ページを確認'))
+  assert.equal(html.includes('/events?view=registration&amp;groupId=7'), registration_open)
+ }
+})
+
+test('detail application link uses a restrained button style with touch and keyboard access', () => {
+ const css = fs.readFileSync('app/(public)/events/guide.module.css', 'utf8')
+ assert.match(css, /\.nav a, \.pagination a, \.webLink\s*\{[^}]*display: inline-flex;[^}]*min-height: 44px;/)
+ assert.match(css, /\.page \.webLink\s*\{[^}]*box-sizing: border-box;[^}]*max-width: 100%;[^}]*padding: 10px 18px;[^}]*background: #f7eef0;[^}]*color: var\(--hub-primary\);/)
+ assert.match(css, /\.page a:focus-visible\s*\{[^}]*outline: 2px solid var\(--hub-primary\);[^}]*outline-offset: 4px;/)
+ assert.match(css, /@media \(max-width: 640px\)[^}]*var\(--hub-gutter-mobile\)/)
 })

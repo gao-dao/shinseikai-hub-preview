@@ -22,5 +22,6 @@
 .pagination { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 24px 0; }
 .participation { border-top: 1px solid #ded8ce; margin-top: 28px; padding-top: 8px; }
 .nav a, .pagination a, .webLink { display: inline-flex; align-items: center; min-height: 44px; padding: 10px 0; }
-.webLink { font-weight: 700; }
+.page .webLink { justify-content: center; box-sizing: border-box; max-width: 100%; padding: 10px 18px; border: 1px solid #ded8ce; border-radius: 6px; background: #f7eef0; color: var(--hub-primary); font-weight: 700; text-align: center; text-decoration: none; }
+.page .webLink:hover { border-color: var(--hub-primary); }
 @media (max-width: 640px) { .page { padding: 24px var(--hub-gutter-mobile) 32px; } }
