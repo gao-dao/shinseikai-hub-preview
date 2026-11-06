@@ -15,7 +15,7 @@ const presentation=compile('lib/event-groups/presentation.ts')
 const guide=compile('lib/event-groups/public-guide.ts',{'./presentation':presentation})
 const server=compile('lib/event-groups/public-guide-server.ts',{'server-only':{},'@/lib/supabase/anonymous':{createAnonymousClient(){assert.fail('No external clients in tests')}},'./public-guide':guide})
 const group=(id=1,changes={})=>({id,title:`開催${id}`,description:null,city:'東京',start_date:'2030-01-01',end_date:'2030-01-01',registration_open:false,is_hidden:false,is_cancelled:false,...changes})
-const row=(id=1,changes={})=>({id,event_group_id:1,title:`クラス${id}`,date:'2030-01-01',start_time:'13:40:00',end_time:'15:40:00',location:'テスト会場',...changes})
+const row=(id=1,changes={})=>({id,event_group_id:1,title:`クラス${id}`,date:'2030-01-01',start_time:'13:40:00',end_time:'15:40:00',location:'テスト会場',type:'稽古会',...changes})
 function db(groups,classes,{truncate=false,fail=false}={}) {
  const calls=[]
  return {calls,from(table){
@@ -66,7 +66,7 @@ test('filtering precedes pagination and batch reads avoid N+1 and availability q
  const first=await server.loadGuidePage(1,client,'2030-01-01')
  assert.equal(first.items.length,20);assert.equal(first.items[0].id,25);assert.equal(first.hasNext,true)
  assert.equal(client.calls.length,2)
- assert.equal(client.calls[1].columns,'id,event_group_id,date')
+ assert.equal(client.calls[1].columns,'id,event_group_id,date,type')
  assert.ok(client.calls.every(q=>!/(capacity|registration_items|registrations)/.test(q.columns)))
  const last=await server.loadGuidePage(2,db(groups,classes),'2030-01-01')
  assert.deepEqual(Array.from(last.items,r=>r.id),[45,46,47,48,49,50,51]);assert.equal(last.hasNext,false)
@@ -194,4 +194,64 @@ test('detail application link uses a restrained button style with touch and keyb
  assert.match(css, /\.page \.webLink\s*\{[^}]*box-sizing: border-box;[^}]*max-width: 100%;[^}]*padding: 10px 18px;[^}]*background: #f7eef0;[^}]*color: var\(--hub-primary\);/)
  assert.match(css, /\.page a:focus-visible\s*\{[^}]*outline: 2px solid var\(--hub-primary\);[^}]*outline-offset: 4px;/)
  assert.match(css, /@media \(max-width: 640px\)[^}]*var\(--hub-gutter-mobile\)/)
+})
+
+
+async function guideList(items) {
+ const page = compile('app/(public)/events/page.tsx', {
+  'react/jsx-runtime': jsxRuntime, 'next/link': { default: Link }, './events-list': { default: () => null },
+  '@/lib/event-groups/public-guide-server': { loadGuidePage: async () => ({ page: 1, items, hasNext: false }) },
+  '@/lib/event-groups/public-guide': guide, './guide.module.css': { default: {} },
+ })
+ return renderToStaticMarkup(await page.default({ searchParams: Promise.resolve({}) }))
+}
+for (const [types, expected] of [
+ [['稽古会'], '稽古会'], [['一般参加'], '一般参加'], [['稽古会','稽古会'], '稽古会'],
+ [['一般参加','稽古会'], '稽古会・一般参加'], [['稽古会','一般参加'], '稽古会・一般参加'],
+ [[null], null], [[undefined], null], [['未定'], null], [['稽古会',null], null], [['一般参加','未定'], null],
+]) test(`guide list/detail use schedule type labels without guessing: ${JSON.stringify(types)}`, async () => {
+ const rows = types.map((type, i) => row(i + 1, { type }))
+ const client = db([group()], rows)
+ const result = await server.loadGuidePage(1, client, '2030-01-01')
+ assert.equal(result.items.length, 1, 'unknown types must not change guide publication')
+ assert.equal(result.items[0].typeLabel, expected)
+ const detailData = await server.loadGuideDetail(1, client, '2030-01-01')
+ assert.ok(detailData)
+ assert.equal(guide.classType(detailData.classes), expected)
+ assert.ok(client.calls.filter(c => c.table === 'schedules').every(c => c.columns.split(',').includes('type')))
+ const listing = await guideList(result.items), html = await detail(detailData.group, detailData.classes)
+ if (expected) {
+  assert.ok(listing.includes(`>${expected}</span>`))
+  assert.ok(html.includes(`>${expected}</p>`))
+ } else {
+  assert.doesNotMatch(listing, />稽古会(?:・一般参加)?<|>一般参加<|>未定</)
+  assert.doesNotMatch(html, />稽古会(?:・一般参加)?<|>一般参加<|>未定</)
+ }
+})
+
+test('guide type aggregation reads every metadata page, retaining the existing number of queries', async () => {
+ const rows = Array.from({length: 501}, (_, i) => row(i + 1, {type: i === 500 ? '一般参加' : '稽古会'}))
+ const client = db([group()], rows)
+ const result = await server.loadGuidePage(1, client, '2030-01-01')
+ assert.equal(result.items[0].typeLabel, '稽古会・一般参加')
+ assert.equal(client.calls.length, 3)
+ const detailed = await server.loadGuideDetail(1, db([group()], rows), '2030-01-01')
+ assert.equal(guide.classType(detailed.classes), '稽古会・一般参加')
+ await assert.rejects(server.loadGuideDetail(1, db([group()], rows, {truncate: true}), '2030-01-01'))
+})
+
+test('type labels are independent of reception flags and do not broaden publication', async () => {
+ for (const registration_open of [true, false]) {
+  const client = db([group(1, {registration_open})], [row()])
+  const result = await server.loadGuidePage(1, client, '2030-01-01')
+  assert.equal(result.items.length, 1)
+  assert.equal(result.items[0].typeLabel, '稽古会')
+  const html = await detail(result.items[0], [row()])
+  assert.equal(html.includes('/events?view=registration&amp;groupId=1'), registration_open)
+ }
+ for (const changes of [{is_hidden: true}, {is_cancelled: true}, {end_date: '2029-12-31'}, {start_date: null}]) {
+  const groups = [group(1, changes)]
+  assert.equal((await server.loadGuidePage(1, db(groups, [row()]), '2030-01-01')).items.length, 0)
+  assert.equal(await server.loadGuideDetail(1, db(groups, [row()]), '2030-01-01'), null)
+ }
 })

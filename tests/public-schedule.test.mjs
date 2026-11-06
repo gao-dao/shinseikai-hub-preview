@@ -121,3 +121,9 @@ test('excluding independent schedules never mutates the source data or other occ
  const groups=[group()],schedules=[row(),row(2,{event_group_id:null,title:'旧データ'})],before=JSON.stringify({groups,schedules})
  assert.equal((await load(db(groups,schedules))).length,1);assert.equal(JSON.stringify({groups,schedules}),before)
 })
+
+
+for (const type of [undefined, null, '未定']) test(`schedule retains existing exclusion for unknown class types: ${type}`, async () => {
+ assert.equal((await load(db([group()], [row(1, {type})]))).length, 0)
+ assert.equal((await load(db([group()], [row(), row(2, {type})]))).length, 0)
+})

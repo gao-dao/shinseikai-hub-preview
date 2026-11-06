@@ -1,7 +1,7 @@
 import { calendarDay, occurrencePhase, tokyoDay } from './presentation'
 
 export type GuideGroup = { id: number; title: string; description: string | null; city: string | null; start_date: string; end_date: string; registration_open: boolean; is_cancelled: boolean; is_hidden: boolean }
-export type GuideClass = { id: number; event_group_id: number; title: string; date: string; start_time: string | null; end_time: string | null; location: string }
+export type GuideClass = { id: number; event_group_id: number; title: string; date: string; start_time: string | null; end_time: string | null; location: string; type?: string | null }
 export function publishable(group: GuideGroup, dates: readonly string[], today: string) {
   return group.is_hidden === false && group.is_cancelled === false && occurrencePhase(group, dates, today) === 'upcoming'
 }
@@ -26,4 +26,11 @@ export function guidePage(value: unknown) {
 export function guideToday(now = new Date()) { return tokyoDay(now) }
 export function validGroup(group: GuideGroup) {
   return Number.isSafeInteger(group.id) && group.id > 0 && typeof group.title === 'string' && calendarDay(group.start_date) && calendarDay(group.end_date) && group.start_date <= group.end_date
+}
+
+// Existing schedule labels: do not infer a type from incomplete or unknown values.
+export function classType(rows: readonly { type?: string | null }[]) {
+  const types = new Set(rows.map(row => row.type))
+  if ([...types].some(type => type !== '稽古会' && type !== '一般参加')) return null
+  return types.size === 2 ? '稽古会・一般参加' : rows[0]?.type ?? null
 }

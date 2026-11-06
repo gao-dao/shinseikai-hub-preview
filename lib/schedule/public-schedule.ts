@@ -1,7 +1,7 @@
 import 'server-only'
 import { createAnonymousClient } from '@/lib/supabase/anonymous'
 import { occurrencePhase, tokyoDay } from '@/lib/event-groups/presentation'
-import { validGroup, type GuideGroup } from '@/lib/event-groups/public-guide'
+import { validGroup, classType, type GuideGroup } from '@/lib/event-groups/public-guide'
 
 type Client = ReturnType<typeof createAnonymousClient>
 type ClassMetadata = { id: number; event_group_id: number; date: string; type: string }
@@ -18,11 +18,6 @@ function completePage<T extends { id: number }>(data: T[] | null, error: unknown
     seen.add(row.id)
   }
   return true
-}
-function classType(rows: ClassMetadata[]) {
-  const types = new Set(rows.map(row => row.type))
-  if ([...types].some(type => type !== '稽古会' && type !== '一般参加')) return null
-  return types.size === 2 ? '稽古会・一般参加' : rows[0]?.type ?? null
 }
 async function classesFor(client: Client, ids: number[]) {
   const rows = new Map<number, ClassMetadata[]>(ids.map(id => [id, []]))
