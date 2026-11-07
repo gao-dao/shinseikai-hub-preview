@@ -1,17 +1,9 @@
 import 'server-only'
+import { isRegistrationEmailEnabled, isSingleEmail } from './confirmation-email-config'
+export { isSingleEmail } from './confirmation-email-config'
 import { loadConfirmationDetails, type ConfirmationDetails } from './confirmation-email-data'
 
-const previewRef = 'ofyxyiumpjsfmycchbki'
 const timeoutMs = 3000
-export function isSingleEmail(value: string): boolean {
-  if (value.length > 254 || value !== value.trim() || /[\s\x00-\x1f\x7f,;<>]/.test(value)) return false
-  const parts = value.split('@')
-  if (parts.length !== 2) return false
-  const [local, domain] = parts
-  return local.length > 0 && local.length <= 64 && !local.startsWith('.') && !local.endsWith('.') && !local.includes('..') &&
-    /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+$/.test(local) && domain.includes('.') &&
-    domain.split('.').every(label => label.length > 0 && label.length <= 63 && /^[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?$/.test(label))
-}
 const line = (value: string) => value.replace(/[\r\n\x00-\x1f\x7f]+/g, ' ').trim()
 export function confirmationText(details: ConfirmationDetails): string {
   return ['心勢会HUBへのお申込みを受け付けました。', '', `開催名：${line(details.title)}`, '', ...details.classes.flatMap(row => [
@@ -24,10 +16,7 @@ export function confirmationText(details: ConfirmationDetails): string {
 type Input = { event_group_id: number; schedule_ids: number[]; contact: string; idempotency_key: string }
 // No durable delivery guarantee: a committed request replay deliberately never sends.
 export async function sendRegistrationConfirmation(input: Input, fetcher: typeof fetch = fetch, env = process.env): Promise<void> {
-  if (env.REGISTRATION_EMAIL_ENABLED !== 'true' || env.REGISTRATION_EMAIL_PROJECT_REF !== previewRef ||
-      env.NEXT_PUBLIC_SUPABASE_URL !== `https://${previewRef}.supabase.co` ||
-      !env.RESEND_API_KEY || !env.RESEND_FROM_EMAIL || !env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-      !isSingleEmail(env.RESEND_FROM_EMAIL) || !isSingleEmail(input.contact) ||
+  if (!isRegistrationEmailEnabled(env) || !isSingleEmail(input.contact) ||
       !Number.isSafeInteger(input.event_group_id) || input.event_group_id <= 0 ||
       !Array.isArray(input.schedule_ids) || input.schedule_ids.length < 1 || input.schedule_ids.length > 50 ||
       input.schedule_ids.some(id => !Number.isSafeInteger(id) || id <= 0) || new Set(input.schedule_ids).size !== input.schedule_ids.length ||

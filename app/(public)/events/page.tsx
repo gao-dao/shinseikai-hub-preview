@@ -6,6 +6,7 @@ import EventsList from './events-list'
 import { loadGuidePage, loadGuideDetail } from '@/lib/event-groups/public-guide-server'
 import { guidePage } from '@/lib/event-groups/public-guide'
 import styles from './guide.module.css'
+import { isRegistrationEmailEnabled } from '@/lib/registrations/confirmation-email-config'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -23,7 +24,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
     }
     if (target?.group.registration_open === true) {
       const { id, title, description } = target.group
-      return <EventsList key={id} initialGroup={{ id, title, description }} classTypes={target.classes.map(({ id, type }) => ({ id, type }))} />
+      return <EventsList key={id} initialGroup={{ id, title, description }} classTypes={target.classes.map(({ id, type }) => ({ id, type }))} showEmailDisabledNotice={!isRegistrationEmailEnabled()} />
     }
     return <main className={styles.page}><div className={styles.inner}><h1>Web申込</h1><p role="alert">{message}</p><Link href="/events">開催案内へ戻る</Link></div></main>
   }

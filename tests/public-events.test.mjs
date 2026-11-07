@@ -235,6 +235,7 @@ function ui() {
 
 test('legacy list URL redirects to guide without querying groups or rendering registration', async () => {
   const page = compile('app/(public)/events/page.tsx', {
+    '@/lib/registrations/confirmation-email-config': { isRegistrationEmailEnabled() { assert.fail('redirect must not read email settings') } },
     'react/jsx-runtime': jsxRuntime, './events-list': { default: () => assert.fail('must not render') },
     'next/link': { default: () => null }, 'next/navigation': { redirect(path) { throw Object.assign(new Error('REDIRECT'), { path }) } },
     '@/lib/event-groups/public-guide-server': { loadGuidePage() { assert.fail('must not query') }, loadGuideDetail() { assert.fail('must not query') } },

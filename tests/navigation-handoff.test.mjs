@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
 import * as jsx from 'react/jsx-runtime'
-function compile(file,deps={}){if(file.startsWith('app/(public)/events/')&&file.endsWith('page.tsx'))deps={'./type-labels':{default:'TypeLabels'},'../type-labels':{default:'TypeLabels'},...deps};const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports,URLSearchParams,require(name){assert.ok(name in deps,`Unexpected ${name}`);return deps[name]}});return exports}
+function compile(file,deps={}){if(file.startsWith('app/(public)/events/')&&file.endsWith('page.tsx'))deps={'@/lib/registrations/confirmation-email-config': { isRegistrationEmailEnabled: () => false }, './type-labels':{default:'TypeLabels'},'../type-labels':{default:'TypeLabels'},...deps};const exports={};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports,URLSearchParams,require(name){assert.ok(name in deps,`Unexpected ${name}`);return deps[name]}});return exports}
 function nodes(tree){if(Array.isArray(tree))return tree.flatMap(nodes);return tree&&typeof tree==='object'?[tree,...nodes(tree.props?.children)]:[]}
 const presentation=compile('lib/event-groups/presentation.ts'),index=compile('lib/event-groups/admin-index.ts',{'./presentation':presentation}),guide=compile('lib/event-groups/public-guide.ts',{'./presentation':presentation})
 const history='/admin/event-groups/history', normal='/admin/event-groups'

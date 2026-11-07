@@ -264,7 +264,7 @@ function hooks() {
     useEffect(fn,deps){const i=cursor++;if(!same(slots[i]?.deps,deps)){const old=slots[i];const entry={deps,fn,cleanup:old?.cleanup};slots[i]=entry;pending.push(entry)}},
   }}
 }
-function form({group={id:5,title:'Synthetic group'},classTypes=[],store=storage(),postResponse=response(),postError=false,pendingPost=false,classes=[row(11),row(12),row(13,{canRegister:false,remainingCapacity:0,status:'満員'})],classesFail=false}={}) {
+function form({group={id:5,title:'Synthetic group'},classTypes=[],showEmailDisabledNotice=false,store=storage(),postResponse=response(),postError=false,pendingPost=false,classes=[row(11),row(12),row(13,{canRegister:false,remainingCapacity:0,status:'満員'})],classesFail=false}={}) {
   const harness=hooks(),calls=[],logs=[],Widget=()=>null;let release
   const {default:Component}=compile('app/(public)/events/registration-form.tsx',{
     '@/lib/event-groups/public-guide':guide,'./guide.module.css':{default:{participationNotice:'participation-notice'}},
@@ -273,7 +273,7 @@ function form({group={id:5,title:'Synthetic group'},classTypes=[],store=storage(
     calls.push([url,options]);if(options?.method==='POST'){if(postError)throw new Error('SECRET');if(pendingPost)return new Promise(resolve=>{release=resolve});return postResponse}
     if(classesFail)throw new Error('SECRET');return {ok:true,json:async()=>({schedules:classes,page:1,pageSize:50,total:classes.length})}
   }})
-  const render=()=>{harness.reset();return elements(Component({group,classTypes}))}
+  const render=()=>{harness.reset();return elements(Component({group,classTypes,showEmailDisabledNotice}))}
   return {render,calls,logs,Widget,release:()=>release(response()),async mount(){render();await harness.flush();return render()},find:id=>render().find(item=>item.props?.id===id),async completeInput(){await this.mount();for(const [id,value] of [['public-name','参加者'],['public-contact','電話'],['public-notes','備考']])this.find(id).props.onChange({target:{value}});render().find(item=>item.type==='input'&&item.props.type==='checkbox').props.onChange({target:{checked:true}})},confirm(){return render().find(item=>item.type==='form').props.onSubmit({preventDefault(){}})},token(value='fresh-token'){render().find(item=>item.type===Widget).props.onToken(value)},submit(){return render().find(item=>item.type==='button'&&['この内容で申し込む','同じ申込の結果を再確認する'].includes(item.props.children)).props.onClick()}}
 }
 
@@ -750,4 +750,57 @@ for(const value of ['','   '])test(`notes remain optional: ${value.length}`,asyn
  assert.ok(tree.some(n=>n.type==='h3'&&n.props.children==='申込内容の確認'))
  assert.ok(tree.some(n=>n.type==='dd'&&n.props.children==='なし'))
  assert.equal(c.calls.filter(call=>call[1]?.method==='POST').length,0)
+})
+
+const disabledEmailText='仮運用中のため、申込確認メールは送信されません。'
+const notices=c=>c.render().filter(n=>n.type==='p'&&n.props.children===disabledEmailText)
+for(const showEmailDisabledNotice of [true,false])test(`notice placement is unique in editing, review and success: ${showEmailDisabledNotice}`,async()=>{
+ const c=form({showEmailDisabledNotice});await c.completeInput()
+ assert.equal(notices(c).length,Number(showEmailDisabledNotice))
+ const assertBeforeAction=action=>{
+  const tree=c.render(),button=tree.find(n=>n.type==='button'&&n.props.children===action)
+  const note=tree.find(n=>n.type==='p'&&n.props.children===disabledEmailText)
+  if(showEmailDisabledNotice)assert.ok(tree.indexOf(note)<tree.indexOf(button))
+ }
+ assertBeforeAction('入力内容を確認する')
+ c.confirm();assert.equal(notices(c).length,Number(showEmailDisabledNotice));assertBeforeAction('この内容で申し込む')
+ c.token();c.submit();await new Promise(resolve=>setImmediate(resolve))
+ assert.equal(notices(c).length,Number(showEmailDisabledNotice))
+ if(showEmailDisabledNotice) {
+  const tree=c.render(),successIndex=tree.findIndex(n=>n.type==='p'&&n.props.role==='status')
+  assert.equal(tree[successIndex+1].props.children,disabledEmailText)
+ }
+ assert.equal(c.calls.filter(call=>call[1]?.method==='POST').length,1)
+ c.render().find(n=>n.type==='button'&&n.props.children==='新しい申込を始める').props.onClick()
+ await c.mount();assert.equal(notices(c).length,Number(showEmailDisabledNotice))
+ assert.ok(c.find('public-name'));assert.equal(c.find('public-name').props.value,'')
+})
+test('reload and A to B to A derive the notice from current settings, not stored delivery history',async()=>{
+ const store=storage(JSON.stringify({version:2,completedGroupIds:[5],pending:null}))
+ const original=store.getItem(model.publicAttemptStorageKey)
+ for(const [id,show] of [[5,true],[6,true],[5,true],[5,false]]) {
+  const c=form({store,group:{id,title:`開催${id}`},showEmailDisabledNotice:show});await c.mount()
+  assert.equal(notices(c).length,Number(show))
+  assert.equal(c.render().some(n=>n.type==='h2'&&n.props.children==='申込を受け付けました'),id===5)
+  assert.equal(store.getItem(model.publicAttemptStorageKey),original)
+  assert.equal(c.calls.filter(call=>call[1]?.method==='POST').length,0)
+ }
+})
+test('blocked and unknown attempts keep their guards without a misleading completion notice',async()=>{
+ const store=storage(JSON.stringify({version:2,completedGroupIds:[],pending:{groupId:5,key:key1}}))
+ const original=store.getItem(model.publicAttemptStorageKey)
+ const blocked=form({store,showEmailDisabledNotice:true});await blocked.mount()
+ assert.equal(notices(blocked).length,0);assert.equal(blocked.render().some(n=>n.type==='form'),false)
+ assert.equal(store.getItem(model.publicAttemptStorageKey),original)
+ const c=form({showEmailDisabledNotice:true,pendingPost:true});await c.completeInput();c.confirm();c.token()
+ const click=c.render().find(n=>n.type==='button'&&n.props.children==='この内容で申し込む').props.onClick
+ click();click();assert.equal(notices(c).length,0)
+ assert.equal(c.calls.filter(call=>call[1]?.method==='POST').length,1)
+ assert.equal(c.render().some(n=>n.type==='input'),false)
+ c.release();await new Promise(resolve=>setImmediate(resolve))
+ assert.equal(notices(c).length,1)
+ const uncertain=form({showEmailDisabledNotice:true,postError:true});await uncertain.completeInput();uncertain.confirm();uncertain.token();uncertain.submit();await new Promise(resolve=>setImmediate(resolve))
+ assert.equal(notices(uncertain).length,0)
+ assert.ok(uncertain.render().some(n=>n.type==='button'&&n.props.children==='同じ申込の結果を再確認する'))
+ assert.equal(uncertain.calls.filter(call=>call[1]?.method==='POST').length,1)
 })

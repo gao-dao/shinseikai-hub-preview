@@ -6,7 +6,7 @@ import ts from 'typescript'
 import * as jsxRuntime from 'react/jsx-runtime'
 import { renderToStaticMarkup } from 'react-dom/server'
 function compile(file, deps = {}) {
- if (file.startsWith('app/(public)/events/') && file.endsWith('page.tsx')) deps = { './type-labels': { default: TypeLabels }, '../type-labels': { default: TypeLabels }, ...deps }
+ if (file.startsWith('app/(public)/events/') && file.endsWith('page.tsx')) deps = { '@/lib/registrations/confirmation-email-config': { isRegistrationEmailEnabled: () => false }, './type-labels': { default: TypeLabels }, '../type-labels': { default: TypeLabels }, ...deps }
  deps = { 'next/navigation': { redirect(path) { throw Object.assign(new Error('REDIRECT'), { path }) } }, ...deps }
  const exports = {}
  vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports,Date,Intl,Map,Set,AbortSignal,require(name){assert.ok(name in deps,`Unexpected dependency ${name}`);return deps[name]}})
@@ -450,4 +450,33 @@ test('a deadline reached after one seat page prevents further reads and never re
  const client=withSeats(db([],[]),({ids})=>{controller.abort();return {data:ids.map(id=>seat(id,2)),error:null}})
  assert.equal((await reception.loadGuideReception(1,true,classes,client,controller.signal)).label,'申込状況を確認できません')
  assert.equal(client.seatCalls.length,1)
+})
+
+test('server derives a notice boolean from the same environment gate without serializing credentials',async()=>{
+ const settings=compile('lib/registrations/confirmation-email-config.ts',{'server-only':{}})
+ const enabled={REGISTRATION_EMAIL_ENABLED:'true',REGISTRATION_EMAIL_PROJECT_REF:'ofyxyiumpjsfmycchbki',NEXT_PUBLIC_SUPABASE_URL:'https://ofyxyiumpjsfmycchbki.supabase.co',RESEND_API_KEY:'SYNTHETIC_PRIVATE_KEY',RESEND_FROM_EMAIL:'sender@example.invalid',NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:'SYNTHETIC_PUBLIC_KEY'}
+ for(const change of [{},{REGISTRATION_EMAIL_ENABLED:'false'},{REGISTRATION_EMAIL_ENABLED:undefined},{REGISTRATION_EMAIL_PROJECT_REF:'other'},{NEXT_PUBLIC_SUPABASE_URL:'https://other.example.invalid'},{RESEND_API_KEY:''},{RESEND_FROM_EMAIL:'invalid'}]) {
+  const env={...enabled,...change},Client='RegistrationHost'
+  const page=compile('app/(public)/events/page.tsx',{
+   'react/jsx-runtime':jsxRuntime,'next/link':{default:Link},'./events-list':{default:Client},
+   '@/lib/event-groups/public-guide-server':{loadGuideDetail:async()=>({group:group(1,{registration_open:true}),classes:[row()]})},
+   '@/lib/event-groups/public-guide':guide,'./guide.module.css':{default:{}},
+   '@/lib/registrations/confirmation-email-config':{isRegistrationEmailEnabled:()=>settings.isRegistrationEmailEnabled(env)},
+  })
+  const tree=await page.default({searchParams:Promise.resolve({view:'registration',groupId:'1'})})
+  assert.equal(tree.props.showEmailDisabledNotice,!settings.isRegistrationEmailEnabled(env))
+  assert.equal(typeof tree.props.showEmailDisabledNotice,'boolean')
+  assert.deepEqual(Object.keys(tree.props).sort(),['initialGroup','classTypes','showEmailDisabledNotice'].sort())
+  assert.doesNotMatch(JSON.stringify(tree.props),/SYNTHETIC_|RESEND_|REGISTRATION_EMAIL_|supabase\.co/)
+ }
+})
+test('client host forwards only the notice boolean and never imports server configuration',()=>{
+ const Form='Form'
+ const host=compile('app/(public)/events/events-list.tsx',{'react/jsx-runtime':jsxRuntime,react:{useRef:()=>({current:null}),useEffect(){}},'next/link':{default:Link},'./registration-form':{default:Form}})
+ const nodes=value=>Array.isArray(value)?value.flatMap(nodes):value&&typeof value==='object'?[value,...nodes(value.props?.children)]:[]
+ for(const showEmailDisabledNotice of [true,false]) {
+  const tree=nodes(host.default({initialGroup:group(),showEmailDisabledNotice}))
+  assert.equal(tree.find(n=>n.type===Form).props.showEmailDisabledNotice,showEmailDisabledNotice)
+ }
+ for(const file of ['app/(public)/events/events-list.tsx','app/(public)/events/registration-form.tsx'])assert.doesNotMatch(fs.readFileSync(file,'utf8'),/confirmation-email-config|process\.env|RESEND_API_KEY/)
 })

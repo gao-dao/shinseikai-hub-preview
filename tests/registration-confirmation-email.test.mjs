@@ -11,7 +11,8 @@ function compile(path, dependencies, globals) {
 }
 const globals = { URLSearchParams, AbortController, setTimeout: (fn) => setTimeout(fn, 30), clearTimeout, process: { env: {} } }
 const data = compile('lib/registrations/confirmation-email-data.ts', { 'server-only': {} }, globals)
-const mail = compile('lib/registrations/confirmation-email.ts', { 'server-only': {}, './confirmation-email-data': data }, globals)
+const config = compile('lib/registrations/confirmation-email-config.ts', { 'server-only': {} }, globals)
+const mail = compile('lib/registrations/confirmation-email.ts', { 'server-only': {}, './confirmation-email-data': data, './confirmation-email-config': config }, globals)
 const env = { REGISTRATION_EMAIL_ENABLED: 'true', REGISTRATION_EMAIL_PROJECT_REF: 'ofyxyiumpjsfmycchbki', NEXT_PUBLIC_SUPABASE_URL: 'https://ofyxyiumpjsfmycchbki.supabase.co', NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'synthetic-publishable', RESEND_API_KEY: 'synthetic-not-real', RESEND_FROM_EMAIL: 'sender@example.invalid' }
 const input = { event_group_id: 5, schedule_ids: [11], contact: 'attendee@example.invalid', idempotency_key: '12345678-abcd-4abc-8abc-123456789abc', notes: 'DO_NOT_INCLUDE_NOTES' }
 const row = { id:11,event_group_id:5,title:'図解用クラス',date:'2030-01-02',start_time:'10:00:00',end_time:'11:00:00',location:'例示会場' }
@@ -57,4 +58,28 @@ test('migration only adds per-call metadata and preserves signature/body',()=>{
  const body=s=>s.slice(s.indexOf('create'),s.lastIndexOf('$$;')+3)
  const original=old.slice(old.indexOf('create function public.submit_registration_idempotent('),old.indexOf('\nrevoke all on function public.submit_registration_idempotent'))
  assert.equal(body(next).replace('create or replace function','create function').replace(", 'created_new', false",'').replace(", 'created_new', v_code = 'REGISTERED'",'').trim(),original.trim())
+})
+
+for(const [name,changes,expected] of [
+ ['enabled',{},true],['flag false',{REGISTRATION_EMAIL_ENABLED:'false'},false],
+ ['flag missing',{REGISTRATION_EMAIL_ENABLED:undefined},false],['flag is case sensitive',{REGISTRATION_EMAIL_ENABLED:'TRUE'},false],
+ ['foreign project',{REGISTRATION_EMAIL_PROJECT_REF:'other'},false],['foreign URL',{NEXT_PUBLIC_SUPABASE_URL:'https://other.example.invalid'},false],
+ ['missing API key',{RESEND_API_KEY:''},false],['missing sender',{RESEND_FROM_EMAIL:''},false],
+ ['invalid sender',{RESEND_FROM_EMAIL:'not-an-address'},false],['missing publishable key',{NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:''},false],
+])test(`shared environment gate and actual sending remain consistent: ${name}`,async()=>{
+ const settings={...env,...changes}
+ assert.equal(config.isRegistrationEmailEnabled(settings),expected)
+ const m=mock();await mail.sendRegistrationConfirmation(input,m.fetcher,settings)
+ assert.equal(m.calls.length,expected?3:0)
+ if(expected) {
+  const request=m.calls[2]
+  assert.equal(request.url,'https://api.resend.com/emails')
+  assert.equal(JSON.parse(request.init.body).subject,'心勢会HUB｜Web申込受付完了')
+  assert.equal(request.init.headers['Idempotency-Key'],`preview/registration-confirmation/${input.idempotency_key}`)
+ }
+})
+test('shared configuration is server-only and performs no network work',()=>{
+ const source=fs.readFileSync('lib/registrations/confirmation-email-config.ts','utf8')
+ assert.match(source,/import 'server-only'/)
+ assert.doesNotMatch(source,/fetch\(|console\.|RESEND_API_KEY.*NEXT_PUBLIC_RESEND/)
 })

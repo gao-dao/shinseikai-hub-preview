@@ -12,8 +12,9 @@ import styles from './guide.module.css'
 
 type Input = NonNullable<ReturnType<typeof validateProxyRegistration>['data']>
 type Stage = 'initializing' | 'editing' | 'confirming' | 'pending' | 'success' | 'blocked'
+const emailDisabledNotice = '仮運用中のため、申込確認メールは送信されません。'
 
-export default function RegistrationForm({ group, classTypes = [] }: { group: { id: number; title: string }; classTypes?: { id: number; type?: string | null }[] }) {
+export default function RegistrationForm({ group, classTypes = [], showEmailDisabledNotice = false }: { group: { id: number; title: string }; classTypes?: { id: number; type?: string | null }[]; showEmailDisabledNotice?: boolean }) {
   const [stage, setStage] = useState<Stage>('initializing')
   const [name, setName] = useState(''), [contact, setContact] = useState(''), [notes, setNotes] = useState('')
   const [classes, setClasses] = useState<PublicClass[]>([]), [selected, setSelected] = useState<number[]>([])
@@ -94,6 +95,7 @@ export default function RegistrationForm({ group, classTypes = [] }: { group: { 
     {stage === 'blocked' && <p role="alert">前の申込結果が不明、または申込状態を保存できません。個人情報はブラウザに保存していないため、このページでは再送内容を復元できません。新しく申し込まず、主催者へ受付状況をお問い合わせください。</p>}
     {stage === 'success' && <>
       <p role="status">申込受付は完了しています。追加で申し込む場合は、新しい申込を開始してください。</p>
+      {showEmailDisabledNotice && <p className={styles.contactHelp}>{emailDisabledNotice}</p>}
       <button type="button" onClick={startNew}>新しい申込を始める</button>
     </>}
     {stage === 'editing' && <form onSubmit={confirm}>
@@ -120,6 +122,7 @@ export default function RegistrationForm({ group, classTypes = [] }: { group: { 
         </label>})}
       </fieldset>
       <p>送信時に申込可否を再確認します。</p>
+      {showEmailDisabledNotice && <p className={styles.contactHelp}>{emailDisabledNotice}</p>}
       <div className="events-actions events-form-actions">
         <button type="submit" className="events-primary" disabled={loading || !!classesError}>入力内容を確認する</button>
         <button type="button" className="events-secondary" disabled={loading} onClick={() => setReload(value => value + 1)}>申込状況を再取得</button>
@@ -131,6 +134,7 @@ export default function RegistrationForm({ group, classTypes = [] }: { group: { 
       <ul>{review.schedule_ids.map(id => { const item = classes.find(row => row.id === id); return <li key={id}>{item?.title} ／ {item?.date} {item?.start_time ?? ''}〜{item?.end_time ?? ''}</li> })}</ul>
       {stage === 'pending' && <p>送信済みの内容を固定しています。結果が不明な場合も、操作確認をやり直して同じ申込を再確認できます。再読み込み後は送信内容を復元できません。</p>}
       {!saving && <TurnstileWidget onToken={onToken} generation={generation} />}
+      {stage === 'confirming' && showEmailDisabledNotice && <p className={styles.contactHelp}>{emailDisabledNotice}</p>}
       <div className="events-actions events-form-actions">
         <button type="button" className="events-primary" disabled={saving || !token} onClick={() => { void submit() }}>{saving ? '送信中...' : stage === 'pending' ? '同じ申込の結果を再確認する' : 'この内容で申し込む'}</button>
         <button type="button" className="events-secondary" disabled={saving} onClick={() => { setToken(''); setGeneration(value => value + 1) }}>操作確認をやり直す</button>
