@@ -26,13 +26,13 @@
 .page .webLink:hover { border-color: var(--hub-primary); }
 @media (max-width: 640px) { .page { padding: 24px var(--hub-gutter-mobile) 32px; } }
 
-.page .typeLabels { display: inline-flex; flex-wrap: wrap; gap: 6px; max-width: 100%; vertical-align: middle; }
-.page .typeLabel { display: inline-block; box-sizing: border-box; max-width: 100%; margin: 0; padding: 3px 9px; border: 1px solid; border-radius: 5px; font-size: 14px; font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; }
-.practiceType { color: #294b3b; background: #edf3ef; border-color: #d5e1da; }
-.openType { color: var(--hub-primary); background: #f7eef0; border-color: #e4cdd1; }
+.page .typeLabels { display: inline-flex; flex-wrap: wrap; gap: 6px 12px; max-width: 100%; vertical-align: middle; }
+.page .typeLabel { display: inline-block; box-sizing: border-box; max-width: 100%; margin: 0; padding: 0; font-size: 14px; font-weight: 600; line-height: 1.6; overflow-wrap: anywhere; }
+.practiceType { color: #294b3b; }
+.openType { color: var(--hub-primary); }
 .participationNotice { display: block; max-width: 100%; color: #374151; font-size: 14px; font-weight: 500; line-height: 1.7; white-space: normal; overflow-wrap: anywhere; }
-.page .receptionLabel { display: inline-block; max-width: 100%; padding: 2px 8px; border: 1px solid; border-radius: 5px; font-size: 14px; font-weight: 600; line-height: 1.7; white-space: normal; overflow-wrap: anywhere; }
-.reception_open { color: #294b3b; background: #edf3ef; border-color: #d5e1da; }
-.reception_full { color: #6b1f2b; background: #f7eef0; border-color: #e4cdd1; }
-.reception_closed, .reception_unknown { color: #475569; background: #f8fafc; border-color: #cbd5e1; }
-.contactHelp { color: #475569; font-size: 14px; line-height: 1.7; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.page .receptionLabel { display: block; max-width: 100%; padding: 0; font-size: 14px; font-weight: 600; line-height: 1.7; white-space: normal; overflow-wrap: anywhere; }
+.reception_open { color: #294b3b; }
+.reception_full { color: #6b1f2b; }
+.reception_closed, .reception_unknown { color: #475569; }
+.contactHelp { color: #374151; font-size: 14px; line-height: 1.7; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }

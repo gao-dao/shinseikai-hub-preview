@@ -693,8 +693,12 @@ test('contact guidance describes email or phone without changing the input contr
  const field=c.find('public-contact')
  assert.equal(field.props.required,true);assert.equal(field.props.type,undefined);assert.equal(field.props.pattern,undefined)
  assert.equal(field.props['aria-describedby'],'public-contact-help')
- const help=c.render().find(n=>n.props?.id==='public-contact-help')
+ const tree=c.render()
+ const help=tree.find(n=>n.props?.id==='public-contact-help')
  assert.equal(help.props.children,'メールアドレスまたは電話番号など、確実に連絡が取れる連絡先をご入力ください。')
+ const label=tree.find(n=>n.type==='label'&&n.props.htmlFor==='public-contact')
+ assert.ok(tree.indexOf(label)<tree.indexOf(help));assert.ok(tree.indexOf(help)<tree.indexOf(tree.find(n=>n.props?.id==='public-contact')))
+ assert.equal(tree.filter(n=>n.props?.id==='public-contact-help').length,1)
  await c.completeInput();assert.equal(c.find('public-contact').props.value,'電話')
  c.confirm();c.token();c.submit();await new Promise(resolve=>setImmediate(resolve))
  assert.ok(c.render().some(n=>n.type==='h2'&&n.props.children==='申込を受け付けました'))
@@ -702,4 +706,48 @@ test('contact guidance describes email or phone without changing the input contr
  assert.equal(c.calls.filter(call=>call[1]?.method==='POST').length,1)
  const css=fs.readFileSync('app/(public)/events/guide.module.css','utf8')
  assert.match(css,/\.contactHelp[^}]*font-size: 14px;[^}]*line-height: 1\.7;[^}]*max-width: 100%;[^}]*white-space: normal;[^}]*overflow-wrap: anywhere/)
+ assert.match(css,/\.contactHelp[^}]*color: #374151;/)
+})
+
+test('concise field labels retain associated controls and required/optional semantics',async()=>{
+ const c=form();await c.mount();const tree=c.render()
+ for(const [id,text,required] of [['public-name','氏名（必須）',true],['public-contact','連絡先（必須）',true],['public-notes','備考（任意）',false]]) {
+  assert.equal(tree.find(n=>n.type==='label'&&n.props.htmlFor===id).props.children,text)
+  assert.equal(Boolean(tree.find(n=>n.props?.id===id).props.required),required)
+ }
+ assert.equal(tree.find(n=>n.props?.id==='public-name').props.autoComplete,'name')
+ assert.doesNotMatch(JSON.stringify(tree),/必須・100文字以内|必須・254文字以内|備考（2000文字以内）/)
+})
+for(const [id,limit,error] of [
+ ['public-name',100,'氏名は1〜100文字で入力してください'],
+ ['public-contact',254,'連絡先は1〜254文字で入力してください'],
+ ['public-notes',2000,'備考は2000文字以内で入力してください'],
+])for(const symbol of ['あ','😀'])test(`existing Unicode length limit is enforced and announced: ${id} ${symbol}`,async()=>{
+ for(const delta of [0,1]) {
+  const c=form();await c.completeInput()
+  c.find(id).props.onChange({target:{value:symbol.repeat(limit+delta)}});c.confirm()
+  const tree=c.render()
+  if(delta===0) {
+   assert.ok(tree.some(n=>n.type==='h3'&&n.props.children==='申込内容の確認'))
+   assert.equal(tree.some(n=>n.props?.role==='alert'),false)
+  } else {
+   assert.ok(tree.some(n=>n.props?.role==='alert'&&n.props.children===error))
+   assert.equal(tree.some(n=>n.type==='h3'&&n.props.children==='申込内容の確認'),false)
+   assert.ok(c.find(id))
+  }
+  assert.equal(c.calls.filter(call=>call[1]?.method==='POST').length,0)
+ }
+})
+for(const id of ['public-name','public-contact'])for(const value of ['','   '])test(`required input still rejects empty and whitespace-only values: ${id} ${value.length}`,async()=>{
+ const c=form();await c.completeInput();c.find(id).props.onChange({target:{value}});c.confirm()
+ const expected=id==='public-name'?'氏名は1〜100文字で入力してください':'連絡先は1〜254文字で入力してください'
+ assert.ok(c.render().some(n=>n.props?.role==='alert'&&n.props.children===expected))
+ assert.equal(c.calls.filter(call=>call[1]?.method==='POST').length,0)
+})
+for(const value of ['','   '])test(`notes remain optional: ${value.length}`,async()=>{
+ const c=form();await c.completeInput();c.find('public-notes').props.onChange({target:{value}});c.confirm()
+ const tree=c.render()
+ assert.ok(tree.some(n=>n.type==='h3'&&n.props.children==='申込内容の確認'))
+ assert.ok(tree.some(n=>n.type==='dd'&&n.props.children==='なし'))
+ assert.equal(c.calls.filter(call=>call[1]?.method==='POST').length,0)
 })

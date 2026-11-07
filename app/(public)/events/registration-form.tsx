@@ -97,12 +97,12 @@ export default function RegistrationForm({ group, classTypes = [] }: { group: { 
       <button type="button" onClick={startNew}>新しい申込を始める</button>
     </>}
     {stage === 'editing' && <form onSubmit={confirm}>
-      <label htmlFor="public-name">氏名（必須・100文字以内）</label>
+      <label htmlFor="public-name">氏名（必須）</label>
       <input id="public-name" required autoComplete="name" value={name} onChange={event => setName(event.target.value)} />
-      <label htmlFor="public-contact">連絡先（必須・254文字以内）</label>
-      <input id="public-contact" required aria-describedby="public-contact-help" value={contact} onChange={event => setContact(event.target.value)} />
+      <label htmlFor="public-contact">連絡先（必須）</label>
       <p id="public-contact-help" className={styles.contactHelp}>メールアドレスまたは電話番号など、確実に連絡が取れる連絡先をご入力ください。</p>
-      <label htmlFor="public-notes">備考（2000文字以内）</label>
+      <input id="public-contact" required aria-describedby="public-contact-help" value={contact} onChange={event => setContact(event.target.value)} />
+      <label htmlFor="public-notes">備考（任意）</label>
       <textarea id="public-notes" rows={3} value={notes} onChange={event => setNotes(event.target.value)} />
       {loading && <p role="status">申込状況を読み込み中...</p>}
       {classesError && <p role="alert">{classesError}</p>}

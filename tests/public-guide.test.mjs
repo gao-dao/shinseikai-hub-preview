@@ -274,23 +274,37 @@ test('public notes render as escaped plain text, never executable HTML',async()=
  assert.match(html,/&lt;img/);assert.doesNotMatch(html,/<script>|<img /)
  assert.ok(html.includes('\n'));assert.match(fs.readFileSync('app/(public)/events/guide.module.css','utf8'),/\.description[^}]*white-space: pre-wrap/)
 })
-for(const [label,expected] of [['稽古会',['稽古会']],['一般参加',['一般参加']],['稽古会・一般参加',['稽古会','一般参加']],[null,[]],['稽古会・未定',[]]])test(`shared type badges preserve names and display both mixed types: ${label}`,()=>{
+for(const [label,expected] of [['稽古会',['稽古会']],['一般参加',['一般参加']],['稽古会・一般参加',['稽古会','一般参加']],[null,[]],['稽古会・未定',[]]])test(`shared type text preserves names and displays both mixed types: ${label}`,()=>{
  const html=renderToStaticMarkup(jsxRuntime.jsx(TypeLabels,{label}))
  assert.equal((html.match(/class="type-label /g)||[]).length,expected.length)
  for(const name of expected)assert.ok(html.includes(`>${name}</span>`))
  if(expected.length===0)assert.equal(html,'')
  if(expected.includes('稽古会'))assert.match(html,/type-label practice/)
  if(expected.includes('一般参加'))assert.match(html,/type-label open/)
+ assert.doesNotMatch(html,/<(?:button|a)\b|\b(?:role|tabindex|onclick)=/i)
 })
-test('list and detail share the badge component and responsive low-decoration CSS',()=>{
+test('list and detail share plain type text with responsive spacing and no button decoration',()=>{
  assert.match(fs.readFileSync('app/(public)/events/page.tsx','utf8'),/<TypeLabels label=\{group.typeLabel\}/)
  assert.match(fs.readFileSync('app/(public)/events/[id]/page.tsx','utf8'),/<TypeLabels label=\{typeLabel\}/)
  const css=fs.readFileSync('app/(public)/events/guide.module.css','utf8')
  assert.match(css,/\.page \.typeLabels[^}]*display: inline-flex;[^}]*flex-wrap: wrap;[^}]*max-width: 100%/)
  assert.match(css,/\.page \.typeLabel[^}]*margin: 0;/)
  assert.match(css,/\.typeLabel[^}]*max-width: 100%;[^}]*font-size: 14px;[^}]*font-weight: 600;[^}]*overflow-wrap: anywhere/)
- assert.match(css,/\.practiceType[^}]*color: #294b3b;[^}]*background: #edf3ef/)
- assert.match(css,/\.openType[^}]*color: var\(--hub-primary\);[^}]*background: #f7eef0/)
+ assert.match(css,/\.practiceType[^}]*color: #294b3b;/)
+ assert.match(css,/\.openType[^}]*color: var\(--hub-primary\);/)
+ assert.match(css,/\.page \.typeLabels[^}]*gap: 6px 12px/)
+ for(const selector of ['.page .typeLabel','.practiceType','.openType','.page .receptionLabel','.reception_open','.reception_full','.reception_closed, .reception_unknown']) {
+  const rule=css.slice(css.indexOf(selector+' {')).split('}')[0]
+  assert.ok(rule.startsWith(selector+' {'))
+  assert.doesNotMatch(rule,/\b(?:border(?:-[a-z-]+)?|background(?:-[a-z-]+)?|cursor|min-height)\s*:/)
+  const padding=rule.match(/\bpadding:\s*([^;]+);/)
+  if(padding)assert.equal(padding[1],'0')
+ }
+ assert.match(css,/\.page \.receptionLabel[^}]*display: block;[^}]*max-width: 100%;[^}]*font-weight: 600;[^}]*white-space: normal;[^}]*overflow-wrap: anywhere/)
+ // Actual action links retain their border, background, touch target and keyboard focus.
+ assert.match(css,/\.nav a, \.pagination a, \.webLink[^}]*min-height: 44px/)
+ assert.match(css,/\.page \.webLink[^}]*padding: 10px 18px;[^}]*border: 1px solid #ded8ce;[^}]*background: #f7eef0/)
+ assert.match(css,/\.page a:focus-visible[^}]*outline: 2px solid var\(--hub-primary\)/)
 })
 
 for (const [types, expected] of [
@@ -415,14 +429,18 @@ test('seats are fetched only for the displayed page with at most four reads in f
 })
 test('list shows reception words while preserving mixed types and the practice condition',async()=>{
  for(const label of ['受付中','満員','受付停止中','現在受付できません','申込状況を確認できません']) {
+  const tone=label==='受付中'?'open':label==='満員'?'full':label==='受付停止中'?'closed':'unknown'
   const page=compile('app/(public)/events/page.tsx',{
    'react/jsx-runtime':jsxRuntime,'next/link':{default:Link},'./events-list':{default:()=>null},
-   '@/lib/event-groups/public-guide-server':{loadGuidePage:async()=>({page:1,hasNext:false,items:[{...group(),typeLabel:'稽古会・一般参加',participationNotice:'稽古会のクラスは初めての方は参加できません',reception:{label,tone:'unknown'}}]})},
-   '@/lib/event-groups/public-guide':guide,'./guide.module.css':{default:{}},
+   '@/lib/event-groups/public-guide-server':{loadGuidePage:async()=>({page:1,hasNext:false,items:[{...group(),typeLabel:'稽古会・一般参加',participationNotice:'稽古会のクラスは初めての方は参加できません',reception:{label,tone}}]})},
+   '@/lib/event-groups/public-guide':guide,'./guide.module.css':{default:{receptionLabel:'reception-text',[`reception_${tone}`]:`state-${tone}`}},
   })
   const html=renderToStaticMarkup(await page.default({searchParams:Promise.resolve({})}))
   assert.ok(html.includes(label));assert.match(html,/稽古会のクラスは初めての方は参加できません/)
   assert.match(html,/>稽古会<\/span>/);assert.match(html,/>一般参加<\/span>/)
+  assert.ok(html.includes(`<span class="reception-text state-${tone}">${label}</span>`))
+  assert.doesNotMatch(html,/<button\b|role="button"|tabindex=/i)
+  assert.ok(html.includes('href="/events/1"'))
  }
 })
 
