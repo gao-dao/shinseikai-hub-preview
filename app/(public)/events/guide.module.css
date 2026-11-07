@@ -31,3 +31,8 @@
 .practiceType { color: #294b3b; background: #edf3ef; border-color: #d5e1da; }
 .openType { color: var(--hub-primary); background: #f7eef0; border-color: #e4cdd1; }
 .participationNotice { display: block; max-width: 100%; color: #374151; font-size: 14px; font-weight: 500; line-height: 1.7; white-space: normal; overflow-wrap: anywhere; }
+.page .receptionLabel { display: inline-block; max-width: 100%; padding: 2px 8px; border: 1px solid; border-radius: 5px; font-size: 14px; font-weight: 600; line-height: 1.7; white-space: normal; overflow-wrap: anywhere; }
+.reception_open { color: #294b3b; background: #edf3ef; border-color: #d5e1da; }
+.reception_full { color: #6b1f2b; background: #f7eef0; border-color: #e4cdd1; }
+.reception_closed, .reception_unknown { color: #475569; background: #f8fafc; border-color: #cbd5e1; }
+.contactHelp { color: #475569; font-size: 14px; line-height: 1.7; max-width: 100%; white-space: normal; overflow-wrap: anywhere; }

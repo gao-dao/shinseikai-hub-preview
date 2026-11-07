@@ -39,6 +39,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
         <h2>{group.title} →</h2><span className={styles.date}>{group.start_date}{group.end_date !== group.start_date ? `〜${group.end_date}` : ''}</span>
         <span className={styles.meta}>地域：{group.city || '未設定'}{group.classCount > 1 ? ` ／ ${group.classCount}クラス` : ''}</span>
         <TypeLabels label={group.typeLabel} />
+        {group.reception && <span className={`${styles.receptionLabel} ${styles[`reception_${group.reception.tone}`]}`}>{group.reception.label}</span>}
         {group.participationNotice && <span className={styles.participationNotice}>{group.participationNotice}</span>}
       </Link></li>)}</ul>
       <nav className={styles.pagination} aria-label="開催案内のページ切替">

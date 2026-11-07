@@ -30,7 +30,7 @@ for(const value of ['0','-1','1.2','x','9007199254740992','','001',['501','502']
  const tree=nodes(await page({searchParams:Promise.resolve({view:'registration',groupId:value})}));assert.ok(tree.some(n=>n.props?.role==='alert'));assert.equal(tree.some(n=>n.type==='EventsList'),false)
 })
 for(const [label,changes,dates] of [['hidden',{is_hidden:true}],['cancelled',{is_cancelled:true}],['ended',{start_date:'2029-01-01',end_date:'2029-01-01'},['2029-01-01']],['closed',{registration_open:false}],['invalid period',{end_date:'2030-01-03'}],['out of period',{},['2030-01-02']],['missing dates',{start_date:null}]])test(`server public eligibility prevents auto-form for ${label}`,async()=>{
- const server=compile('lib/event-groups/public-guide-server.ts',{'server-only':{},'@/lib/supabase/anonymous':{createAnonymousClient(){assert.fail('No external DB')}},'./public-guide':guide})
+ const server=compile('lib/event-groups/public-guide-server.ts',{'server-only':{},'@/lib/supabase/anonymous':{createAnonymousClient(){assert.fail('No external DB')}},'./public-guide':guide,'./public-guide-reception':{loadGuideReception(){assert.fail('Detail eligibility must not read seats')}}})
  const page=publicPage(id=>server.loadGuideDetail(id,db(group(changes),dates),'2030-01-01'))
  const tree=nodes(await page({searchParams:Promise.resolve({view:'registration',groupId:'501'})}));assert.equal(tree.some(n=>n.type==='EventsList'),false);assert.ok(tree.some(n=>n.props?.role==='alert'));assert.ok(!JSON.stringify(tree).includes('対象開催回'))
 })

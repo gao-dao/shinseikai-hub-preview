@@ -687,3 +687,19 @@ test('missing metadata and failed availability do not invent practice conditions
   if(options.classesFail)assert.ok(c.render().some(n=>n.props?.role==='alert'))
  }
 })
+
+test('contact guidance describes email or phone without changing the input contract or successful flow',async()=>{
+ const c=form();await c.mount()
+ const field=c.find('public-contact')
+ assert.equal(field.props.required,true);assert.equal(field.props.type,undefined);assert.equal(field.props.pattern,undefined)
+ assert.equal(field.props['aria-describedby'],'public-contact-help')
+ const help=c.render().find(n=>n.props?.id==='public-contact-help')
+ assert.equal(help.props.children,'メールアドレスまたは電話番号など、確実に連絡が取れる連絡先をご入力ください。')
+ await c.completeInput();assert.equal(c.find('public-contact').props.value,'電話')
+ c.confirm();c.token();c.submit();await new Promise(resolve=>setImmediate(resolve))
+ assert.ok(c.render().some(n=>n.type==='h2'&&n.props.children==='申込を受け付けました'))
+ assert.equal(c.render().some(n=>n.props?.id==='public-contact-help'),false)
+ assert.equal(c.calls.filter(call=>call[1]?.method==='POST').length,1)
+ const css=fs.readFileSync('app/(public)/events/guide.module.css','utf8')
+ assert.match(css,/\.contactHelp[^}]*font-size: 14px;[^}]*line-height: 1\.7;[^}]*max-width: 100%;[^}]*white-space: normal;[^}]*overflow-wrap: anywhere/)
+})

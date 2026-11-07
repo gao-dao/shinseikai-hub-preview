@@ -9,13 +9,14 @@ function compile(file, deps = {}) {
  if (file.startsWith('app/(public)/events/') && file.endsWith('page.tsx')) deps = { './type-labels': { default: TypeLabels }, '../type-labels': { default: TypeLabels }, ...deps }
  deps = { 'next/navigation': { redirect(path) { throw Object.assign(new Error('REDIRECT'), { path }) } }, ...deps }
  const exports = {}
- vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports,Date,Intl,Map,Set,require(name){assert.ok(name in deps,`Unexpected dependency ${name}`);return deps[name]}})
+ vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,jsx:ts.JsxEmit.ReactJSX}}).outputText,{exports,Date,Intl,Map,Set,AbortSignal,require(name){assert.ok(name in deps,`Unexpected dependency ${name}`);return deps[name]}})
  return exports
 }
 const TypeLabels = compile('app/(public)/events/type-labels.tsx', { 'react/jsx-runtime': jsxRuntime, './guide.module.css': { default: { typeLabels: 'type-labels', typeLabel: 'type-label', practiceType: 'practice', openType: 'open' } } }).default
 const presentation=compile('lib/event-groups/presentation.ts')
 const guide=compile('lib/event-groups/public-guide.ts',{'./presentation':presentation})
-const server=compile('lib/event-groups/public-guide-server.ts',{'server-only':{},'@/lib/supabase/anonymous':{createAnonymousClient(){assert.fail('No external clients in tests')}},'./public-guide':guide})
+const reception=compile('lib/event-groups/public-guide-reception.ts',{'server-only':{},'@/lib/supabase/anonymous':{},'@/lib/registrations/public-availability':compile('lib/registrations/public-availability.ts')})
+const server=compile('lib/event-groups/public-guide-server.ts',{'server-only':{},'@/lib/supabase/anonymous':{createAnonymousClient(){assert.fail('No external clients in tests')}},'./public-guide':guide,'./public-guide-reception':reception})
 const group=(id=1,changes={})=>({id,title:`開催${id}`,description:null,city:'東京',start_date:'2030-01-01',end_date:'2030-01-01',registration_open:false,is_hidden:false,is_cancelled:false,...changes})
 const row=(id=1,changes={})=>({id,event_group_id:1,title:`クラス${id}`,date:'2030-01-01',start_time:'13:40:00',end_time:'15:40:00',location:'テスト会場',type:'稽古会',...changes})
 function db(groups,classes,{truncate=false,fail=false}={}) {
@@ -68,8 +69,8 @@ test('filtering precedes pagination and batch reads avoid N+1 and availability q
  const first=await server.loadGuidePage(1,client,'2030-01-01')
  assert.equal(first.items.length,20);assert.equal(first.items[0].id,25);assert.equal(first.hasNext,true)
  assert.equal(client.calls.length,2)
- assert.equal(client.calls[1].columns,'id,event_group_id,date,type')
- assert.ok(client.calls.every(q=>!/(capacity|registration_items|registrations)/.test(q.columns)))
+ assert.equal(client.calls[1].columns,'id,event_group_id,date,type,capacity,registration_enabled')
+ assert.ok(client.calls.every(q=>!/(registration_items|registrations)/.test(q.columns)))
  const last=await server.loadGuidePage(2,db(groups,classes),'2030-01-01')
  assert.deepEqual(Array.from(last.items,r=>r.id),[45,46,47,48,49,50,51]);assert.equal(last.hasNext,false)
 })
@@ -335,4 +336,100 @@ for(const open of [true,false])test(`practice note does not alter reception visi
 test('condition text wraps without fixed width on narrow viewports',()=>{
  const css=fs.readFileSync('app/(public)/events/guide.module.css','utf8')
  assert.match(css,/\.participationNotice[^}]*max-width: 100%;[^}]*font-size: 14px;[^}]*line-height: 1\.7;[^}]*white-space: normal;[^}]*overflow-wrap: anywhere/)
+})
+
+const seatClass=(id=1,changes={})=>row(id,{capacity:2,registration_enabled:true,...changes})
+const seat=(id,registered_count=0)=>({schedule_id:id,capacity:2,registered_count,remaining_capacity:Math.max(2-registered_count,0),is_full:registered_count>=2})
+function withSeats(client,resolve=({ids})=>({data:ids.map(id=>seat(id)),error:null})) {
+ client.seatCalls=[]
+ client.rpc=(name,args)=>{
+  assert.equal(name,'get_event_group_availability')
+  const call={groupId:args.p_event_group_id};client.seatCalls.push(call)
+  const query={in(column,ids){assert.equal(column,'schedule_id');call.ids=ids;return query},range(a,b){call.range=[a,b];return query},abortSignal(signal){call.signal=signal;return query},then(onValue,onError){return Promise.resolve().then(()=>resolve(call)).then(onValue,onError)}}
+  return query
+ }
+ return client
+}
+for(const [name,open,classes,counts,expected] of [
+ ['all available',true,[seatClass()], [seat(1)],'受付中'],
+ ['partially full',true,[seatClass(),seatClass(2)], [seat(1,2),seat(2)],'受付中'],
+ ['all full',true,[seatClass(),seatClass(2)], [seat(1,2),seat(2,2)],'満員'],
+ ['parent stopped',false,[seatClass()], [seat(1)],'受付停止中'],
+ ['all classes stopped',true,[seatClass(1,{registration_enabled:false})], [],'受付停止中'],
+ ['closed and available',true,[seatClass(1,{registration_enabled:false}),seatClass(2)], [seat(2)],'受付中'],
+ ['closed and full',true,[seatClass(1,{registration_enabled:false}),seatClass(2)], [seat(2,2)],'満員'],
+ ['capacity unset',true,[seatClass(1,{capacity:null})], [],'現在受付できません'],
+ ['unset and full',true,[seatClass(1,{capacity:null}),seatClass(2)], [seat(2,2)],'現在受付できません'],
+ ['unset and available',true,[seatClass(1,{capacity:null}),seatClass(2)], [seat(2)],'受付中'],
+ ['missing seats',true,[seatClass()], [],'申込状況を確認できません'],
+ ['full and unknown',true,[seatClass(),seatClass(2)], [seat(1,2)],'申込状況を確認できません'],
+ ['one known available',true,[seatClass(),seatClass(2)], [seat(1)],'受付中'],
+ ['no classes',true,[], [],'現在受付できません'],
+])test(`guide reception label: ${name}`,async()=>{
+ const client=withSeats(db([group(1,{registration_open:open})],classes),()=>({data:counts,error:null}))
+ const result=await reception.loadGuideReception(1,open,classes,client)
+ assert.equal(result.label,expected)
+ if(!open||!classes.some(r=>r.registration_enabled&&r.capacity!==null))assert.equal(client.seatCalls.length,0)
+ if(classes.length) {
+  const listing=await server.loadGuidePage(1,client,'2030-01-01')
+  assert.equal(listing.items[0].reception.label,expected)
+ }
+})
+for(const result of [{error:{}},{data:null},{data:[null]},{data:[seat(1),seat(1)]},{data:[seat(1,-1)]},{data:[{...seat(1),remaining_capacity:50}]}])test(`seat read fails closed: ${JSON.stringify(result)}`,async()=>{
+ const client=withSeats(db([],[]),()=>result)
+ assert.equal((await reception.loadGuideReception(1,true,[seatClass()],client)).label,'申込状況を確認できません')
+})
+test('seat transport errors and exhausted shared deadline keep announcements visible and unknown',async()=>{
+ const client=withSeats(db([group(1,{registration_open:true})],[seatClass()]),()=>{throw new Error('private diagnostics')})
+ const result=await server.loadGuidePage(1,client,'2030-01-01')
+ assert.equal(result.items.length,1);assert.equal(result.items[0].reception.tone,'unknown')
+ const controller=new AbortController();controller.abort()
+ const fresh=withSeats(db([],[]))
+ assert.equal((await reception.loadGuideReception(1,true,[seatClass()],fresh,controller.signal)).tone,'unknown')
+ assert.equal(fresh.seatCalls.length,0)
+})
+test('large occurrences page the safe RPC by fifty IDs instead of trusting truncated results',async()=>{
+ const classes=Array.from({length:101},(_,i)=>seatClass(i+1))
+ const client=withSeats(db([],[]),({ids})=>({data:ids.map(id=>seat(id,2)),error:null}))
+ assert.equal((await reception.loadGuideReception(1,true,classes,client)).label,'満員')
+ assert.deepEqual(client.seatCalls.map(c=>c.ids.length),[50,50,1])
+ assert.deepEqual(client.seatCalls.map(c=>Array.from(c.range)),[[0,49],[0,49],[0,0]])
+ assert.equal(new Set(client.seatCalls.map(c=>c.signal)).size,1)
+})
+test('seats are fetched only for the displayed page with at most four reads in flight',async()=>{
+ const groups=Array.from({length:45},(_,i)=>group(i+1,{registration_open:true}))
+ groups.push(group(100,{is_hidden:true,registration_open:true}),group(101,{is_cancelled:true,registration_open:true}))
+ const classes=groups.map(g=>seatClass(g.id,{event_group_id:g.id}))
+ let active=0,maxActive=0
+ const client=withSeats(db(groups,classes),async({ids})=>{
+  active++;maxActive=Math.max(maxActive,active)
+  await new Promise(resolve=>setTimeout(resolve,2));active--
+  return {data:ids.map(id=>seat(id)),error:null}
+ })
+ const result=await server.loadGuidePage(2,client,'2030-01-01')
+ assert.equal(result.items.length,20);assert.equal(result.hasNext,true)
+ assert.deepEqual(client.seatCalls.map(c=>c.groupId).sort((a,b)=>a-b),Array.from({length:20},(_,i)=>i+21))
+ assert.ok(maxActive<=4);assert.ok(maxActive>1)
+ assert.equal(new Set(client.seatCalls.map(c=>c.signal)).size,1)
+ assert.ok(client.calls.every(c=>['event_groups','schedules'].includes(c.table)))
+})
+test('list shows reception words while preserving mixed types and the practice condition',async()=>{
+ for(const label of ['受付中','満員','受付停止中','現在受付できません','申込状況を確認できません']) {
+  const page=compile('app/(public)/events/page.tsx',{
+   'react/jsx-runtime':jsxRuntime,'next/link':{default:Link},'./events-list':{default:()=>null},
+   '@/lib/event-groups/public-guide-server':{loadGuidePage:async()=>({page:1,hasNext:false,items:[{...group(),typeLabel:'稽古会・一般参加',participationNotice:'稽古会のクラスは初めての方は参加できません',reception:{label,tone:'unknown'}}]})},
+   '@/lib/event-groups/public-guide':guide,'./guide.module.css':{default:{}},
+  })
+  const html=renderToStaticMarkup(await page.default({searchParams:Promise.resolve({})}))
+  assert.ok(html.includes(label));assert.match(html,/稽古会のクラスは初めての方は参加できません/)
+  assert.match(html,/>稽古会<\/span>/);assert.match(html,/>一般参加<\/span>/)
+ }
+})
+
+test('a deadline reached after one seat page prevents further reads and never reports partial full data as full',async()=>{
+ const classes=Array.from({length:51},(_,i)=>seatClass(i+1))
+ const controller=new AbortController()
+ const client=withSeats(db([],[]),({ids})=>{controller.abort();return {data:ids.map(id=>seat(id,2)),error:null}})
+ assert.equal((await reception.loadGuideReception(1,true,classes,client,controller.signal)).label,'申込状況を確認できません')
+ assert.equal(client.seatCalls.length,1)
 })
