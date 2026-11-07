@@ -1,6 +1,6 @@
 import 'server-only'
 import { createAnonymousClient } from '@/lib/supabase/anonymous'
-import { guideToday, publishable, validGroup, sortClasses, classType, type GuideGroup, type GuideClass } from './public-guide'
+import { guideToday, publishable, validGroup, sortClasses, classType, practiceParticipationNotice, type GuideGroup, type GuideClass } from './public-guide'
 
 type Client = ReturnType<typeof createAnonymousClient>
 const columns = 'id,title,description,participation_notes,city,start_date,end_date,registration_open,is_cancelled,is_hidden'
@@ -33,7 +33,7 @@ async function classMetadata(client: Client, ids: number[]) {
 export async function loadGuidePage(page: number, client = createAnonymousClient(), today = guideToday()) {
   const start = (page - 1) * guidePageSize
   let eligible = 0
-  const items: Array<GuideGroup & { classCount: number; typeLabel: string | null }> = []
+  const items: Array<GuideGroup & { classCount: number; typeLabel: string | null; participationNotice: string | null }> = []
   // Bounded metadata batches; validation precedes visitor-facing pagination.
   // Deep pages rescan preceding candidates; an aggregate read-only RPC could optimize this later.
   for (let offset = 0; offset < 10000; offset += batchSize) {
@@ -45,7 +45,7 @@ export async function loadGuidePage(page: number, client = createAnonymousClient
       const rows = metadata.get(group.id)!, days = rows.map(row => row.date)
       if (!validGroup(group) || !publishable(group, days, today)) continue
       if (eligible++ < start) continue
-      items.push({ ...group, classCount: days.length, typeLabel: classType(rows) })
+      items.push({ ...group, classCount: days.length, typeLabel: classType(rows), participationNotice: practiceParticipationNotice(rows) })
       if (items.length > guidePageSize) return { items: items.slice(0, guidePageSize), hasNext: true, page }
     }
     if (groups.length < batchSize) return { items, hasNext: false, page }

@@ -23,7 +23,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
     }
     if (target?.group.registration_open === true) {
       const { id, title, description } = target.group
-      return <EventsList key={id} initialGroup={{ id, title, description }} />
+      return <EventsList key={id} initialGroup={{ id, title, description }} classTypes={target.classes.map(({ id, type }) => ({ id, type }))} />
     }
     return <main className={styles.page}><div className={styles.inner}><h1>Web申込</h1><p role="alert">{message}</p><Link href="/events">開催案内へ戻る</Link></div></main>
   }
@@ -39,6 +39,7 @@ export default async function EventsPage({ searchParams }: { searchParams: Promi
         <h2>{group.title} →</h2><span className={styles.date}>{group.start_date}{group.end_date !== group.start_date ? `〜${group.end_date}` : ''}</span>
         <span className={styles.meta}>地域：{group.city || '未設定'}{group.classCount > 1 ? ` ／ ${group.classCount}クラス` : ''}</span>
         <TypeLabels label={group.typeLabel} />
+        {group.participationNotice && <span className={styles.participationNotice}>{group.participationNotice}</span>}
       </Link></li>)}</ul>
       <nav className={styles.pagination} aria-label="開催案内のページ切替">
         {result.page > 1 && <Link href={`/events?page=${result.page - 1}`}>← 前へ</Link>}

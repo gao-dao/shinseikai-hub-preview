@@ -7,11 +7,13 @@ import { PublicRegistrationAttempt, loadPublicRegistrationClasses } from '@/lib/
 import type { PublicClass } from '@/lib/registrations/public-availability'
 import { publicClassLabel } from '@/lib/registrations/public-class-display'
 import TurnstileWidget from './turnstile-widget'
+import { practiceParticipationNotice } from '@/lib/event-groups/public-guide'
+import styles from './guide.module.css'
 
 type Input = NonNullable<ReturnType<typeof validateProxyRegistration>['data']>
 type Stage = 'initializing' | 'editing' | 'confirming' | 'pending' | 'success' | 'blocked'
 
-export default function RegistrationForm({ group }: { group: { id: number; title: string } }) {
+export default function RegistrationForm({ group, classTypes = [] }: { group: { id: number; title: string }; classTypes?: { id: number; type?: string | null }[] }) {
   const [stage, setStage] = useState<Stage>('initializing')
   const [name, setName] = useState(''), [contact, setContact] = useState(''), [notes, setNotes] = useState('')
   const [classes, setClasses] = useState<PublicClass[]>([]), [selected, setSelected] = useState<number[]>([])
@@ -106,12 +108,15 @@ export default function RegistrationForm({ group }: { group: { id: number; title
       <fieldset disabled={loading || !!classesError}>
         <legend>参加するクラス（複数選択可・最大50件）</legend>
         {!loading && !classesError && classes.length === 0 && <p>申込対象のクラスはありません。</p>}
-        {classes.map(item => <label key={item.id} className="events-class">
+        {classes.map(item => {
+          const notice = practiceParticipationNotice(classTypes.filter(row => row.id === item.id))
+          return <label key={item.id} className="events-class">
           <input type="checkbox" checked={selected.includes(item.id)} disabled={!item.canRegister || (!selected.includes(item.id) && selected.length >= 50)}
             onChange={event => { if (event.target.checked && !item.canRegister) return; setSelected(value => event.target.checked ? value.includes(item.id) ? value : [...value, item.id] : value.filter(id => id !== item.id)) }} />
           {' '}{item.title} ／ {item.date} {item.start_time ?? '開始時刻未設定'}〜{item.end_time ?? '終了時刻未設定'}
           <span>{publicClassLabel(item)}</span>
-        </label>)}
+          {notice && <span className={styles.participationNotice}>{notice}</span>}
+        </label>})}
       </fieldset>
       <p>送信時に申込可否を再確認します。</p>
       <div className="events-actions events-form-actions">

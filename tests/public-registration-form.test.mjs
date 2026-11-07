@@ -14,6 +14,7 @@ const details=compile('lib/registrations/details.ts')
 const proxy=compile('lib/registrations/proxy-registration.ts',{'./details':details})
 const validation=compile('lib/registrations/public-registration.ts',{'./proxy-registration':proxy})
 const model=compile('lib/registrations/public-form.ts',{'./proxy-registration':proxy,'./public-registration':validation})
+const guide=compile('lib/event-groups/public-guide.ts',{'./presentation':compile('lib/event-groups/presentation.ts')})
 const input={event_group_id:5,name:' Synthetic attendee ',contact:' synthetic.contact.invalid ',notes:' Synthetic notes ',schedule_ids:[12,11]}
 const key1='12345678-1234-4234-8234-123456789001',key2='12345678-1234-4234-8234-123456789002'
 const plain=value=>JSON.parse(JSON.stringify(value))
@@ -263,15 +264,16 @@ function hooks() {
     useEffect(fn,deps){const i=cursor++;if(!same(slots[i]?.deps,deps)){const old=slots[i];const entry={deps,fn,cleanup:old?.cleanup};slots[i]=entry;pending.push(entry)}},
   }}
 }
-function form({group={id:5,title:'Synthetic group'},store=storage(),postResponse=response(),postError=false,pendingPost=false,classes=[row(11),row(12),row(13,{canRegister:false,remainingCapacity:0,status:'満員'})],classesFail=false}={}) {
+function form({group={id:5,title:'Synthetic group'},classTypes=[],store=storage(),postResponse=response(),postError=false,pendingPost=false,classes=[row(11),row(12),row(13,{canRegister:false,remainingCapacity:0,status:'満員'})],classesFail=false}={}) {
   const harness=hooks(),calls=[],logs=[],Widget=()=>null;let release
   const {default:Component}=compile('app/(public)/events/registration-form.tsx',{
+    '@/lib/event-groups/public-guide':guide,'./guide.module.css':{default:{participationNotice:'participation-notice'}},
     'next/link':{default:'a'},'@/lib/registrations/public-class-display':compile('lib/registrations/public-class-display.ts'),react:harness.react,'react/jsx-runtime':jsxRuntime,'@/lib/registrations/proxy-registration':proxy,'@/lib/registrations/public-form':model,'./turnstile-widget':{default:Widget},
   },{crypto:{randomUUID:()=>key1},window:{sessionStorage:store,addEventListener(){},removeEventListener(){}},console:{log:(...args)=>logs.push(args),error:(...args)=>logs.push(args)},fetch:async(url,options)=>{
     calls.push([url,options]);if(options?.method==='POST'){if(postError)throw new Error('SECRET');if(pendingPost)return new Promise(resolve=>{release=resolve});return postResponse}
     if(classesFail)throw new Error('SECRET');return {ok:true,json:async()=>({schedules:classes,page:1,pageSize:50,total:classes.length})}
   }})
-  const render=()=>{harness.reset();return elements(Component({group}))}
+  const render=()=>{harness.reset();return elements(Component({group,classTypes}))}
   return {render,calls,logs,Widget,release:()=>release(response()),async mount(){render();await harness.flush();return render()},find:id=>render().find(item=>item.props?.id===id),async completeInput(){await this.mount();for(const [id,value] of [['public-name','参加者'],['public-contact','電話'],['public-notes','備考']])this.find(id).props.onChange({target:{value}});render().find(item=>item.type==='input'&&item.props.type==='checkbox').props.onChange({target:{checked:true}})},confirm(){return render().find(item=>item.type==='form').props.onSubmit({preventDefault(){}})},token(value='fresh-token'){render().find(item=>item.type===Widget).props.onToken(value)},submit(){return render().find(item=>item.type==='button'&&['この内容で申し込む','同じ申込の結果を再確認する'].includes(item.props.children)).props.onClick()}}
 }
 
@@ -662,4 +664,26 @@ test('successful reload keeps the guide link and explicit additional application
  c.render().find(n=>n.type==='button'&&n.props.children==='新しい申込を始める').props.onClick()
  assert.equal(c.render().find(n=>n.type==='a'&&n.props.children==='開催詳細へ戻る').props.href,'/events/5')
  assert.equal(c.calls.some(call=>call[1]?.method==='POST'),false)
+})
+
+for(const status of ['受付可能','満員','クラス受付停止中','定員未設定'])test(`class-specific practice condition keeps existing availability: ${status}`,async()=>{
+ const available=status==='受付可能'
+ const c=form({classes:[row(11,{status,canRegister:available,remainingCapacity:available?8:0}),row(12),row(13)],classTypes:[{id:11,type:'稽古会'},{id:12,type:'一般参加'},{id:13,type:'未定'},{id:99,type:'稽古会'}]})
+ await c.mount()
+ const labels=c.render().filter(n=>n.type==='label'&&n.props.className==='events-class')
+ assert.equal(labels.length,3)
+ for(let i=0;i<labels.length;i++) {
+  const children=elements(labels[i])
+  const note=children.filter(n=>n.props.className==='participation-notice')
+  assert.equal(note.length,i===0?1:0)
+  if(i===0){assert.equal(note[0].props.children,'初めての方は参加できません');assert.equal(children.find(n=>n.type==='input').props.disabled,!available)}
+ }
+ assert.equal(c.calls.filter(call=>call[1]?.method==='POST').length,0)
+})
+test('missing metadata and failed availability do not invent practice conditions',async()=>{
+ for(const options of [{},{classesFail:true,classTypes:[{id:11,type:'稽古会'}]}]) {
+  const c=form(options);await c.mount()
+  assert.equal(c.render().filter(n=>n.props?.className==='participation-notice').length,0)
+  if(options.classesFail)assert.ok(c.render().some(n=>n.props?.role==='alert'))
+ }
 })

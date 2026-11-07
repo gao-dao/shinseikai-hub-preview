@@ -291,3 +291,48 @@ test('list and detail share the badge component and responsive low-decoration CS
  assert.match(css,/\.practiceType[^}]*color: #294b3b;[^}]*background: #edf3ef/)
  assert.match(css,/\.openType[^}]*color: var\(--hub-primary\);[^}]*background: #f7eef0/)
 })
+
+for (const [types, expected] of [
+ [['稽古会'], '初めての方は参加できません'],
+ [['稽古会','稽古会'], '初めての方は参加できません'],
+ [['一般参加'], null], [['一般参加','一般参加'], null],
+ [['稽古会','一般参加'], '稽古会のクラスは初めての方は参加できません'],
+ [['稽古会',null], '稽古会のクラスは初めての方は参加できません'],
+ [[null], null], [['未定'], null], [[], null],
+]) test(`practice condition follows only explicit types: ${JSON.stringify(types)}`, async () => {
+ const classes=types.map((type,index)=>row(index+1,{type}))
+ assert.equal(guide.practiceParticipationNotice(classes),expected)
+ const result=await server.loadGuidePage(1,db([group()],classes),'2030-01-01')
+ if (classes.length) assert.equal(result.items[0].participationNotice,expected)
+ const html=await detail(group(1,{participation_notes:'服装・保険のご案内\n持ち物について'}),classes)
+ assert.equal((html.match(/初めての方は参加できません/g)||[]).length,expected ? 1 : 0)
+ if(expected) assert.ok(html.includes(expected))
+ assert.match(html,/参加にあたって/); assert.match(html,/服装・保険のご案内/)
+})
+test('list renders one condition near badges and targeted form receives only class ID/type metadata',async()=>{
+ const classes=[row(1),row(2,{type:'一般参加'})]
+ const items=(await server.loadGuidePage(1,db([group()],classes),'2030-01-01')).items
+ const Client='RegistrationHost'
+ const page=compile('app/(public)/events/page.tsx',{
+  'react/jsx-runtime':jsxRuntime,'next/link':{default:Link},'./events-list':{default:Client},
+  '@/lib/event-groups/public-guide-server':{loadGuidePage:async()=>({page:1,hasNext:false,items}),loadGuideDetail:async()=>({group:group(1,{registration_open:true}),classes})},
+  '@/lib/event-groups/public-guide':guide,'./guide.module.css':{default:{}},
+ })
+ const html=renderToStaticMarkup(await page.default({searchParams:Promise.resolve({})}))
+ assert.equal((html.match(/稽古会のクラスは初めての方は参加できません/g)||[]).length,1)
+ assert.ok(html.indexOf('type-label')<html.indexOf('初めての方'))
+ const target=await page.default({searchParams:Promise.resolve({view:'registration',groupId:'1'})})
+ assert.equal(target.type,Client)
+ assert.deepEqual(JSON.parse(JSON.stringify(target.props.classTypes)),[{id:1,type:'稽古会'},{id:2,type:'一般参加'}])
+ assert.doesNotMatch(JSON.stringify(target.props.classTypes),/location|capacity|registration_enabled/)
+})
+for(const open of [true,false])test(`practice note does not alter reception visibility: ${open}`,async()=>{
+ const html=await detail(group(1,{registration_open:open}),[row()])
+ assert.match(html,/初めての方は参加できません/)
+ if(open) assert.match(html,/events\?view=registration&amp;groupId=1/)
+ else {assert.match(html,/Web申込の受付は停止/);assert.doesNotMatch(html,/Web申込ページへ/)}
+})
+test('condition text wraps without fixed width on narrow viewports',()=>{
+ const css=fs.readFileSync('app/(public)/events/guide.module.css','utf8')
+ assert.match(css,/\.participationNotice[^}]*max-width: 100%;[^}]*font-size: 14px;[^}]*line-height: 1\.7;[^}]*white-space: normal;[^}]*overflow-wrap: anywhere/)
+})

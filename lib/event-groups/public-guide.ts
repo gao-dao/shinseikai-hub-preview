@@ -29,6 +29,13 @@ export function validGroup(group: GuideGroup) {
 }
 
 // Existing schedule labels: do not infer a type from incomplete or unknown values.
+export function practiceParticipationNotice(rows: readonly { type?: string | null }[]) {
+  if (!rows.some(row => row.type === '稽古会')) return null
+  return rows.every(row => row.type === '稽古会')
+    ? '初めての方は参加できません'
+    : '稽古会のクラスは初めての方は参加できません'
+}
+
 export function classType(rows: readonly { type?: string | null }[]) {
   const types = new Set(rows.map(row => row.type))
   if ([...types].some(type => type !== '稽古会' && type !== '一般参加')) return null

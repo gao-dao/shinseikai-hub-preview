@@ -7,7 +7,7 @@ import RegistrationForm from './registration-form'
 type Group = { id: number; title: string; description: string | null }
 
 // This component only hosts a server-validated, explicitly selected occurrence.
-export default function EventsList({ initialGroup }: { initialGroup: Group }) {
+export default function EventsList({ initialGroup, classTypes = [] }: { initialGroup: Group; classTypes?: { id: number; type?: string | null }[] }) {
   const registrationStart = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function EventsList({ initialGroup }: { initialGroup: Group }) {
       <nav className="events-navigation" aria-label="公開メニュー"><Link href="/events">開催案内へ</Link><Link href="/schedule">スケジュールへ</Link></nav>
       <h1>Web申込</h1>
       <div className="events-registration-start" ref={registrationStart} tabIndex={-1} aria-label={`${initialGroup.title}の参加申込`}>
-        <RegistrationForm key={initialGroup.id} group={initialGroup} />
+        <RegistrationForm key={initialGroup.id} group={initialGroup} classTypes={classTypes} />
       </div>
     </div>
   </main>
