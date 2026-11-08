@@ -111,7 +111,7 @@ for (const extra of [{ capacity: null }, { capacity: 3 }, { capacity: 2 }]) test
   const c = screen({ parentOpen: true, rows: [row(1, extra)] }); await c.flush(); assert.match(c.text(), /現在の公開申込：(現在受付できません|満員)/); assert.doesNotMatch(c.text(), /現在の公開申込：受付可能/)
 })
 for (const option of [{ cancelled: true }, { hidden: true }]) test(`blocked occurrence stays closed ${JSON.stringify(option)}`, async () => {
-  const c = screen({ parentOpen: true, ...option }); await c.flush(); assert.match(c.text(), /現在の公開申込：受付停止（開催中止・非表示）/)
+  const c = screen({ parentOpen: true, ...option }); await c.flush(); assert.match(c.text(), /現在の公開申込：受付停止（開催中止・一覧から削除）/)
 })
 test('zero classes provides neither individual control nor a guessed single class state', async () => {
   const c = screen({ rows: [] }); await c.flush(); assert.match(c.text(), /クラス未登録/); assert.equal(c.nodes().filter(n => n.type === 'button').length, 0); assert.doesNotMatch(c.text(), /現在の公開申込：/)

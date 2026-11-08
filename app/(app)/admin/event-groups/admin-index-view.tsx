@@ -12,7 +12,7 @@ export default function AdminIndexView({ options, result, error }: { options: In
     <header className={styles.header}><h1>{options.history ? '開催履歴' : '開催回管理'}</h1>{!options.history && <Link data-admin-action="navigation" className={styles.primary} href="/admin/event-groups/new">新規作成</Link>}</header>
     {options.history && <form className={styles.filters} action="/admin/event-groups/history" method="get">
       <label>開催名<input type="search" name="q" defaultValue={options.q} maxLength={100} /></label>
-      <label>状態<select name="state" defaultValue={options.state}><option value="all">すべて</option><option value="ended">開催終了</option><option value="cancelled">開催中止</option><option value="hidden">非表示</option></select></label>
+      <label>状態<select name="state" defaultValue={options.state}><option value="all">すべて</option><option value="ended">開催終了</option><option value="cancelled">開催中止</option><option value="hidden">一覧から削除済み</option></select></label>
       <button data-admin-action="primary" type="submit">検索</button>
     </form>}
     {error && <p role="alert">{error}</p>}

@@ -75,7 +75,7 @@ test('history DB search, literal wildcard escaping and state filters preserve ex
  for(const [state,want] of [['hidden',1],['cancelled',2],['ended',1]]){
   const result=await server.loadAdminIndex(index.indexOptions(true,{state}),db(groups,classes),'2030-01-01');assert.equal(result.total,want)
  }
- assert.ok(index.indexLabels(all.items[0]).includes('非表示'));assert.ok(index.indexLabels(all.items[0]).includes('開催中止'))
+ assert.ok(index.indexLabels(all.items[0]).includes('一覧から削除済み'));assert.ok(index.indexLabels(all.items[0]).includes('開催中止'))
 })
 test('past inconsistent group stays in review rather than disappearing into history',async()=>{
  const groups=[group(1,{start_date:'2029-12-30',end_date:'2029-12-31'})],rows=[row(1,{date:'2029-12-30'})]
@@ -107,7 +107,7 @@ for(const isHistory of [false,true])test(`minimal ${isHistory?'history':'normal'
  const html=renderToStaticMarkup(jsxRuntime.jsx(View,{options,result:{items:[item],total:1,upcoming:1,review:0,page:1,pageSize:20},error:''}))
  assert.ok(html.includes(isHistory?'開催履歴':'開催回管理'));assert.equal((html.match(/href="\/admin\/event-groups\/1(?:\?returnTo=[^"]*)?"/g)||[]).length,1)
  assert.ok(!html.includes('/1/edit'));assert.ok(!html.includes('申込数'));assert.ok(!html.includes('クラス数'))
- if(isHistory){assert.ok(html.includes('method="get"'));assert.ok(!html.includes('name="page"'));assert.ok(html.includes('非表示'))}else assert.ok(html.includes('/admin/event-groups/new'))
+ if(isHistory){assert.ok(html.includes('method="get"'));assert.ok(!html.includes('name="page"'));assert.ok(html.includes('一覧から削除済み'))}else assert.ok(html.includes('/admin/event-groups/new'))
 })
 for(const path of ['app/(app)/admin/event-groups/page.tsx','app/(app)/admin/event-groups/history/page.tsx'])for(const status of [401,403,200])test(`admin gate before reads: ${path}, ${status}`,async()=>{
  let reads=0

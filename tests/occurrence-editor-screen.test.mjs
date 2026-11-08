@@ -270,7 +270,7 @@ for (const open of [false, true]) test(`saved edit copy preserves reception cave
  assert.ok(c.render().some(n => n.type === 'h2' && text(n) === '保存しました'));
  assert.match(c.text(), /開催回とクラスの情報を保存しました/);
  assert.match(c.text(), /今回の保存では、開催回全体の受付状態は変更していません/);
- assert.match(c.text(), open ? /中止・非表示などで受付状態が変わる場合があります/ : /開催回全体が受付停止中の場合、クラス受付が有効でも申し込めません/);
+ assert.match(c.text(), open ? /中止・一覧からの削除などで受付状態が変わる場合があります/ : /開催回全体が受付停止中の場合、クラス受付が有効でも申し込めません/);
  assert.match(c.text(), /最新の受付状態の確認・変更は、詳細画面で行えます/);
  assert.equal(c.render().find(n => n.type === 'Link' && text(n) === '開催回の詳細・受付管理へ').props.href, '/admin/event-groups/9');
  assert.equal(c.calls.filter(v => v[0] === 'save').length, 1);

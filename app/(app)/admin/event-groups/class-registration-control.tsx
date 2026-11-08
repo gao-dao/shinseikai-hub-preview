@@ -43,7 +43,7 @@ export default function ClassRegistrationControl({ groupId, row, parentOpen, onR
   }
 
   // Display only: the existing flags, update handlers and capacity guards are unchanged.
-  const publicStatus = needsCheck ? '申込状況を確認できません' : occurrenceBlocked ? '受付停止（開催中止・非表示）'
+  const publicStatus = needsCheck ? '申込状況を確認できません' : occurrenceBlocked ? '受付停止（開催中止・一覧から削除）'
     : !parentOpen ? '開催回全体が受付停止中' : !row.registration_enabled ? '受付停止中（クラス受付が停止中）'
     : row.capacity === null ? '現在受付できません（定員未設定）' : row.registeredCount >= row.capacity ? '満員' : '受付可能'
   return <div className="class-reception">

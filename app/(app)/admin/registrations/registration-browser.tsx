@@ -82,7 +82,7 @@ export default function RegistrationBrowser({ initialGroupId = null, initialScop
   <p>開催回とクラスを選択してください。件数は申込明細数です。日時は日本時間です。</p>
   {invalidGroup && <p role="alert">開催回IDが不正です。開催回を一覧から選択してください。</p>}
   <div className={styles.controls}><label htmlFor="occurrence-scope">開催回の表示</label><select id="occurrence-scope" value={scope} disabled={busy} onChange={e => { navigateGroup(null, e.target.value); setScope(e.target.value); setGroupPage(1); setGroup(null); setSchedule(null); setClassPage(1); resetRows(); }}>
-   <option value="upcoming">開催予定</option><option value="all">すべて・履歴を含む</option><option value="ended">終了済み</option><option value="cancelled">中止</option><option value="hidden">非表示</option><option value="review">日付要確認</option>
+   <option value="upcoming">開催予定</option><option value="all">すべて・履歴を含む</option><option value="ended">終了済み</option><option value="cancelled">中止</option><option value="hidden">一覧から削除済み</option><option value="review">日付要確認</option>
   </select><button data-admin-action="secondary" disabled={busy || groups.loading || classes.loading || applicants.loading} onClick={() => { setGroupRevision(n => n + 1); refresh(); }}>再取得</button></div>
   <Notice loading={groups.loading} error={groups.error}/>
   {groups.data && <><h2>開催回</h2><div className={styles.choices}>{groups.data.items.map(item => <button data-admin-action="secondary" key={item.id} aria-pressed={group?.id === item.id} disabled={busy} onClick={() => { navigateGroup(item.id); setGroup({ id: item.id, title: item.title }); setClassPage(1); setSchedule(null); resetRows(); setMessage(''); }}><strong>{item.title}</strong><span>{item.start_date ?? '日付不明'} ～ {item.end_date ?? '日付不明'} · ID {item.id}</span><span>{indexLabels(item).join('・')}</span></button>)}</div>

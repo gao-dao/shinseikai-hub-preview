@@ -46,7 +46,7 @@ export default function OccurrenceList() {
     <header><div><p className="eyebrow">開催・募集・参加者をまとめて管理</p><h1>開催回一覧</h1></div>
       <Link className="primary" href="/admin/event-groups/new">＋ 開催回を作成</Link></header>
     <nav aria-label="管理メニュー"><strong>開催回</strong><Link href="/admin/videos">動画管理</Link><Link href="/admin/passwords">パスワード管理</Link><Link href="/admin/registrations">全開催回の申込一覧</Link></nav>
-    <nav aria-label="表示する開催回"><button aria-pressed={visibility === 'visible'} onClick={() => { setPage(1); setVisibility('visible') }}>通常の開催回</button><button aria-pressed={visibility === 'hidden'} onClick={() => { setPage(1); setVisibility('hidden') }}>非表示の開催回</button></nav>
+    <nav aria-label="表示する開催回"><button aria-pressed={visibility === 'visible'} onClick={() => { setPage(1); setVisibility('visible') }}>通常の開催回</button><button aria-pressed={visibility === 'hidden'} onClick={() => { setPage(1); setVisibility('hidden') }}>一覧から削除した開催回</button></nav>
     <div className="toolbar"><p>開催回を選ぶと、基本情報・クラス・受付操作を確認できます。</p><button disabled={loading} onClick={() => setReload(v => v + 1)}>一覧を再取得</button></div>
     <p className="note">申込状況は取得時点の有効クラス申込の延べ件数です。同じ人の複数クラス申込を含み、申込者数ではありません。</p>
     {loading && <p role="status">開催回を読み込み中...</p>}
@@ -60,7 +60,7 @@ export default function OccurrenceList() {
       return <article key={group.id} className="occurrence-card">
         {phase === 'unknown' && <p className="note">日付未設定、開催期間との不整合、またはクラス日付の確認待ちです。詳細で確認してください。</p>}
         {group.is_cancelled && <p><strong>開催中止</strong></p>}
-        {group.is_hidden && <p>非表示</p>}
+        {group.is_hidden && <p>一覧から削除済み（履歴は保持）</p>}
         <span className={group.registration_open ? 'badge open' : 'badge'}>{group.registration_open ? '募集中' : '受付停止中'}</span>
         <h2><Link href={`/admin/event-groups/${group.id}`}>{group.title}</Link></h2>
         <dl><div><dt>開催日</dt><dd>{group.start_date ? group.end_date && group.end_date !== group.start_date ? `${group.start_date} 〜 ${group.end_date}` : group.start_date : '未設定'}</dd></div>

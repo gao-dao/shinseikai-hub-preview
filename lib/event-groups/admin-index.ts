@@ -19,7 +19,7 @@ export function indexMatches(item: IndexItem, options: IndexOptions) {
   return item.phase === 'ended' || item.is_cancelled || item.is_hidden
 }
 export function indexLabels(item: IndexItem) {
-  return [item.phase === 'ended' ? '開催終了' : item.phase === 'unknown' ? '日付要確認' : '', item.is_cancelled ? '開催中止' : '', item.is_hidden ? '非表示' : ''].filter(Boolean)
+  return [item.phase === 'ended' ? '開催終了' : item.phase === 'unknown' ? '日付要確認' : '', item.is_cancelled ? '開催中止' : '', item.is_hidden ? '一覧から削除済み' : ''].filter(Boolean)
 }
 export function sortIndex(items: IndexItem[], history: boolean) {
   return [...items].sort((a,b) => {

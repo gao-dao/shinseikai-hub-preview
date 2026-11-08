@@ -141,7 +141,7 @@ test('hidden groups have a separate recoverable list; switching visibility reset
  const c=overviewScreen({groups,summary});await c.mount()
  const links=()=>c.render().filter(n=>n.type==='Link'&&n.props.className==='detail').map(n=>n.props.href)
  assert.deepEqual(links(),['/admin/event-groups/1'])
- c.render().find(n=>n.type==='button'&&n.props.children==='非表示の開催回').props.onClick();await c.mount()
+ c.render().find(n=>n.type==='button'&&n.props.children==='一覧から削除した開催回').props.onClick();await c.mount()
  assert.deepEqual(links(),['/admin/event-groups/2']);assert.ok(c.render().some(n=>n.type==='strong'&&n.props.children==='開催中止'))
  c.render().find(n=>n.type==='button'&&n.props.children==='通常の開催回').props.onClick();await c.mount();assert.deepEqual(links(),['/admin/event-groups/1'])
 })

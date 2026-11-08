@@ -142,6 +142,6 @@ test('ambiguous update never promises public acceptance until the existing rerea
 test('cancelled or hidden occurrence is never described as accepting even if raw flags are enabled', () => {
  const c=screen({occurrenceBlocked:true,parentOpen:true,enabled:true,registeredCount:2})
  assert.match(c.text(),/クラス受付設定：有効/)
- assert.match(c.text(),/現在の公開申込：受付停止（開催中止・非表示）/)
+ assert.match(c.text(),/現在の公開申込：受付停止（開催中止・一覧から削除）/)
  assert.equal(c.calls.length,0)
 })

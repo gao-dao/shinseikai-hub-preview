@@ -27,14 +27,14 @@ test('malformed or unsafe success cannot appear as successful',async()=>{assert.
 function screen({count=3,status=200,confirm=true,patchStatus=200,groupData=group,disabled=false}={}) {
  const slots=[],calls=[],confirmations=[];let cursor=0,updated=0
  const react={useState(initial){const i=cursor++;if(!(i in slots))slots[i]=initial;return[slots[i],v=>slots[i]=v]},useRef(initial){const i=cursor++;return slots[i]??={current:initial}}}
- const jsx=(type,props)=>({type,props});const Component=compile('app/(app)/admin/event-groups/occurrence-state.tsx',{react,'react/jsx-runtime':{jsx,jsxs:jsx},'@/lib/event-groups/lifecycle':lifecycle},{window:{confirm:text=>{confirmations.push(text);return confirm}},fetch:async(url,options={})=>{calls.push({url,options});return{ok:(options.method?patchStatus:status)===200,status:options.method?patchStatus:status,json:async()=>options.method?{eventGroup:{...group,is_hidden:true,registration_open:false,state_version:3}}:{eventGroup:group,registrationCount:count}}}}).default
+ const jsx=(type,props)=>({type,props});const Component=compile('app/(app)/admin/event-groups/occurrence-state.tsx',{react,'react/jsx-runtime':{jsx,jsxs:jsx},'@/lib/event-groups/lifecycle':lifecycle},{window:{confirm:text=>{confirmations.push(text);return confirm}},fetch:async(url,options={})=>{calls.push({url,options});return{ok:(options.method?patchStatus:status)===200,status:options.method?patchStatus:status,json:async()=>options.method?{eventGroup:{...groupData,is_hidden:JSON.parse(options.body).action==='hide',is_cancelled:groupData.is_cancelled||JSON.parse(options.body).action==='cancel',registration_open:false,state_version:groupData.state_version+1}}:{eventGroup:groupData,registrationCount:count}}}}).default
  const nodes=n=>Array.isArray(n)?n.flatMap(nodes):n&&typeof n==='object'?[n,...nodes(n.props?.children)]:[]
  const render=()=>{cursor=0;return nodes(Component({group:groupData,disabled,onUpdated:()=>updated++}))}
  return{calls,confirmations,render,updated:()=>updated,click:label=>render().find(n=>n.type==='button'&&n.props.children===label).props.onClick()}
 }
-test('confirmation includes title, all history count and cancellation warning; success reloads',async()=>{const c=screen();await c.click('一覧から非表示にする');await new Promise(r=>setImmediate(r));assert.equal(c.confirmations.length,1);assert.match(c.confirmations[0],/Synthetic occurrence/);assert.match(c.confirmations[0],/3件/);assert.match(c.confirmations[0],/自動取消されません/);assert.match(c.confirmations[0],/連絡は別途必要/);assert.equal(c.updated(),1);assert.equal(c.calls.length,2);assert.equal(JSON.parse(c.calls[1].options.body).expected_state_version,2)})
-test('declined confirmation and unknown counts send no PATCH',async()=>{for(const options of [{confirm:false},{count:null},{status:503}]){const c=screen(options);await c.click('一覧から非表示にする');await new Promise(r=>setImmediate(r));assert.equal(c.calls.length,1);assert.equal(c.updated(),0)}})
-test('409 does not auto retry or claim success',async()=>{const c=screen({patchStatus:409});await c.click('一覧から非表示にする');await new Promise(r=>setImmediate(r));assert.equal(c.calls.length,2);assert.equal(c.updated(),0);assert.ok(c.render().some(n=>n.props?.role==='alert'))})
+test('confirmation includes title, all history count and cancellation warning; success reloads',async()=>{const c=screen();await c.click('一覧から削除');await new Promise(r=>setImmediate(r));assert.equal(c.confirmations.length,1);assert.match(c.confirmations[0],/Synthetic occurrence/);assert.match(c.confirmations[0],/3件/);assert.match(c.confirmations[0],/自動取消されません/);assert.match(c.confirmations[0],/連絡は別途必要/);assert.equal(c.updated(),1);assert.equal(c.calls.length,2);assert.equal(JSON.parse(c.calls[1].options.body).expected_state_version,2)})
+test('declined confirmation and unknown counts send no PATCH',async()=>{for(const options of [{confirm:false},{count:null},{status:503}]){const c=screen(options);await c.click('一覧から削除');await new Promise(r=>setImmediate(r));assert.equal(c.calls.length,1);assert.equal(c.updated(),0)}})
+test('409 does not auto retry or claim success',async()=>{const c=screen({patchStatus:409});await c.click('一覧から削除');await new Promise(r=>setImmediate(r));assert.equal(c.calls.length,2);assert.equal(c.updated(),0);assert.ok(c.render().some(n=>n.props?.role==='alert'))})
 test('schedule delegates public visibility to the anonymous server loader', async()=>{
  const jsx=(type,props)=>({type,props})
  let loaded=0
@@ -51,7 +51,7 @@ test('cancellation is separated from auxiliary actions in a closed native disclo
  assert.equal(nodes.find(n=>n.type==='summary').props.children,'その他の操作')
  const auxiliary=nodes.find(n=>n.props?.className==='occurrence-lifecycle-actions')
  const cancellation=nodes.find(n=>n.props?.className==='occurrence-cancellation')
- assert.match(visibleText(auxiliary),/一覧から非表示にする/)
+ assert.match(visibleText(auxiliary),/一覧から削除/)
  assert.doesNotMatch(visibleText(auxiliary),/開催中止にする/)
  assert.match(visibleText(cancellation),/開催中止にする/)
  assert.match(visibleText(cancellation),/元に戻せません/)
@@ -93,4 +93,30 @@ test('lifecycle controls preserve focus, touch targets and distinguish disabled 
  assert.match(css,/:focus-visible\{outline:3px solid #6b1f2b;outline-offset:3px\}/)
  assert.match(css,/min-height:44px/)
  assert.match(css,/occurrence-lifecycle-actions\s*\{\s*display:flex;\s*flex-wrap:wrap;\s*gap:8px/)
+})
+
+test('list removal remains PATCH hide and explains retained data and restoration',async()=>{
+ const c=screen();await c.click('一覧から削除');await new Promise(r=>setImmediate(r))
+ assert.match(c.confirmations[0],/DB上のデータは削除しません/)
+ assert.match(c.confirmations[0],/開催・申込履歴は保持され、再表示できます/)
+ assert.match(c.confirmations[0],/一覧に戻しても自動再開しません/)
+ assert.equal(c.calls[1].options.method,'PATCH')
+ assert.deepEqual(JSON.parse(c.calls[1].options.body),{action:'hide',expected_state_version:2})
+ assert.ok(!c.calls.some(call=>call.options.method==='DELETE'))
+})
+test('list restoration keeps show and leaves reception stopped',async()=>{
+ const c=screen({groupData:{...group,is_hidden:true,registration_open:false}})
+ await c.click('一覧に戻す');await new Promise(r=>setImmediate(r))
+ assert.match(c.confirmations[0],/開催・申込履歴は保持され、再表示できます/)
+ assert.match(c.confirmations[0],/一覧に戻しても自動再開しません/)
+ assert.deepEqual(JSON.parse(c.calls[1].options.body),{action:'show',expected_state_version:2})
+ assert.match(visibleText(c.render()),/操作が完了しました。受付は停止中です/)
+ assert.equal(c.updated(),1)
+})
+test('home and applicant-management filter use list-removal labels without changing routes or filter values',()=>{
+ const home=fs.readFileSync('app/(app)/admin/page.tsx','utf8')
+ const browser=fs.readFileSync('app/(app)/admin/registrations/registration-browser.tsx','utf8')
+ assert.match(home,/終了・中止・一覧から削除した開催回を確認/)
+ assert.match(home,/href: '\/admin\/event-groups\/history'/)
+ assert.match(browser,/<option value="hidden">一覧から削除済み<\/option>/)
 })
